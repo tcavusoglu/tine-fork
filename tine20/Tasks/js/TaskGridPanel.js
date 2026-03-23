@@ -71,7 +71,26 @@ Tine.Tasks.TaskGridPanel = Ext.extend(Tine.widgets.grid.GridPanel, {
         // mhh! but disabling this, breaks keynav 
         //this.grid.view.focusCell = Ext.emptyFn;
     },
-    
+
+    /**
+     * template fn for subclasses to add custom items to action toolbar
+     * overwrites the default method
+     *
+     * @return {Array/Object}
+     */
+    getActionToolbarItems: function() {
+
+        if (! this.actionToolbarItems) {
+            this.actionToolbarItems = [];
+        }
+
+        this.actionToolbarItems.push({
+            text: 'Kanban View'
+        });
+
+        return Tine.Tasks.TaskGridPanel.superclass.getActionToolbarItems.call(this);
+    },
+
     /**
      * returns cm
      * @return Ext.grid.ColumnModel
