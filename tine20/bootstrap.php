@@ -19,17 +19,7 @@ ini_set('magic_quotes_runtime', 0);
 error_reporting(E_COMPILE_ERROR | E_CORE_ERROR | E_ERROR | E_PARSE);
 ini_set('display_errors', 1);
 ini_set('log_errors', 1);
-
-// iconv_set_encoding throws a deprecated exception since 5.6.*
-// Zend 1 still uses that, but at least we can effort to fix that.
-if (PHP_VERSION_ID > 50600) {
-    ini_set('default_charset', 'UTF-8');
-} else {
-    // set default internal encoding
-    if (extension_loaded('iconv')) {
-        iconv_set_encoding('internal_encoding', "UTF-8");
-    }
-}
+ini_set('default_charset', 'UTF-8');
 
 if (extension_loaded('mbstring')) {
     mb_internal_encoding("UTF-8");
@@ -39,4 +29,4 @@ if (extension_loaded('mbstring')) {
 $autoloader = require __DIR__ . '/vendor/autoload.php';
 
 // activate our own error handler after autoloader initialization
-set_error_handler('Tinebase_Core::errorHandler', E_ALL | E_STRICT | E_DEPRECATED);
+set_error_handler('Tinebase_Core::errorHandler', E_ALL | E_DEPRECATED);

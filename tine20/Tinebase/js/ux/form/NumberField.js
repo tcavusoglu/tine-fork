@@ -143,7 +143,7 @@ Ext.ux.form.NumberField = Ext.extend(Ext.form.NumberField, {
 
     getValue: function () {
         let value = Ext.ux.form.NumberField.superclass.getValue.call(this);
-        return value === '' ? null : value;
+        return value === '' ? (this.nullable ? null : 0) : value;
     },
 
     // private, overwrites Ext.form.NumberField.parseValue
@@ -174,12 +174,12 @@ Ext.ux.form.NumberField = Ext.extend(Ext.form.NumberField, {
      */
     validateValue: function(value) {
         if (value && this.prefix) {
-            var regex = new RegExp(this.prefix, 'g');
+            var regex = new RegExp(_.escapeRegExp(this.prefix), 'g');
             value = value.replace(regex, '');
         }
         
         if (value && this.suffix) {
-            var regex = new RegExp(this.suffix, 'g');
+            var regex = new RegExp(_.escapeRegExp(this.suffix), 'g');
             value = value.replace(regex, '');
         }
         

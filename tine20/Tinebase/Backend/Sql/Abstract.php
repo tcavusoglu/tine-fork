@@ -15,7 +15,8 @@
 
 /**
  * Abstract class for a Tine 2.0 sql backend
- * 
+ *
+ * @template T of Tinebase_Record_Interface
  * @package     Tinebase
  * @subpackage  Backend
  */
@@ -137,6 +138,9 @@ abstract class Tinebase_Backend_Sql_Abstract extends Tinebase_Backend_Abstract i
      */
     protected $_additionalColumns = array();
 
+    /**
+     * @var array<string, SplObjectStorage>
+     */
     protected $_selectHooks = [];
 
     /**
@@ -180,12 +184,12 @@ abstract class Tinebase_Backend_Sql_Abstract extends Tinebase_Backend_Abstract i
         if (!isset($this->_selectHooks[$hook->getKey()])) {
             $this->_selectHooks[$hook->getKey()] = new SplObjectStorage();
         }
-        $this->_selectHooks[$hook->getKey()]->attach($hook);
+        $this->_selectHooks[$hook->getKey()]->offsetSet($hook);
     }
 
     public function removeSelectHook(Tinebase_Backend_Sql_SelectHook $hook): void
     {
-        $this->_selectHooks[$hook->getKey()]->detach($hook);
+        $this->_selectHooks[$hook->getKey()]->offsetUnset($hook);
         if (0 === $this->_selectHooks[$hook->getKey()]->count()) {
             unset($this->_selectHooks[$hook->getKey()]);
         }
@@ -243,7 +247,7 @@ abstract class Tinebase_Backend_Sql_Abstract extends Tinebase_Backend_Abstract i
      *
      * @param string|Tinebase_Record_Interface $_id
      * @param boolean $_getDeleted get deleted records
-     * @return Tinebase_Record_Interface
+     * @return T
      * @throws Tinebase_Exception_InvalidArgument|Tinebase_Exception_NotFound
      */
     public function get($_id, $_getDeleted = FALSE) 
@@ -728,8 +732,10 @@ abstract class Tinebase_Backend_Sql_Abstract extends Tinebase_Backend_Abstract i
                     $sortCol = (substr_count((string) $sort, $this->_tableName) === 0) ? $this->_tableName . '.' .
                         $sort : $sort;
                     if ($schema && substr_count((string) $sortCol, $this->_tableName) && !in_array($sort, array_keys($schema))) {
-                        if (Tinebase_Core::isLogLevel(Zend_Log::NOTICE)) Tinebase_Core::getLogger()->notice(
-                            __METHOD__ . '::' . __LINE__ . ' skip invalid sort field: ' . $sort);
+                        if (Tinebase_Core::isLogLevel(Zend_Log::NOTICE)) {
+                            Tinebase_Core::getLogger()->notice(
+                                __METHOD__ . '::' . __LINE__ . ' Skip invalid sort field: ' . $sort);
+                        }
                     } else {
                         $colsToFetch[$sort] = $sortCol;
                     }
@@ -852,7 +858,7 @@ abstract class Tinebase_Backend_Sql_Abstract extends Tinebase_Backend_Abstract i
                 if ($_mode === self::FETCH_MODE_SINGLE) {
                     $result[] = $row[0];
                 } else if ($_mode === self::FETCH_MODE_PAIR) {
-                    $result[$row[0]] = $row[1];
+                    $result[$row[0] ?? ''] = $row[1];
                 }
             }
         }
@@ -896,7 +902,6 @@ abstract class Tinebase_Backend_Sql_Abstract extends Tinebase_Backend_Abstract i
         
         $this->_addForeignTableJoins($select, $cols);
 
-        /** @var SplObjectStorage $objs */
         foreach ($this->_selectHooks as $objs) {
             $objs->rewind();
             $objs->current()->manipulateSelect($select);
@@ -1675,7 +1680,7 @@ abstract class Tinebase_Backend_Sql_Abstract extends Tinebase_Backend_Abstract i
     {
         return $this->_tablePrefix . $this->_tableName;
     }
-    
+
     /**
      * get table identifier
      * 
@@ -1689,12 +1694,12 @@ abstract class Tinebase_Backend_Sql_Abstract extends Tinebase_Backend_Abstract i
     /**
      * get db adapter
      *
-     * @return Tinebase_Backend_Sql_Adapter_Pdo_Mysql
+     * @return Zend_Db_Adapter_Abstract
      * @throws Tinebase_Exception_Backend_Database
      */
     public function getAdapter()
     {
-        if (! $this->_db instanceof Tinebase_Backend_Sql_Adapter_Pdo_Mysql) {
+        if (! $this->_db instanceof Zend_Db_Adapter_Abstract) {
             throw new Tinebase_Exception_Backend_Database('Could not fetch database adapter');
         }
         

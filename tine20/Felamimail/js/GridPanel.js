@@ -126,7 +126,7 @@ Tine.Felamimail.GridPanel = Ext.extend(Tine.widgets.grid.GridPanel, {
         if (! record.hasFlag('\\Seen')) {
             className += 'flag_unread ';
         }
-        if (record.get('is_spam_suspicions')) {
+        if (record.get('is_spam_suspicions') && !record.hasFlag('SPAM')) {
             className += 'is_spam_suspicions ';
         }
         return className;
@@ -441,7 +441,7 @@ Tine.Felamimail.GridPanel = Ext.extend(Tine.widgets.grid.GridPanel, {
         Tine.Felamimail.GridPanel.superclass.initActions.call(this);
 
         this.action_deleteRecord.setText(this.app.i18n._('Delete'));
-        this.action_deleteRecord.initialConfig.translationObject = null;
+        Ext.Action.setInitialConfig(this.action_deleteRecord, 'translationObject', null);
 
         this.actionUpdater.addActions([
             this.action_editRecord,
@@ -781,21 +781,26 @@ Tine.Felamimail.GridPanel = Ext.extend(Tine.widgets.grid.GridPanel, {
         };
 
         const icons = record.getFlagIcons();
+        const mailServerIcon = record.getMailSenderIcon();
         const leftIcons = icons.filter(icon => ['passed', 'answered'].includes(icon.name));
-        const rightIcons = icons.filter(icon => ['spam', 'encrypted', 'tine20'].includes(icon.name));
+        const rightIcons = icons.filter(icon => ['spam', 'encrypted', 'tine20', mailServerIcon?.id].includes(icon.name));
         const unreadIcon = icons.find(icon => 'seen' === icon.name);
         const date = record.data?.received ?? '';
 
         const createImageElements = (icons) => {
-            return icons.map(icon => `
-                <img 
-                  src="${icon.src || ''}" 
-                  class="felamimail-message-icon ${icon.cls || icon.name || ''}" 
-                  id="${icon.name}"
-                  alt="${icon.name}"
-                  ${icon.qtip ? `ext:qtip="${icon.qtip}"` : ''}
-                >
-              `).join('');
+            return icons
+                .filter(icon => icon.src) // remove empty src
+                .map(icon => `
+              <img 
+                src="${icon.src}" 
+                class="felamimail-message-icon ${icon.cls || icon.name || ''}" 
+                id="${icon.name}"
+                alt="${icon.name}"
+                ${icon.qtip ? `ext:qtip="${icon.qtip}"` : ''}
+                style="display:none;"
+                onload="this.style.display='inline-block';"
+              >
+            `).join('');
         };
 
         const html = `
@@ -1206,6 +1211,7 @@ Tine.Felamimail.GridPanel = Ext.extend(Tine.widgets.grid.GridPanel, {
         this.movingOrDeleting = false;
         
         Tine.log.debug('Tine.Felamimail.GridPanel::onAfterDelete() -> Loading grid data after delete.');
+
         this.loadGridData({
             removeStrategy: 'keepBuffered',
             autoRefresh: true
@@ -1953,7 +1959,9 @@ Tine.Felamimail.GridPanel = Ext.extend(Tine.widgets.grid.GridPanel, {
         const nextRecord = sm.isFilterSelect ? null : this.getNextMessage(msgs);
         const account = this.app.getActiveAccount();
         const msgsIds = [];
-        
+
+        document.getElementById('spam_toolbar')?.remove();
+
         try {
             const promises = [];
             let increaseUnreadCountInTargetFolder = 0;
@@ -2015,8 +2023,13 @@ Tine.Felamimail.GridPanel = Ext.extend(Tine.widgets.grid.GridPanel, {
             }
             
             await Promise.allSettled(promises)
-                .then(() => {
-                    this.onAfterDelete(msgsIds);
+                .then((result) => {
+                    if ('spam' === option) {
+                        this.onAfterDelete(msgsIds);
+                    }
+                    if ('ham' === option) {
+                        this.movingOrDeleting = false;
+                    }
                     this.doRefresh();
             });
             

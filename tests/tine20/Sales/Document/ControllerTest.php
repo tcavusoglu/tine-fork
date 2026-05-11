@@ -4,7 +4,7 @@
  *
  * @package     Sales
  * @license     http://www.gnu.org/licenses/agpl.html
- * @copyright   Copyright (c) 2021-2024 Metaways Infosystems GmbH (http://www.metaways.de)
+ * @copyright   Copyright (c) 2021-2026 Metaways Infosystems GmbH (http://www.metaways.de)
  * @author      Paul Mehrer <p.mehrer@metaways.de>
  */
 
@@ -746,7 +746,9 @@ class Sales_Document_ControllerTest extends Sales_Document_Abstract
         try {
             Tinebase_TransactionManager::getInstance()->commitTransaction($this->_transactionId);
             $this->fail('unreachable');
-        } catch (Tinebase_Exception) {}
+        } catch (Tinebase_Exception) {
+            $this->_transactionId = Tinebase_TransactionManager::getInstance()->startTransaction(Tinebase_Core::getDb());
+        }
 
         $invoice = Sales_Controller_Document_Invoice::getInstance()->get($invoice->getId());
         $this->assertSame(Sales_Model_Document_Invoice::STATUS_DISPATCHED, $invoice->{Sales_Model_Document_Invoice::FLD_INVOICE_STATUS});
@@ -879,6 +881,31 @@ class Sales_Document_ControllerTest extends Sales_Document_Abstract
         $this->assertNotSame($invoice->{Sales_Model_Document_Invoice::FLD_POSITIONS}->getFirstRecord()->{Sales_Model_DocumentPosition_Invoice::FLD_NOTES}->getFirstRecord()->getId(), $copy->{Sales_Model_Document_Invoice::FLD_POSITIONS}->getFirstRecord()->{Sales_Model_DocumentPosition_Invoice::FLD_NOTES}->getFirstRecord()->getId());
     }
 
+    public function testCreateDocumentWithoutDebitorOnCustomer()
+    {
+        $customer = $this->_createCustomer();
+        Sales_Controller_Debitor::getInstance()->getBackend()->delete($customer->{Sales_Model_Customer::FLD_DEBITORS}->getFirstRecord()->getId());
+
+        $product1 = $this->_createProduct();
+
+        $order = Sales_Controller_Document_Order::getInstance()->create(new Sales_Model_Document_Order([
+            Sales_Model_Document_Order::FLD_CUSTOMER_ID => $customer,
+            Sales_Model_Document_Order::FLD_POSITIONS => [
+                new Sales_Model_DocumentPosition_Order([
+                    Sales_Model_DocumentPosition_Order::FLD_TITLE => 'pos 1',
+                    Sales_Model_DocumentPosition_Order::FLD_PRODUCT_ID => $product1->getId(),
+                    Sales_Model_DocumentPosition_Order::FLD_QUANTITY => 1,
+                    Sales_Model_DocumentPosition_Order::FLD_UNIT_PRICE => 1,
+                    Sales_Model_DocumentPosition_Invoice::FLD_SALES_TAX_RATE => 19,
+                ], true),
+            ],
+            Sales_Model_Document_Abstract::FLD_PAYMENT_MEANS => new Tinebase_Record_RecordSet(Sales_Model_PaymentMeans::class, [new Sales_Model_PaymentMeans([
+                Sales_Model_PaymentMeans::FLD_PAYMENT_MEANS_CODE => Sales_Config::getInstance()->{Sales_Config::DEBITOR_DEFAULT_PAYMENT_MEANS},
+                Sales_Model_PaymentMeans::FLD_DEFAULT => true,
+            ])]),
+        ]));
+    }
+    
     public function testInvoiceStorno()
     {
         $this->clear(Sales_Config::APP_NAME, Sales_Model_DocumentPosition_Invoice::MODEL_NAME_PART);
@@ -1374,6 +1401,51 @@ class Sales_Document_ControllerTest extends Sales_Document_Abstract
         unset($unitTestModeRaii);
     }
 
+    public function testPurchaseInvoiceSupplier(): void
+    {
+        $pInvoice = Sales_Controller_Document_PurchaseInvoice::getInstance()->create(new Sales_Model_Document_PurchaseInvoice([
+            Sales_Model_Document_PurchaseInvoice::FLD_SUPPLIER_ID => new Sales_Model_Document_Supplier([
+                'name' => 'test supplier',
+                'postal_id' => new Sales_Model_Document_SupplierAddress([
+                        'email' => 'a@b.c',
+                    ], true),
+            ])
+        ]));
+        $this->assertNull($pInvoice->{Sales_Model_Document_PurchaseInvoice::FLD_SUPPLIER_ID}->{Sales_Model_Document_PurchaseInvoice::FLD_ORIGINAL_ID});
+        $this->assertNull($pInvoice->{Sales_Model_Document_PurchaseInvoice::FLD_SUPPLIER_ID}->postal_id->{Sales_Model_Document_PurchaseInvoice::FLD_ORIGINAL_ID});
+        $this->assertTrue((bool)$pInvoice->{Sales_Model_Document_PurchaseInvoice::FLD_SUPPLIER_ID}->{Sales_Model_Document_PurchaseInvoice::FLD_LOCALLY_CHANGED});
+        $this->assertSame('a@b.c', $pInvoice->{Sales_Model_Document_PurchaseInvoice::FLD_SUPPLIER_ID}->postal_id->email);
+
+        $supplier = Sales_Controller_Supplier::getInstance()->create(new Sales_Model_Supplier([
+            'name' => 'test supplier',
+            'postal_id' => new Sales_Model_Address([
+                'email' => 'x@y.z',
+            ], true),
+        ]));
+        $this->assertSame('x@y.z', $supplier->postal_id->email);
+
+        $pInvoice->{Sales_Model_Document_PurchaseInvoice::FLD_SUPPLIER_ID}->postal_id = $supplier->postal_id;
+        $pInvoiceUpdated = Sales_Controller_Document_PurchaseInvoice::getInstance()->update($pInvoice);
+        $this->assertNull($pInvoiceUpdated->{Sales_Model_Document_PurchaseInvoice::FLD_SUPPLIER_ID}->{Sales_Model_Document_PurchaseInvoice::FLD_ORIGINAL_ID});
+        $this->assertSame($supplier->postal_id->getId(), $pInvoiceUpdated->{Sales_Model_Document_PurchaseInvoice::FLD_SUPPLIER_ID}->postal_id->{Sales_Model_Document_PurchaseInvoice::FLD_ORIGINAL_ID});
+
+
+        $pInvoice = Sales_Controller_Document_PurchaseInvoice::getInstance()->create(new Sales_Model_Document_PurchaseInvoice([
+            Sales_Model_Document_PurchaseInvoice::FLD_SUPPLIER_ID => $supplier,
+        ]));
+        $this->assertSame($supplier->getId(), $pInvoice->{Sales_Model_Document_PurchaseInvoice::FLD_SUPPLIER_ID}->{Sales_Model_Document_PurchaseInvoice::FLD_ORIGINAL_ID});
+        $this->assertNotSame($supplier->getId(), ($docSupplierId = $pInvoice->{Sales_Model_Document_PurchaseInvoice::FLD_SUPPLIER_ID}->getId()));
+        $this->assertFalse((bool)$pInvoice->{Sales_Model_Document_PurchaseInvoice::FLD_SUPPLIER_ID}->{Sales_Model_Document_PurchaseInvoice::FLD_LOCALLY_CHANGED});
+
+        $pInvoice->{Sales_Model_Document_PurchaseInvoice::FLD_SUPPLIER_ID}->url = 'https://unittest';
+        $pInvoiceUpdated = Sales_Controller_Document_PurchaseInvoice::getInstance()->update($pInvoice);
+        $this->assertSame($supplier->getId(), $pInvoiceUpdated->{Sales_Model_Document_PurchaseInvoice::FLD_SUPPLIER_ID}->{Sales_Model_Document_PurchaseInvoice::FLD_ORIGINAL_ID});
+        $this->assertNotSame($supplier->getId(), $pInvoiceUpdated->{Sales_Model_Document_PurchaseInvoice::FLD_SUPPLIER_ID}->getId());
+        $this->assertSame($docSupplierId, $pInvoiceUpdated->{Sales_Model_Document_PurchaseInvoice::FLD_SUPPLIER_ID}->getId());
+        $this->assertTrue((bool)$pInvoiceUpdated->{Sales_Model_Document_PurchaseInvoice::FLD_SUPPLIER_ID}->{Sales_Model_Document_PurchaseInvoice::FLD_LOCALLY_CHANGED});
+        $this->assertSame($pInvoice->{Sales_Model_Document_PurchaseInvoice::FLD_SUPPLIER_ID}->url, $pInvoiceUpdated->{Sales_Model_Document_PurchaseInvoice::FLD_SUPPLIER_ID}->url);
+    }
+
     public function testCategoryEvalDimensionCopy()
     {
         $customer = $this->_createCustomer();
@@ -1576,6 +1648,63 @@ class Sales_Document_ControllerTest extends Sales_Document_Abstract
         ]));
 
         return $order;
+    }
+
+    public function testSalesTaxValidation(): void
+    {
+        try {
+            new Sales_Model_Document_SalesTax([
+                Sales_Model_Document_SalesTax::FLD_DOCUMENT_TYPE => Sales_Model_Document_Order::class,
+                Sales_Model_Document_SalesTax::FLD_DOCUMENT_ID => 'a',
+                Sales_Model_Document_SalesTax::FLD_TAX_RATE => null,
+                Sales_Model_Document_SalesTax::FLD_TAX_AMOUNT => 0,
+                Sales_Model_Document_SalesTax::FLD_NET_AMOUNT => 1,
+                Sales_Model_Document_SalesTax::FLD_GROSS_AMOUNT => 1,
+            ]);
+            $this->fail('expect record validation to fail');
+        } catch (Tinebase_Exception_Record_Validation $e) {
+            $this->assertSame('Some fields (tax_rate) have invalid content (Sales_Model_Document_SalesTax)', $e->getMessage());
+        }
+
+        $st = new Sales_Model_Document_SalesTax([
+            Sales_Model_Document_SalesTax::FLD_DOCUMENT_TYPE => Sales_Model_Document_Order::class,
+            Sales_Model_Document_SalesTax::FLD_DOCUMENT_ID => 'a',
+            Sales_Model_Document_SalesTax::FLD_TAX_RATE => 0,
+            Sales_Model_Document_SalesTax::FLD_TAX_AMOUNT => 0,
+            Sales_Model_Document_SalesTax::FLD_NET_AMOUNT => 1,
+            Sales_Model_Document_SalesTax::FLD_GROSS_AMOUNT => 1,
+        ]);
+        $this->assertSame(0.0, $st->{Sales_Model_Document_SalesTax::FLD_TAX_RATE});
+
+        $st = new Sales_Model_Document_SalesTax([
+            Sales_Model_Document_SalesTax::FLD_DOCUMENT_TYPE => Sales_Model_Document_Order::class,
+            Sales_Model_Document_SalesTax::FLD_DOCUMENT_ID => 'a',
+            Sales_Model_Document_SalesTax::FLD_TAX_RATE => 0.0,
+            Sales_Model_Document_SalesTax::FLD_TAX_AMOUNT => 0,
+            Sales_Model_Document_SalesTax::FLD_NET_AMOUNT => 1,
+            Sales_Model_Document_SalesTax::FLD_GROSS_AMOUNT => 1,
+        ]);
+        $this->assertSame(0.0, $st->{Sales_Model_Document_SalesTax::FLD_TAX_RATE});
+
+        $st = new Sales_Model_Document_SalesTax([
+            Sales_Model_Document_SalesTax::FLD_DOCUMENT_TYPE => Sales_Model_Document_Order::class,
+            Sales_Model_Document_SalesTax::FLD_DOCUMENT_ID => 'a',
+            Sales_Model_Document_SalesTax::FLD_TAX_RATE => '0',
+            Sales_Model_Document_SalesTax::FLD_TAX_AMOUNT => 0,
+            Sales_Model_Document_SalesTax::FLD_NET_AMOUNT => 1,
+            Sales_Model_Document_SalesTax::FLD_GROSS_AMOUNT => 1,
+        ]);
+        $this->assertSame(0.0, $st->{Sales_Model_Document_SalesTax::FLD_TAX_RATE});
+
+        $st = new Sales_Model_Document_SalesTax([
+            Sales_Model_Document_SalesTax::FLD_DOCUMENT_TYPE => Sales_Model_Document_Order::class,
+            Sales_Model_Document_SalesTax::FLD_DOCUMENT_ID => 'a',
+            Sales_Model_Document_SalesTax::FLD_TAX_RATE => '0.0',
+            Sales_Model_Document_SalesTax::FLD_TAX_AMOUNT => 0,
+            Sales_Model_Document_SalesTax::FLD_NET_AMOUNT => 1,
+            Sales_Model_Document_SalesTax::FLD_GROSS_AMOUNT => 1,
+        ]);
+        $this->assertSame(0.0, $st->{Sales_Model_Document_SalesTax::FLD_TAX_RATE});
     }
 
     public function testPositionRemoval()

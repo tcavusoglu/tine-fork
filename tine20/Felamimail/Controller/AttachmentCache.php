@@ -20,6 +20,7 @@
  */
 class Felamimail_Controller_AttachmentCache extends Tinebase_Controller_Record_Abstract
 {
+    /** @use Tinebase_Controller_SingletonTrait<Felamimail_Controller_AttachmentCache> */
     use Tinebase_Controller_SingletonTrait;
 
     /**
@@ -192,7 +193,7 @@ class Felamimail_Controller_AttachmentCache extends Tinebase_Controller_Record_A
         return $createdRecord;
     }
 
-    protected function _handleRecordCreateOrUpdateException(Throwable $e)
+    protected function _handleRecordCreateOrUpdateException(Throwable $e, ?string $transactionId = null): void
     {
         // email attachment encoding failure or invalid temp file
         if ($e instanceof ErrorException && strpos($e->getMessage(), 'invalid byte sequence') ||

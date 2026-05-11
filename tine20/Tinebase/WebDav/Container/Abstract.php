@@ -44,7 +44,7 @@ abstract class Tinebase_WebDav_Container_Abstract extends \Sabre\DAV\Collection 
     public function __construct(protected Tinebase_Model_Container|Tinebase_Model_Tree_Node $_container, $_useIdAsName = false)
     {
         $this->_application = Tinebase_Application::getInstance()->getApplicationByName($this->_applicationName);
-        $this->_useIdAsName = (boolean)$_useIdAsName;
+        $this->_useIdAsName = (bool) $_useIdAsName;
     }
     
     /**
@@ -525,7 +525,7 @@ abstract class Tinebase_WebDav_Container_Abstract extends \Sabre\DAV\Collection 
      * @param  string  $_name  the name for example vcard.vcf
      * @return string
      */
-    protected function _getIdFromName($_name)
+    protected function _getIdFromName(string $_name): string
     {
         $id = ($pos = strrpos($_name, '.')) === false ? $_name : substr($_name, 0, $pos);
         $id = strlen((string)$id) > 40 ? sha1($id) : $id;

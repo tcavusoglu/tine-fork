@@ -206,13 +206,19 @@ class Tinebase_EmailUser
      *
      * @param string $configType
      * @return Tinebase_User_Plugin_Abstract
+     * @throws Tinebase_Exception_Backend
      */
     public static function getInstance($configType = Tinebase_Config::IMAP)
     {
         $type = self::getConfiguredBackend($configType);
 
         if (!isset(self::$_backends[$type])) {
-            self::$_backends[$type] = self::factory($type);
+            try {
+                self::$_backends[$type] = self::factory($type);
+            } catch (Exception $e) {
+                throw new Tinebase_Exception_Backend('Could not create email user backend (' . $type . '): '
+                    . $e->getMessage());
+            }
         }
 
         return self::$_backends[$type];
@@ -327,7 +333,12 @@ class Tinebase_EmailUser
         if (! self::manages(Tinebase_Config::SMTP)) {
             return false;
         }
-        $plugin = Tinebase_EmailUser::getInstance(Tinebase_Config::SMTP);
+        try {
+            $plugin = Tinebase_EmailUser::getInstance(Tinebase_Config::SMTP);
+        } catch (Tinebase_Exception_Backend $teb) {
+            Tinebase_Exception::log($teb);
+            return false;
+        }
         return $plugin->supportsAliasesDispatchFlag();
     }
 
@@ -484,16 +495,16 @@ class Tinebase_EmailUser
      * @param string $_email
      * @param boolean $_throwException
      * @param array $_allowedDomains
-     * @param boolean $_includeExternalDomains
+     * @param bool $_internalDomainOnly
      * @return boolean
-     * @throws Tinebas_Exception_SystemGeneric
-     * @throws Tinebase_Exception_EmailInAddionalDomains
+     * @throws Tinebase_Exception_EmailInAdditionalDomains
+     * @throws Tinebase_Exception_SystemGeneric
      */
     public static function checkAllowedDomain(
         $_email,
-        $_throwException = false,
-        $_allowedDomains = null,
-        $_includeExternalDomains = false
+        bool $_throwException = false,
+        array $_allowedDomains = [],
+        bool $_internalDomainOnly = false
     ): bool
     {
         if (!Tinebase_EmailUser::manages(Tinebase_Config::IMAP) ||
@@ -503,7 +514,7 @@ class Tinebase_EmailUser
         }
 
         $result = true;
-        $allowedDomains = $_allowedDomains ?: self::getAllowedDomains(_includeAdditional: $_includeExternalDomains);
+        $allowedDomains = $_allowedDomains ?: self::getAllowedDomains(_includeAdditional: !$_internalDomainOnly);
 
         if (empty($_email) || !preg_match(Tinebase_Mail::EMAIL_ADDRESS_REGEXP, $_email)) {
             if (Tinebase_Core::isLogLevel(Zend_Log::WARN)) {
@@ -519,14 +530,7 @@ class Tinebase_EmailUser
         $isExternal = self::isExternalDomain($_email);
         $allowAnyExternalDomains = Tinebase_Config::getInstance()->{Tinebase_Config::SMTP}->allowAnyExternalDomains;
 
-        if ($allowAnyExternalDomains === null) {
-            // todo: allowExternalEmail is deprecated , we should only check allowAnyExternalDomains
-            $manageImapEmailUser = Tinebase_EmailUser::manages(Tinebase_Config::IMAP);
-            $allowExternalEmail = ! $manageImapEmailUser || Tinebase_Config::getInstance()->get(Tinebase_Config::IMAP)->allowExternalEmail;
-            $allowAnyExternalDomains = $allowExternalEmail;
-        }
-
-        if ($isExternal && $allowAnyExternalDomains) {
+        if ($isExternal && $allowAnyExternalDomains && !$_internalDomainOnly) {
             if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) {
                 Tinebase_Core::getLogger()->debug(
                     __METHOD__ . '::' . __LINE__ . ' Allowed all external domains, skip!'
@@ -536,25 +540,25 @@ class Tinebase_EmailUser
         }
 
         if (!empty($allowedDomains) && !in_array($domain, $allowedDomains)) {
-            if (Tinebase_Core::isLogLevel(Zend_Log::WARN)) {
-                Tinebase_Core::getLogger()->warn(
-                    __METHOD__ . '::' . __LINE__ . ' ' . $domain . ' is not in allowed domains! Allowed domains: ' . print_r($allowedDomains, true)
+            if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) {
+                Tinebase_Core::getLogger()->debug(
+                    __METHOD__ . '::' . __LINE__ . ' ' . $domain . ' is not in allowed domains! Allowed domains: '
+                    . print_r($allowedDomains, true)
                 );
             }
             $result = false;
         }
 
         if (!$result && $_throwException) {
-            if (!$_includeExternalDomains && $isExternal) {
+            if ($_internalDomainOnly && $isExternal) {
                 throw new Tinebase_Exception_EmailInAdditionalDomains();
-            } else {
-                $translation = Tinebase_Translation::getTranslation('Tinebase');
-                throw new Tinebase_Exception_SystemGeneric(str_replace(
-                    ['{0}', '{1}'],
-                    [$_email, implode(',', $allowedDomains)],
-                    $translation->_('Email address {0} not in allowed domains [{1}] or invalid')
-                ));
             }
+            $translation = Tinebase_Translation::getTranslation();
+            throw new Tinebase_Exception_SystemGeneric(str_replace(
+                ['{0}', '{1}'],
+                [$_email, implode(',', $allowedDomains)],
+                $translation->_('Email address {0} not in allowed domains [{1}] or invalid')
+            ));
         }
 
         return $result;
@@ -711,7 +715,12 @@ class Tinebase_EmailUser
             return false;
         }
 
-        $imapEmailBackend = Tinebase_EmailUser::getInstance();
+        try {
+            $imapEmailBackend = Tinebase_EmailUser::getInstance();
+        } catch (Tinebase_Exception_Backend $teb) {
+            Tinebase_Exception::log($teb);
+            return false;
+        }
         if (method_exists($imapEmailBackend, 'checkMasterUserTable')) {
             try {
                 $imapEmailBackend->checkMasterUserTable();

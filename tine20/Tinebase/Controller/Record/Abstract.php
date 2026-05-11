@@ -205,6 +205,8 @@ abstract class Tinebase_Controller_Record_Abstract
      */
     protected $_recordPathFeatureEnabled = null;
 
+    protected bool $_skipSetModlog = false;
+
     /**
      * add / remove relations during _setReleatedData for virtual relation proproperties
      *
@@ -784,10 +786,15 @@ abstract class Tinebase_Controller_Record_Abstract
     /**
      * add one record
      *
-     * @param   Tinebase_Record_Interface $_record
-     * @param   boolean $_duplicateCheck
-     * @return  T
-     * @throws  Tinebase_Exception_AccessDenied
+     * @param Tinebase_Record_Interface $_record
+     * @param boolean $_duplicateCheck
+     * @return T
+     * @throws Throwable
+     * @throws Tinebase_Exception_AccessDenied
+     * @throws Tinebase_Exception_AreaLocked
+     * @throws Tinebase_Exception_Backend_Database
+     * @throws Tinebase_Exception_NotFound
+     * @throws Zend_Cache_Exception
      */
     public function create(Tinebase_Record_Interface $_record, $_duplicateCheck = true)
     {
@@ -795,10 +802,12 @@ abstract class Tinebase_Controller_Record_Abstract
 
         $this->_duplicateCheck = $_duplicateCheck;
 
-        if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . ' '
-            . print_r($_record->toArray(),true));
-        if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__
-            . ' Create new ' . $this->_modelName);
+        if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) {
+            Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . ' '
+                . print_r($_record->toArray(), true));
+            Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__
+                . ' Create new ' . $this->_modelName);
+        }
 
         $db = (method_exists($this->_backend, 'getAdapter')) ? $this->_backend->getAdapter() : Tinebase_Core::getDb();
 
@@ -807,7 +816,8 @@ abstract class Tinebase_Controller_Record_Abstract
             $path = Tinebase_FileSystem_RecordAttachments::getInstance()->getRecordAttachmentBasePath($_record);
             Tinebase_FileSystem::getInstance()->fileExists($path);
         }
-        
+
+        $transactionId = null;
         try {
             $transactionId = Tinebase_TransactionManager::getInstance()->startTransaction($db);
 
@@ -819,7 +829,7 @@ abstract class Tinebase_Controller_Record_Abstract
             $this->_checkGrant($_record, self::ACTION_CREATE);
 
             // added _doForceModlogInfo behavior
-            if ($_record->has('created_by')) {
+            if ($_record->has('created_by') && !$this->_skipSetModlog) {
                 $origRecord = clone ($_record);
                 Tinebase_Timemachine_ModificationLog::setRecordMetaData($_record, self::ACTION_CREATE);
                 $this->_forceModlogInfo($_record, $origRecord, self::ACTION_CREATE);
@@ -847,7 +857,7 @@ abstract class Tinebase_Controller_Record_Abstract
             
             Tinebase_TransactionManager::getInstance()->commitTransaction($transactionId);
         } catch (Exception $e) {
-            $this->_handleRecordCreateOrUpdateException($e);
+            $this->_handleRecordCreateOrUpdateException($e, $transactionId);
         }
         
         if ($this->_clearCustomFieldsCache) {
@@ -992,11 +1002,12 @@ abstract class Tinebase_Controller_Record_Abstract
      * 
      * @todo invent hooking mechanism for database/backend independent exception handling (like lock timeouts)
      */
-    protected function _handleRecordCreateOrUpdateException(\Throwable $e)
+    protected function _handleRecordCreateOrUpdateException(\Throwable $e, ?string $transactionId = null): void
     {
         if ($e instanceof Tinebase_Exception_ProgramFlow || Tinebase_Exception::isDbDuplicate($e)) {
-            // log as ERROR? or better INFO? NOTICE?
-            Tinebase_Exception::logExceptionToLogger($e);
+            if (Tinebase_Core::isLogLevel(Zend_Log::INFO)) {
+                Tinebase_Core::getLogger()->info(__METHOD__ . '::' . __LINE__ . ' ' . $e->getMessage());
+            }
         } else {
             Tinebase_Exception::log($e);
         }
@@ -1025,8 +1036,9 @@ abstract class Tinebase_Controller_Record_Abstract
     protected function _denormalizedDiff(Tinebase_Record_Interface $_record, Tinebase_Record_Interface $_otherRecord)
     {
         return $_record->diff($_otherRecord,
-            ['id', 'seq', 'created_by', 'creation_time', 'last_modified_by', 'last_modified_time', 'deleted_by',
-                'deleted_time', 'is_deleted', TMCC::FLD_LOCALLY_CHANGED, TMCC::FLD_ORIGINAL_ID]);
+            array_merge(['id', 'seq', 'created_by', 'creation_time', 'last_modified_by', 'last_modified_time', 'deleted_by',
+                'deleted_time', 'is_deleted', TMCC::FLD_LOCALLY_CHANGED, TMCC::FLD_ORIGINAL_ID],
+                $_record::getConfiguration()->denormalizationConfig[TMCC::DENORMALIZATION_DIFF_OMIT_FIELDS] ?? []));
     }
 
     /**
@@ -1142,9 +1154,9 @@ abstract class Tinebase_Controller_Record_Abstract
             try {
                 /** @var Tinebase_Controller_Record_Abstract $ctrl */
                 $ctrl = Tinebase_Core::getApplicationInstance($definition[TMCC::CONFIG][TMCC::DENORMALIZATION_OF]);
-                $originalRecord = $ctrl->get(_id: $record->{TMCC::FLD_ORIGINAL_ID} ?: $record->getId(), _getRelatedData:  false, _getDeleted: true);
+                $originalRecord = $ctrl->get(_id: $record->{TMCC::FLD_ORIGINAL_ID} ?: $record->getId(), _getDeleted: true);
                 $record->{TMCC::FLD_ORIGINAL_ID} = $originalRecord->getId();
-            } catch (Tinebase_Exception_NotFound) {
+            } catch (Tinebase_Exception_NotFound | Tinebase_Exception_AccessDenied) {
                 $record->{TMCC::FLD_ORIGINAL_ID} = null;
             }
         }
@@ -1176,8 +1188,10 @@ abstract class Tinebase_Controller_Record_Abstract
             return;
         }
 
-        if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ .
-            ' Doing duplicate check.');
+        if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) {
+            Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ .
+                ' Doing duplicate check.');
+        }
 
         $duplicates = $this->search($duplicateFilter, new Tinebase_Model_Pagination(array('limit' => 5)), /* $_getRelations = */ true);
 
@@ -1562,14 +1576,21 @@ abstract class Tinebase_Controller_Record_Abstract
      */
     protected function _updateACLCheck($_record, $_currentRecord)
     {
-        if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__
-            . ' Doing ACL check ...');
+        if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) {
+            Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__
+                . ' Doing ACL check ...');
+        }
         
-        if (($_currentRecord->has('container_id') && Tinebase_Record_Abstract::convertId($_currentRecord->container_id) != Tinebase_Record_Abstract::convertId($_record->container_id)) ||
+        if (($_currentRecord->has('container_id')
+            && Tinebase_Record_Abstract::convertId($_currentRecord->container_id)
+                != Tinebase_Record_Abstract::convertId($_record->container_id)) ||
             (($mc = $_record::getConfiguration()) && ($daf = $mc->delegateAclField) && (
-                $mc->getFields()[$daf][TMCC::TYPE] === TMCC::TYPE_RECORDS ?
-                    (($migration = $_currentRecord->{$daf}->getMigration($_record->{$daf}->getArrayOfIds())) && (count($migration['toDeleteIds']) > 0 || count($migration['toCreateIds']) > 0))
-                    : ($_currentRecord->getIdFromProperty($daf) !== $_record->getIdFromProperty($daf))))) {
+                $mc->getFields()[$daf][TMCC::TYPE] === TMCC::TYPE_RECORDS
+                    ? ($_currentRecord->{$daf} && (
+                        $migration = $_currentRecord->{$daf}->getMigration($_record->{$daf}->getArrayOfIds())
+                    ) && (count($migration['toDeleteIds']) > 0 || count($migration['toCreateIds']) > 0))
+                    : ($_currentRecord->getIdFromProperty($daf) !== $_record->getIdFromProperty($daf))))
+        ) {
             $this->_checkGrant($_record, self::ACTION_CREATE);
             $this->_checkRight(self::ACTION_CREATE);
             // NOTE: It's not yet clear if we have to demand delete grants here or also edit grants would be fine
@@ -2561,7 +2582,12 @@ abstract class Tinebase_Controller_Record_Abstract
                     $this->_deleteDependentRecords($_record, $property, $fieldDef['config']);
                 }
             }
-            foreach ($config->getFields() as $field) {
+            foreach ($config->getFields() as $key => $field) {
+                if (TMCC::TYPE_DYNAMIC_RECORD === ($field[TMCC::TYPE] ?? null) &&
+                        true === ($field[TMCC::CONFIG][TMCC::PERSISTENT] ?? null) &&
+                        $_record->$key instanceof Tinebase_Record_Interface) {
+                    $this->handleDeleteDependentRecords($_record->$key);
+                }
                 if (TMCC::TYPE_PASSWORD === ($field[TMCC::TYPE] ?? null) &&
                         'shared' === ($field[TMCC::CONFIG][TMCC::CREDENTIAL_CACHE] ?? null) &&
                         ($field[TMCC::CONFIG][TMCC::REF_ID_FIELD] ?? null) &&
@@ -2710,20 +2736,16 @@ abstract class Tinebase_Controller_Record_Abstract
      * @param Tinebase_Record_Interface $_record
      * @param string $_action
      * @param boolean $_throw
-     * @param string $_errorMessage
+     * @param ?string $_errorMessage
      * @param Tinebase_Record_Interface $_oldRecord
      * @return boolean
      * @throws Tinebase_Exception_AccessDenied
-     *
-     * @todo use this function in other create + update functions
-     * @todo invent concept for simple adding of grants (plugins?)
-     *
      */
     protected function _checkGrant(
         $_record,
         $_action,
         $_throw = true,
-        $_errorMessage = 'No Permission.',
+        $_errorMessage = null,
         /** @noinspection PhpUnusedParameterInspection */ $_oldRecord = null
     ) {
         if (
@@ -2767,6 +2789,9 @@ abstract class Tinebase_Controller_Record_Abstract
                     . ' No permissions to ' . $_action . ' in container ' . print_r($containerId, true));
             }
             if ($_throw) {
+                if (!$_errorMessage) {
+                    $_errorMessage = $this->_getTranslatedNoPermissionMessage($_action);
+                }
                 throw new Tinebase_Exception_AccessDenied($_errorMessage);
             }
         }
@@ -2774,10 +2799,25 @@ abstract class Tinebase_Controller_Record_Abstract
         return $hasGrant;
     }
 
+    protected function _getTranslatedNoPermissionMessage(string $action): string
+    {
+        $translation = Tinebase_Translation::getTranslation();
+        $translatedAction = $translation->_($action);
+        // TODO use translated record name
+        $recordName = $this->_modelName;
+        $errorMessage = sprintf(
+            $translation->_('You do not have permission to %s record of type %s'),
+            $translatedAction,
+            $recordName
+        );
+
+        return $errorMessage;
+    }
+
     protected function _checkDelegatedGrant(Tinebase_Record_Interface $_record,
                                             string $_action,
                                             bool $_throw,
-                                            string $_errorMessage,
+                                            ?string $_errorMessage,
                                             ?Tinebase_Record_Interface $_oldRecord): bool
     {
         $mc = $_record->getConfiguration();
@@ -3605,7 +3645,7 @@ abstract class Tinebase_Controller_Record_Abstract
             foreach ($_record->{$_property} as $record) {
                 $record->{$_fieldConfig['refIdField']} = $_record->getId();
 
-                while (empty($record->getId()) && $uniqueFlds) {
+                while ($uniqueFlds && (empty($record->getId()) || !$controller->has([$record->getId()], true))) {
                     $filter = Tinebase_Model_Filter_FilterGroup::getFilterForModel($recordClassName);
                     foreach ($uniqueFlds as $uniqueFld) {
                         if (null === $record->{$uniqueFld}) {
@@ -3616,7 +3656,9 @@ abstract class Tinebase_Controller_Record_Abstract
                     if ($recordMC->modlogActive) {
                         $filter->addFilter($filter->createFilter(TMCC::FLD_IS_DELETED, TMFA::OP_EQUALS, Tinebase_Model_Filter_Bool::VALUE_NOTSET));
                     }
-                    $record->setId($controller->search($filter)->getFirstRecord()?->getId());
+                    if ($foundUniqueMatch = $controller->search($filter)->getFirstRecord()) {
+                        $record->setId($foundUniqueMatch->getId());
+                    }
                     break;
                 }
 
@@ -3721,8 +3763,7 @@ abstract class Tinebase_Controller_Record_Abstract
      */
     protected function _deleteDependentRecords($_record, $_property, $_fieldConfig)
     {
-        if (! isset($_fieldConfig['dependentRecords']) || ! $_fieldConfig['dependentRecords'] ||
-                (isset($_fieldConfig[TMCC::STORAGE]) && $_fieldConfig[TMCC::STORAGE] === TMCC::TYPE_JSON)) {
+        if (!($_fieldConfig[TMCC::DEPENDENT_RECORDS] ?? false) || ($_fieldConfig[TMCC::STORAGE] ?? null) === TMCC::TYPE_JSON) {
             return;
         }
 
@@ -3791,11 +3832,11 @@ abstract class Tinebase_Controller_Record_Abstract
      */
     protected function _undeleteDependentRecords($_record, $_property, $_fieldConfig)
     {
-        if (! isset($_fieldConfig['dependentRecords']) || ! $_fieldConfig['dependentRecords']) {
+        if (!($_fieldConfig[TMCC::DEPENDENT_RECORDS] ?? false) || ($_fieldConfig[TMCC::STORAGE] ?? null) === TMCC::TYPE_JSON) {
             return;
         }
 
-        if (! isset ($_fieldConfig['refIdField'])) {
+        if (!($_fieldConfig[TMCC::REF_ID_FIELD] ?? false)) {
             throw new Tinebase_Exception_Record_DefinitionFailure('If a record is dependent, a refIdField has to be defined!');
         }
 
@@ -4089,8 +4130,12 @@ HumanResources_CliTests.testSetContractsEndDate */
         return $node;
     }
 
-    protected function _setFileMessageNote($record, $node)
+    protected function _setFileMessageNote(Tinebase_Record_Interface $record, Tinebase_Model_Tree_Node $node): void
     {
+        if (!$record->has('notes')) {
+            return;
+        }
+
         $translation = Tinebase_Translation::getTranslation();
         $noteText = str_replace(
             ['{0}'],

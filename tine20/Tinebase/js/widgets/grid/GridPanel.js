@@ -68,15 +68,6 @@ Tine.widgets.grid.GridPanel = function(config) {
         this.app = Tine.Tinebase.appMgr.get(this.recordClass.getMeta('appName'));
     }
 
-    // autogenerate stateId
-    if (this.stateful !== false && ! this.stateId) {
-        this.stateId = this.recordClass.getMeta('appName') + '-' + this.recordClass.getMeta('recordName') + '-GridPanel';
-    }
-
-    if (this.stateId && Ext.isTouchDevice) {
-        this.stateId = this.stateId + '-Touch';
-    }
-
     this.plugins = this.plugins || [];
 
     if (this.recordClass) {
@@ -463,7 +454,11 @@ Ext.extend(Tine.widgets.grid.GridPanel, Ext.Panel, {
         this.i18nRecordsName = this.i18nRecordsName ? this.i18nRecordsName : this.recordClass.getRecordsName();
         this.i18nContainerName = this.i18nContainerName ? this.i18nContainerName : this.recordClass.getContainerName();
         this.i18nContainersName = this.i18nContainersName ? this.i18nContainersName : this.recordClass.getContainersName();
-        
+
+        if (_.get(this, 'viewConfig.emptyText') && !this.i18nEmptyText) {
+            this.i18nEmptyText = this.app.i18n._hidden(_.get(this, 'viewConfig.emptyText'));
+        }
+
         this.i18nEmptyText = this.i18nEmptyText ||
             this.i18nContainersName
             ? String.format(i18n._("No {0} could be found. Please try changing your filter criteria, view options, or the {1} you are searching in."), this.i18nRecordsName, (this.i18nContainersName ? this.i18nContainersName : this.i18nRecordsName))
@@ -1257,10 +1252,10 @@ Ext.extend(Tine.widgets.grid.GridPanel, Ext.Panel, {
             var serviceKey = this.app.name + '.delete' + this.recordClass.getMeta('modelName') + 's';
             if (! services.hasOwnProperty(serviceKey)) {
                 this.action_deleteRecord.setDisabled(1);
-                this.action_deleteRecord.initialConfig.actionUpdater = function(action) {
+                Ext.Action.setInitialConfig(this.action_deleteRecord, 'actionUpdater', function(action) {
                     Tine.log.debug("disable delete action because no delete method was found in serviceMap");
                     action.setDisabled(1);
-                }
+                });
             }
         }
     },
@@ -1515,7 +1510,7 @@ Ext.extend(Tine.widgets.grid.GridPanel, Ext.Panel, {
         options.params = options.params || {};
         // always start with an empty filter set!
         // this is important for paging and sort header!
-        options.params.filter = [];
+        options.params.filter = this.filterToolbar ? [] : (_.isArray(this.defaultFilters) ? [... this.defaultFilters] : []);
 
         if (! options.removeStrategy || options.removeStrategy !== 'keepBuffered') {
             this.editBuffer = [];
@@ -1539,7 +1534,17 @@ Ext.extend(Tine.widgets.grid.GridPanel, Ext.Panel, {
         this.grid.getView().setResponsiveMode(this.regionConfig[this.detailsPanelRegion]?.responsiveLevel ?? 'auto');
         this.grid.view.layout();
     },
-    
+
+    getStateId: function() {
+        // autogenerate stateId
+        if (this.stateful !== false && !this.stateId) {
+            this.stateId = this.recordClass.getMeta('appName') + '-' + this.recordClass.getMeta('recordName')
+                + '-GridPanel' + this.getStateIdSuffix()
+        }
+
+        return this.stateId;
+    },
+
     getResolvedGridStateId() {
         const stateIdSuffix = this.getStateIdSuffix();
         const suffixEast = this.detailsPanelRegion === 'east' ? '_DetailsPanel_East' : '';
@@ -1835,9 +1840,44 @@ Ext.extend(Tine.widgets.grid.GridPanel, Ext.Panel, {
                     })
                 }
             });
+
+            if (this.stateful) {
+                this.gridConfig.stateful = true;
+                this.gridConfig.stateId = this.getStateId() + '-Grid';
+                const gridStateId = this.getResolvedGridStateId();
+                let gridState = Ext.state.Manager.get(gridStateId);
+                if (gridState) this.defaultSortInfo = gridState.sort;
+
+                const stateId = `${this.recordClass.prototype.appName}-${this.recordClass.prototype.modelName}`;
+                this.regionStateId = `${stateId}_detailspanelregion`;
+                this.detailsPanelRegion = Ext.state.Manager.get(this.regionStateId, this.detailsPanelRegion);
+
+                this.regionConfigStateId = `${stateId}_region_config`;
+                this.regionConfig = Ext.state.Manager.get(this.regionConfigStateId, {
+                    'south': {},
+                    'east': {},
+                });
+
+                //update script , it should be removed after we make sure customer has the updateed state
+                const oldRegionStateId = `${this.recordClass.prototype.appName}_detailspanelregion`;
+                const oldDetailsPanelRegion = Ext.state.Manager.get(oldRegionStateId);
+                if (oldDetailsPanelRegion) {
+                    this.detailsPanelRegion = oldDetailsPanelRegion;
+                    Ext.state.Manager.set(this.regionStateId, this.detailsPanelRegion);
+                    Ext.state.Manager.clear(oldRegionStateId);
+                }
+                const oldRegionConfigStateId = `${this.recordClass.prototype.appName}_region_config`;
+                const oldRegionConfig = Ext.state.Manager.get(oldRegionConfigStateId);
+                if (oldRegionConfig) {
+                    this.regionConfig = oldRegionConfig;
+                    Ext.state.Manager.set(this.regionConfigStateId, this.regionConfig);
+                    Ext.state.Manager.clear(oldRegionConfigStateId);
+                }
+            }
+
             // todo : hide the layout action if disableResponsiveLayout ?
             const levels = [...new Set(columns.map((col) => col?.responsiveLevel).filter(Boolean))];
-            this.widthClasses = ['auto', 'oneColumn', 'big'].concat(levels);
+            this.widthClasses = _.uniq(['auto', 'oneColumn', 'big'].concat(levels)); // @TODO sort by size!
             
             const layoutActions = this.widthClasses.map((level) => {
                 const text = level === 'oneColumn' ? 'one column' : level;
@@ -1853,9 +1893,22 @@ Ext.extend(Tine.widgets.grid.GridPanel, Ext.Panel, {
                     }
                 });
             });
+            const layoutMenuItems = layoutActions.slice();
+            layoutMenuItems.push('-');
+            layoutMenuItems.push(new Ext.menu.CheckItem({
+                text: Ext.util.Format.capitalize(i18n._('show full text')),
+                checked: this.regionConfig ? !!this.regionConfig.showFullText : null,
+                checkHandler: (item, checked) => {
+                    this.regionConfig.showFullText = checked;
+                    Ext.state.Manager.set(this.regionConfigStateId, this.regionConfig);
+
+                    this.grid.view.refresh();
+                }
+            }));
+
             this.layoutMenu = new Ext.Action({
                 xtype: 'tbsplit',
-                menu: new Ext.menu.Menu({items: layoutActions}),
+                menu: new Ext.menu.Menu({items: layoutMenuItems}),
                 displayPriority: 80,
                 iconCls: 'x-cols-icon',
                 tooltip: 'Layout',
@@ -1871,6 +1924,13 @@ Ext.extend(Tine.widgets.grid.GridPanel, Ext.Panel, {
                         const level = this.regionConfig[this.detailsPanelRegion]?.responsiveLevel;
                         action.setIconClass(action.initialConfig.dataIndex === level ? 'action_enable' : '');
                     });
+                    if (action.items) {
+                        const menuItems = action.items[0].menu.items;
+                        const checkItem = menuItems.items[menuItems.items.length - 1];
+                        if (checkItem instanceof Ext.menu.CheckItem) {
+                            checkItem.setChecked(!!this.regionConfig.showFullText);
+                        }
+                    }
                 },
             });
             this.pagingToolbar.insert(11, this.sortingMenu);
@@ -1904,40 +1964,6 @@ Ext.extend(Tine.widgets.grid.GridPanel, Ext.Panel, {
             Grid = (this.gridConfig.gridType || Ext.grid.GridPanel);
         }
         //we need the state configs before initial Grid
-        if (this.stateful) {
-            this.gridConfig.stateful = true;
-            this.gridConfig.stateId = this.stateId + '-Grid';
-            const gridStateId = this.getResolvedGridStateId();
-            let gridState = Ext.state.Manager.get(gridStateId);
-            if (gridState) this.defaultSortInfo = gridState.sort;
-            
-            const stateId = `${this.recordClass.prototype.appName}-${this.recordClass.prototype.modelName}`;
-            this.regionStateId = `${stateId}_detailspanelregion`;
-            this.detailsPanelRegion = Ext.state.Manager.get(this.regionStateId, this.detailsPanelRegion);
-            
-            this.regionConfigStateId = `${stateId}_region_config`;
-            this.regionConfig = Ext.state.Manager.get(this.regionConfigStateId, {
-                'south': {},
-                'east': {},
-            });
-            
-            //update script , it should be removed after we make sure customer has the updateed state
-            const oldRegionStateId = `${this.recordClass.prototype.appName}_detailspanelregion`;
-            const oldDetailsPanelRegion = Ext.state.Manager.get(oldRegionStateId);
-            if (oldDetailsPanelRegion) {
-                this.detailsPanelRegion = oldDetailsPanelRegion;
-                Ext.state.Manager.set(this.regionStateId, this.detailsPanelRegion);
-                Ext.state.Manager.clear(oldRegionStateId);
-            }
-            const oldRegionConfigStateId = `${this.recordClass.prototype.appName}_region_config`;
-            const oldRegionConfig = Ext.state.Manager.get(oldRegionConfigStateId);
-            if (oldRegionConfig) {
-                this.regionConfig = oldRegionConfig;
-                Ext.state.Manager.set(this.regionConfigStateId, this.regionConfig);
-                Ext.state.Manager.clear(oldRegionConfigStateId);
-            }
-        }
-        
         this.gridConfig.store = this.store;
         
         // activate grid header menu for column selection
@@ -1960,40 +1986,7 @@ Ext.extend(Tine.widgets.grid.GridPanel, Ext.Panel, {
             parentScope: this,
             view: this.createView(),
             recordClass: this.recordClass,
-            getDragDropText: this.getDragDropText.createDelegate(this),
-            getState : ()=> {
-                const o = {columns: []};
-                const store = this.store;
-                let ss;
-                let gs;
-                
-                let i = 0, c;
-                for(; (c = this.grid.colModel.config[i]); i++){
-                    o.columns[i] = {
-                        id: c.id,
-                        width: c.width,
-                    };
-                    if(c.useManualWidth){
-                        o.columns[i].useManualWidth = true;
-                    }
-                    if(c.hidden){
-                        o.columns[i].hidden = true;
-                    }
-                }
-                if(store){
-                    ss = store.getSortState();
-                    if(ss){
-                        o.sort = ss;
-                    }
-                    if(store.getGroupState){
-                        gs = store.getGroupState();
-                        if(gs){
-                            o.group = gs;
-                        }
-                    }
-                }
-                return o;
-            },
+            getDragDropText: this.getDragDropText.createDelegate(this)
         }));
         
 

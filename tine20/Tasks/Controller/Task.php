@@ -26,6 +26,7 @@ use Tinebase_Model_Alarm as TBMA;
  */
 class Tasks_Controller_Task extends Tinebase_Controller_Record_Abstract implements Tinebase_Controller_Alarm_Interface
 {
+    /** @use Tinebase_Controller_SingletonTrait<Tasks_Controller_Task> */
     use Tinebase_Controller_SingletonTrait;
 
     /**
@@ -54,12 +55,12 @@ class Tasks_Controller_Task extends Tinebase_Controller_Record_Abstract implemen
      * @param Tinebase_Record_Interface $_record
      * @param string $_action
      * @param boolean $_throw
-     * @param string $_errorMessage
+     * @param ?string $_errorMessage
      * @param Tinebase_Record_Interface $_oldRecord
      * @return boolean
      * @throws Tinebase_Exception_AccessDenied
      */
-    protected function _checkGrant($_record, $_action, $_throw = TRUE, $_errorMessage = 'No Permission.', $_oldRecord = NULL)
+    protected function _checkGrant($_record, $_action, $_throw = true, $_errorMessage = null, $_oldRecord = null)
     {
         try {
             $result = parent::_checkGrant($_record, $_action, $_throw, $_errorMessage, $_oldRecord);
@@ -123,6 +124,9 @@ class Tasks_Controller_Task extends Tinebase_Controller_Record_Abstract implemen
         }
 
         if (!$result && $_throw) {
+            if (!$_errorMessage) {
+                $_errorMessage = $this->_getTranslatedNoPermissionMessage($_action);
+            }
             throw new Tinebase_Exception_AccessDenied($_errorMessage);
         }
 
@@ -149,7 +153,7 @@ class Tasks_Controller_Task extends Tinebase_Controller_Record_Abstract implemen
         }
 
         static $knownFilterIds = [];
-        if (isset($knownFilterIds[$_filter->getId()])) {
+        if (isset($knownFilterIds[$_filter->getId() ?? ''])) {
             return;
         }
         $_filter->andWrapItself();

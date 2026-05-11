@@ -18,12 +18,14 @@
  */
 class Timetracker_Controller_Timeaccount extends Tinebase_Controller_Record_Container
 {
+    public const TASK_TIMEACCOUNT_CUSTOM_FIELD_NAME = 'timeaccount';
+
     /**
      * the constructor
      *
      * don't use the constructor. use the singleton 
      */
-    private function __construct()
+    protected function __construct()
     {
         $this->_applicationName = 'Timetracker';
         $this->_backend = new Timetracker_Backend_Timeaccount();

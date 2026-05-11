@@ -5,6 +5,9 @@
  * @author      Alexander Stintzing <a.stintzing@metaways.de>
  * @copyright   Copyright (c) 2013 Metaways Infosystems GmbH (http://www.metaways.de)
  */
+import RelatedDocumentsGridPanel from './Document/RelatedDocumentsGridPanel'
+import './createFromContactAction'
+
 Ext.ns('Tine.Sales');
 
 /**
@@ -29,8 +32,18 @@ Tine.Sales.CustomerEditDialog = Ext.extend(Tine.widgets.dialog.EditDialog, {
     
     initComponent: function() {
         Tine.Sales.CustomerEditDialog.superclass.initComponent.call(this);
+
+        _.each(Tine.Sales.Model.Address.getModelConfiguration().uiconfig.contactManagedFields, fieldName => {
+            this.form.findField(`adr_${fieldName}`).fixedIf = (v, record) => _.some(record.get('relations'), rel => rel.type === 'CONTACTCUSTOMER')
+        })
     },
 
+    checkStates: function() {
+        Tine.Sales.CustomerEditDialog.superclass.checkStates.call(this);
+
+        const rel = _.find(this.record.get('relations'), {type: 'CONTACTCUSTOMER'});
+        this.contactManagedInfo.setVisible(!!rel);
+    },
     /**
      * executed after record got updated from proxy
      */
@@ -60,7 +73,6 @@ Tine.Sales.CustomerEditDialog = Ext.extend(Tine.widgets.dialog.EditDialog, {
                 this.window.setTitle(this.app.i18n._('Add New Customer'));
             } else {
                 this.window.setTitle(String.format(this.app.i18n._('Edit Customer "{0}"'), this.record.getTitle()));
-                this.getForm().findField('number').disable();
             }
         }
     },
@@ -157,6 +169,12 @@ Tine.Sales.CustomerEditDialog = Ext.extend(Tine.widgets.dialog.EditDialog, {
             border: false,
             plain: true,
             activeTab: 0,
+            plugins: [{
+                ptype : 'ux.tabpanelkeyplugin'
+            }, {
+                ptype: 'ux.itemregistry',
+                key:   [this.app.appName, this.recordClass.getMeta('modelName'), 'EditDialog-TabPanel'].join('-')
+            }],
             items: [{
             title: this.app.i18n._('Customer'),
             autoScroll: true,
@@ -306,6 +324,13 @@ Tine.Sales.CustomerEditDialog = Ext.extend(Tine.widgets.dialog.EditDialog, {
                         formDefaults: formFieldDefaults,
                         items: [
                             [{
+                                xtype: 'v-alert',
+                                ref: '../../../../../../../contactManagedInfo',
+                                hidden: true,
+                                columnWidth: 1,
+                                variant: 'info',
+                                label: this.app.formatMessage('This address is managed by the linked contact. Changes to the readonly fields can be done in that contact directly.'),
+                            }], [{
                                 name: 'adr_name_shorthand',
                                 columnWidth: .2,
                                 fieldLabel: this.app.i18n._('Name shorthand')

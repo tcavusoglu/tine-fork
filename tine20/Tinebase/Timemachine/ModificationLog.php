@@ -161,7 +161,6 @@ class Tinebase_Timemachine_ModificationLog implements Tinebase_Controller_Interf
 
         if ($additionalFilter) {
             $refProp = new ReflectionProperty(Tinebase_Model_Filter_FilterGroup::class, '_filterModel');
-            $refProp->setAccessible(true);
             $refProp->setValue($filter, [
                 'application_id' => ['filter' => Tinebase_Model_Filter_Text::class],
                 'record_type' => ['filter' => Tinebase_Model_Filter_Text::class],
@@ -1515,7 +1514,6 @@ class Tinebase_Timemachine_ModificationLog implements Tinebase_Controller_Interf
                                 file_put_contents($path, $fh);
                             $fh && @fclose($fh);
                             @unlink($tmpFile);
-                        default;
                     }
                 }
             }

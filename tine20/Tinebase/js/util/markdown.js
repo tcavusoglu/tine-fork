@@ -1,4 +1,4 @@
-import '../../css/util/markdown.less'
+import '../../styles/util/markdown.scss'
 
 let marked
 let DOMPurify
@@ -10,6 +10,7 @@ const getMarked = async () => {
             async: true,
             pedantic: false,
             gfm: true,
+            breaks: true,
         })
     }
 
@@ -42,9 +43,14 @@ const parseInlinePurified = async (markdownString ,options) => {
     return (await getDOMPurify()).sanitize(await parseInline(markdownString, options))
 }
 
+const escapeMarkdown = (text) => {
+    return text.replace(/[\\`*_{}\[\]()#+\-!.>|]/g, '\\$&');
+}
+
 export {
     parse,
     parsePurified,
     parseInline,
-    parseInlinePurified
+    parseInlinePurified,
+    escapeMarkdown
 }

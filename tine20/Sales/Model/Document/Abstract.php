@@ -132,10 +132,11 @@ abstract class Sales_Model_Document_Abstract extends Tinebase_Record_NewAbstract
         self::APP_NAME                      => Sales_Config::APP_NAME,
         self::RECORD_NAME                   => 'Document', // ngettext('Document', 'Documents', n)
         self::RECORDS_NAME                  => 'Documents', // gettext('GENDER_Document')
-        self::TITLE_PROPERTY                => self::FLD_DOCUMENT_NUMBER,
+        self::TITLE_PROPERTY                => '{{'. self::FLD_DOCUMENT_NUMBER . '}} [{{ renderTitle('.self::FLD_CUSTOMER_ID.', "'.Sales_Model_Document_Customer::class.'") }}]{% if '. self::FLD_DOCUMENT_TITLE . '%} {{' . self::FLD_DOCUMENT_TITLE .'}}{% endif %}{% if '. self::FLD_DOCUMENT_DATE . '%} ({{'. self::FLD_DOCUMENT_DATE .'|localizeddate("short", "none", app.user.locale )}}){% endif %}',
         self::MODLOG_ACTIVE                 => true,
         self::EXPOSE_JSON_API               => true,
         self::EXPOSE_HTTP_API               => true,
+        self::DEFAULT_SORT_INFO             => [self::FIELD => self::FLD_DOCUMENT_NUMBER],
 
         self::HAS_ATTACHMENTS => true,
         self::HAS_CUSTOM_FIELDS => true,
@@ -147,6 +148,16 @@ abstract class Sales_Model_Document_Abstract extends Tinebase_Record_NewAbstract
 
         self::CONTAINER_PROPERTY        => null,
         self::DELEGATED_ACL_FIELD       => self::FLD_DEBITOR_ID,
+        self::TABLE                     => [
+            self::INDEXES                   => [
+                self::FLD_DOCUMENT_DATE         => [
+                    self::COLUMNS                   => [self::FLD_DOCUMENT_DATE],
+                ],
+                self::FLD_DOCUMENT_NUMBER       => [
+                    self::COLUMNS                   => [self::FLD_DOCUMENT_NUMBER],
+                ],
+            ],
+        ],
 
         self::JSON_EXPANDER             => [
             Tinebase_Record_Expander::EXPANDER_PROPERTIES => [
@@ -298,7 +309,7 @@ abstract class Sales_Model_Document_Abstract extends Tinebase_Record_NewAbstract
                 self::TYPE                          => self::TYPE_STRING,
                 self::LENGTH                        => 255,
                 self::NULLABLE                      => true,
-                self::QUERY_FILTER              => true,
+                self::QUERY_FILTER                  => true,
             ],
             self::FLD_DOCUMENT_DATE             => [
                 self::LABEL                         => 'Document Date', //_('Document Date')
@@ -345,7 +356,7 @@ abstract class Sales_Model_Document_Abstract extends Tinebase_Record_NewAbstract
             ],
             self::FLD_CONTRACT_NUMBER        => [
                 self::LABEL                         => 'Contract Number', //_('Contract Number')
-                // self::DESCRIPTION                   => 'An identifier assigned by the acquirer and used for internal control purposes (BT-10 [EN 16931]).', // _('An identifier assigned by the acquirer and used for internal control purposes (BT-10 [EN 16931]).')
+                self::DESCRIPTION                   => 'A unique identifier for the contract (e.g., contract number) (BT-12 [EN 16931]).', // _('A unique identifier for the contract (e.g., contract number) (BT-12 [EN 16931]).')
                 self::TYPE                          => self::TYPE_STRING,
                 self::LENGTH                        => 255,
                 self::NULLABLE                      => true,
@@ -407,6 +418,9 @@ abstract class Sales_Model_Document_Abstract extends Tinebase_Record_NewAbstract
 
             self::FLD_POSITIONS                 => [
                 // needs to be set by concret implementation
+                // @TODO - no filter w.o. label... but simple operations do not work like:
+                //         invoices with posings having tax_rate 0 (including null)...
+//                self::LABEL                         => 'Positions',
                 self::TYPE                          => self::TYPE_RECORDS,
                 self::CONFIG                        => [
                     self::APP_NAME                      => Sales_Config::APP_NAME,
@@ -522,6 +536,7 @@ abstract class Sales_Model_Document_Abstract extends Tinebase_Record_NewAbstract
                 ],
                 self::UI_CONFIG                     => [
                     self::READ_ONLY                     => true,
+                    'xtype'                             => 'sales-taxbyrate-field'
                 ],
             ],
             self::FLD_GROSS_SUM                 => [

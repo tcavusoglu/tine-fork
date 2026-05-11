@@ -12,12 +12,15 @@
  * Test helper
  */
 require_once dirname(dirname(dirname(dirname(__FILE__)))) . DIRECTORY_SEPARATOR . 'TestHelper.php';
+use phpmock\phpunit\PHPMock;
+use PHPMailer\DKIMValidator\Validator;
 
 /**
  * Test class for Felamimail_Controller_Cache_*
  */
 class Felamimail_Controller_Cache_MessageTest extends TestCase
 {
+    use PHPMock;
     /**
      * @var Felamimail_Controller_Cache_Message
      */
@@ -499,11 +502,13 @@ class Felamimail_Controller_Cache_MessageTest extends TestCase
     {
         $this->_testNeedsTransaction();
         // Get test message
-        $message = $this->_emailTestClass->messageTestHelper('multipart_alternative.eml');
+        $folderToTest = $this->_getFolder('INBOX');
+        $message = $this->_emailTestClass->messageTestHelper('multipart_alternative.eml', _folder: $folderToTest);
         $this->_headerValueToDelete = 'HEADER X-Tine20TestMessage multipart_alternative.eml';
 
-        $filter = array(array(
-            'field' => 'messageuid', 'operator' => 'in', 'value' => array($message->messageuid)
+        $filter = new Felamimail_Model_MessageFilter(array(
+            array('field' => 'folder_id', 'operator' => 'equals', 'value' => $folderToTest->getId()),
+            array('field' => 'messageuid', 'operator' => 'in', 'value' => array($message->messageuid))
         ));
         $json = new Felamimail_Frontend_Json();
 
@@ -525,9 +530,9 @@ class Felamimail_Controller_Cache_MessageTest extends TestCase
         Tinebase_Tags::getInstance()->setRights($right);
         Felamimail_Controller_Message_Flags::getInstance()->addFlags([$message], [$tag->getId()]);
 
-        $updatedFolder = $this->_folder;
+        $updatedFolder = $folderToTest;
         while (! isset($updatedFolder) || $updatedFolder->cache_status === Felamimail_Model_Folder::CACHE_STATUS_INCOMPLETE) {
-            $updatedFolder = $this->_controller->updateCache($this->_folder, 30, 1);
+            $updatedFolder = $this->_controller->updateCache($updatedFolder, 30, 1);
         }
 
         $result = $json->searchMessages($filter, []);
@@ -547,5 +552,50 @@ class Felamimail_Controller_Cache_MessageTest extends TestCase
 
         $this->assertEquals(1, count($result['results'][0]['tags']), 'Message should fetch the tags again');
         $this->assertEquals(1, count($updatedTags), 'tag should be recreated');
+    }
+
+    /**
+     * @group noupdate
+     *
+     * @return void
+     * @throws Felamimail_Exception
+     * @throws Tinebase_Exception_AccessDenied
+     * @throws Tinebase_Exception_InvalidArgument
+     * @throws Tinebase_Exception_Record_DefinitionFailure
+     * @throws Tinebase_Exception_Record_Validation
+     */
+    public function testAddMessageCacheWithSenderFlag(): void
+    {
+        $message = $this->_emailTestClass->messageTestHelper('test_dkim.eml');
+        $filter = array(array(
+            'field' => 'messageuid', 'operator' => 'in', 'value' => array($message->messageuid)
+        ));
+        $json = new Felamimail_Frontend_Json();
+        $result = $json->searchMessages($filter, []);
+
+        $this->assertEquals('Metaways', $result['results'][0]['flags'][1], 'Message should have sender tag');
+    }
+
+    public function testAddMessageCacheWithSenderFlagInvalidCTag(): void
+    {
+        $mailAsString = file_get_contents(dirname(__FILE__) . '/../../files/test_dkim_invalid_c.eml');
+        $validator = new Validator($mailAsString);
+        $result = $validator->validateBoolean();
+
+        $this->assertFalse($result);
+    }
+
+    public function testAddMessageCacheWithSenderFlagEmptyPTag(): void
+    {
+        $mailAsString = file_get_contents(dirname(__FILE__) . '/../../files/test_dkim.eml');
+        $dnsGetRecord = $this->getFunctionMock('PHPMailer\\DKIMValidator', 'dns_get_record');
+        $dnsGetRecord->expects($this->any())
+            ->willReturn([[
+                'type' => 'TXT',
+                'txt' => 'v=DKIM1; h=sha256; k=rsa; p= ; s=email;'
+            ]]);
+        $validator = new Validator($mailAsString);
+        $result = $validator->validateBoolean();
+        $this->assertFalse($result);
     }
 }

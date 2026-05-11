@@ -73,6 +73,7 @@ class Addressbook_Model_ContactProperties_Address extends Tinebase_Record_NewAbs
                 self::CONFIG                    => [
                     self::APP_NAME                  => Addressbook_Config::APP_NAME,
                     self::MODEL_NAME                => Addressbook_Model_Contact::MODEL_NAME_PART,
+                    self::IS_PARENT                 => true,
                 ],
                 self::DISABLED => true,
                 self::VALIDATORS => [
@@ -203,11 +204,11 @@ class Addressbook_Model_ContactProperties_Address extends Tinebase_Record_NewAbs
             return;
         }
         $prefix = $def[self::CONFIG][self::JSON_FACADE];
-        $self = new self([
+        $self = new static([
             self::FLD_CONTACT_ID => $record->getId(),
         ], true);
 
-        foreach (self::$_facadeFields as $field) {
+        foreach (static::$_facadeFields as $field) {
             $self->{$field} = $record->{$prefix . $field};
         }
 

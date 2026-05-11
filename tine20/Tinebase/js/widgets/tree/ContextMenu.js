@@ -191,6 +191,7 @@ Tine.widgets.tree.ContextMenu = {
         }
         
         return new Ext.menu.Menu({
+            openerCt: config.openerCt,
             plugins: menuPlugins,
             items: items
         });
@@ -322,7 +323,8 @@ Tine.widgets.tree.ContextMenu = {
                             
                                 var nodeData = Ext.util.JSON.decode(_result.responseText);
                                 node.setText(Ext.util.Format.htmlEncode(_text));
-                                
+                                node.attributes.longName = _text;
+
                                 this.scope.fireEvent('containerrename', nodeData, node, _text);
                                                               
                             },

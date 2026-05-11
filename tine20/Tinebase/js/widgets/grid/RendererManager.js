@@ -12,7 +12,7 @@ require('./ImageRenderer');
 require('./jsonRenderer');
 
 import {supportedTypes as supportedACETypes} from "../form/AceField";
-import getACERenderer from './ACERenderer'
+import getACERenderer from './ACERenderer';
 
 /**
  * central renderer manager
@@ -127,13 +127,15 @@ Tine.widgets.grid.RendererManager = function() {
                         renderer = null;
                     }
                     break;
+                case 'bigint':
                 case 'integer':
                 case 'float':
                     if (fieldDefinition.hasOwnProperty('specialType')) {
                         switch (fieldDefinition.specialType) {
                             case 'bytes1000':
                                 renderer = function (value, cell, record) {
-                                    return Tine.Tinebase.common.byteRenderer(value, cell, record, 2, true);
+                                    const forceUnit = _.get(fieldDefinition, 'uiconfig.forceUnit', null);
+                                    return Tine.Tinebase.common.byteFormatter(parseInt(value), forceUnit, 2, true);
                                 };
                                 break;
                             case 'bytes':
@@ -154,18 +156,18 @@ Tine.widgets.grid.RendererManager = function() {
                                 break;
                             case 'discount':
                                 if (fieldDefinition.singleField) {
-                                    renderer = function (value, cell, record) {
+                                    renderer = function (value, metaData, record) {
                                         const type = record.get(fieldName.replace(/_sum$/, '_type'));
                                         if (type === 'PERCENTAGE') {
                                             value = record.get(fieldDefinition.fieldName.replace(/_sum$/, '_percentage'));
                                             return !value && value !== 0 ? '' : Tine.Tinebase.common.percentRenderer(value, 'float');
                                         } else {
-                                            return !value && value !== 0 ? '' : Ext.util.Format.money(value);
+                                            return !value && value !== 0 ? '' : Ext.util.Format.money(value, metaData);
                                         }
                                     }
                                 } else {
-                                    renderer = function (value, cell, record) {
-                                        return !value ? '' : Ext.util.Format.money(value);
+                                    renderer = function (value, metaData, record) {
+                                        return !value ? '' : Ext.util.Format.money(value, metaData);
                                     }
                                 }
                                 break;
@@ -209,12 +211,24 @@ Tine.widgets.grid.RendererManager = function() {
                     break;
                 case 'text':
                 case 'fulltext':
-                    renderer = this.defaultRenderer;
+                    renderer = function (value, metaData, record) {
+                        if (metaData && metaData.showFullText) {
+                            return Tine.Tinebase.common.markdownRenderer(value, metaData, record);
+                        } else {
+                            return Tine.widgets.grid.RendererManager.defaultRenderer(value);
+                        }
+                    };
+
                     if (fieldDefinition.hasOwnProperty('specialType')) {
                         if (supportedACETypes.indexOf(fieldDefinition.specialType) >= 0) {
                             renderer = getACERenderer(fieldDefinition.specialType);
+                        } else if (fieldDefinition.specialType === 'markdown') {
+                            renderer = Tine.Tinebase.common.markdownRenderer;
                         }
+                    } else if (fieldName === 'description') {
+                        renderer = Tine.Tinebase.common.markdownRenderer;
                     }
+
                     break;
                 case 'user':
                     renderer = Tine.Tinebase.common.usernameRenderer;
@@ -248,8 +262,8 @@ Tine.widgets.grid.RendererManager = function() {
                     renderer = Tine.Tinebase.common.booleanRenderer;
                     break;
                 case 'money':
-                    renderer = function (value, cell, record) {
-                        return Ext.util.Format.money(value, {zeroMoney: fieldDefinition?.specialType === 'zeroMoney'}, fieldDefinition.nullable);
+                    renderer = function (value, metaData, record) {
+                        return Ext.util.Format.money(value, Object.assign({zeroMoney: fieldDefinition?.specialType === 'zeroMoney'}, metaData), fieldDefinition.nullable);
                     };
                     break;
                 case 'attachments':
@@ -317,7 +331,8 @@ Tine.widgets.grid.RendererManager = function() {
                     renderer = function renderer(value, metaData, record, rowIndex, colIndex, store) {
                         const lang = store?.localizedLang || keyFieldDef.default
                         const localized = _.find(value, { language: lang })
-                        const text = Ext.util.Format.htmlEncode(_.get(localized, 'text', ''));
+                        let text = Tine.Tinebase.common.markdownRenderer(_.get(localized, 'text', ''), metaData, record);
+
                         const langCode = lang.toUpperCase();
                         const qtip = i18n._('This is a multilingual field:') + '<br />' + _.reduce(value, (text, localized) => {
                             return text + '<br />' + translationList[localized.language] + ': ' + Ext.util.Format.htmlEncode(localized.text)
@@ -387,7 +402,17 @@ Tine.widgets.grid.RendererManager = function() {
                 renderer = Tine.widgets.customfields.Renderer.get(appName, cfConfig);
             }
 
-            return renderer ? renderer : this.defaultRenderer;
+            // finally apply generic wrap for dynamic metadata provider
+            const wrap = _.wrap(renderer ? renderer : this.defaultRenderer, function(func, ...args) {
+                let [value, metaData, record, rowIndex, colIndex, store] = args;
+                if (_.isFunction(wrap.transformMetaData)) {
+                    metaData = wrap.transformMetaData.apply(this, args);
+                    args[1] = metaData;
+                }
+                return func.apply(this, args);
+            });
+
+            return wrap
         },
 
         /**

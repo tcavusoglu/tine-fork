@@ -27,6 +27,7 @@ class MatrixSynapseIntegrator_Config extends Tinebase_Config_Abstract
     public const IDENTITY_SERVER_URL = 'identityServerUrl';
 
     public const CORPORAL_SHARED_AUTH_TOKEN = 'corporalSharedAuthToken';
+    public const CORPORAL_USER_ID = 'corporalUserId';
 
     public const MATRIX_DIRECTORY_ENABLED = 'matrixDirectoryEnabled';
     public const MATRIX_DIRECTORY_DATABASE_URL = 'matrixDirectoryDatabaseUrl';
@@ -37,8 +38,10 @@ class MatrixSynapseIntegrator_Config extends Tinebase_Config_Abstract
     public const MATRIX_SYNAPSE_DATABASE_USERNAME = 'matrixSynapseDatabaseUsername';
     public const MATRIX_SYNAPSE_DATABASE_PASSWORD = 'matrixSynapseDatabasePassword';
     public const MATRIX_SYNAPSE_SHARED_SECRET_AUTH = 'matrixSynapseSharedSecretAuth';
+    public const REST_AUTH_ALLOW_UNINITIALIZED = 'restAuthAllowUninitialized';
 
     public const ADDRESSBOOK_CF_NAME_MATRIX_ID = 'matrix_id';
+    public const ADDRESSBOOK_CF_NAME_ROOM = 'room';
 
     /**
      * (non-PHPdoc)
@@ -70,7 +73,6 @@ class MatrixSynapseIntegrator_Config extends Tinebase_Config_Abstract
             self::CLIENTREGISTRYINCLUDE     => true,
             self::SETBYADMINMODULE          => true,
             self::SETBYSETUPMODULE          => true,
-            self::DEFAULT_STR               => 'http://{MATRIX_USER_ID}.localhost:8080/',
         ],
         self::HOME_SERVER_URL            => [
             //_('Home Server URL')
@@ -99,6 +101,16 @@ class MatrixSynapseIntegrator_Config extends Tinebase_Config_Abstract
             self::LABEL                     => 'Corporal Shared Auth Token',
             //_('Corporal Shared Auth Token')
             self::DESCRIPTION               => 'Corporal Shared Auth Token',
+            self::TYPE                      => self::TYPE_STRING,
+            self::CLIENTREGISTRYINCLUDE     => false,
+            self::SETBYADMINMODULE          => false,
+            self::SETBYSETUPMODULE          => false,
+        ],
+        self::CORPORAL_USER_ID    => [
+            //_('Corporal User ID')
+            self::LABEL                     => 'Corporal User ID',
+            //_('Corporal User ID')
+            self::DESCRIPTION               => 'Corporal User ID',
             self::TYPE                      => self::TYPE_STRING,
             self::CLIENTREGISTRYINCLUDE     => false,
             self::SETBYADMINMODULE          => false,
@@ -196,6 +208,17 @@ class MatrixSynapseIntegrator_Config extends Tinebase_Config_Abstract
             self::SETBYADMINMODULE      => false,
             self::SETBYSETUPMODULE      => true,
         ],
+        self::REST_AUTH_ALLOW_UNINITIALIZED => [
+            //_('Synapse shared secret auth')
+            self::LABEL                 => 'rest auth allow uninitialized',
+            //_('Synapse shared secret auth')
+            self::DESCRIPTION           => 'rest auth allow uninitialized',
+            self::TYPE                  => self::TYPE_BOOL,
+            self::CLIENTREGISTRYINCLUDE => false,
+            self::SETBYADMINMODULE      => false,
+            self::SETBYSETUPMODULE      => false,
+            self::DEFAULT_STR           => true,
+        ],
     ];
 
     /**
@@ -244,5 +267,25 @@ class MatrixSynapseIntegrator_Config extends Tinebase_Config_Abstract
     public static function getProperties()
     {
         return self::$_properties;
+    }
+
+    /**
+     * @throws Tinebase_Exception_InvalidArgument
+     * @see Tinebase_Frontend_Http_SinglePageApplication::getHeaders()
+     */
+    public function registerCspSources(): void
+    {
+        $url = $this->get(MatrixSynapseIntegrator_Config::ELEMENT_URL);
+
+        if (!empty($url)) {
+            $url = preg_replace('/[\w-]*{MATRIX_USER_ID}[\w-]*/', '*', $url);
+
+            $parsed = parse_url(rtrim($url, '/'));
+            if ($parsed) {
+                $origin = $parsed['scheme'] . '://' . $parsed['host']
+                    . (isset($parsed['port']) ? ':' . $parsed['port'] : '');
+                Tinebase_Frontend_Http_CspRegistry::getInstance()->addSource('frame-src', $origin);
+            }
+        }
     }
 }

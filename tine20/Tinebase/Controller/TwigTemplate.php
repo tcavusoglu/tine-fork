@@ -22,6 +22,7 @@ use Tinebase_Model_Filter_Abstract as TMFA;
  */
 class Tinebase_Controller_TwigTemplate extends Tinebase_Controller_Record_Abstract
 {
+    /** @use Tinebase_Controller_SingletonTrait<Tinebase_Controller_TwigTemplate> */
     use Tinebase_Controller_SingletonTrait;
 
     /**
@@ -47,7 +48,7 @@ class Tinebase_Controller_TwigTemplate extends Tinebase_Controller_Record_Abstra
         if (!$this->_doContainerACLChecks) {
             return true;
         }
-        if (Tinebase_Core::getUser()->hasRight($_record->{Tinebase_Model_TwigTemplate::FLD_APPLICATION_ID}, Tinebase_Acl_Rights::TWIG)) {
+        if (Tinebase_Core::getUser()->hasRight($_record->{Tinebase_Model_TwigTemplate::FLD_APPLICATION_ID}, Tinebase_Acl_Rights::MANAGE_TEMPLATES)) {
             return true;
         }
 
@@ -72,7 +73,7 @@ class Tinebase_Controller_TwigTemplate extends Tinebase_Controller_Record_Abstra
 
         $appIds = [];
         foreach (Tinebase_Application::getInstance()->getApplicationsByState(Tinebase_Application::ENABLED) as $app) {
-            if (Tinebase_Core::getUser()->hasRight($app, Tinebase_Acl_Rights_Abstract::TWIG)) {
+            if (Tinebase_Core::getUser()->hasRight($app, Tinebase_Acl_Rights_Abstract::MANAGE_TEMPLATES)) {
                 $appIds[] = $app->getId();
             }
         }

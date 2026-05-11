@@ -1,18 +1,18 @@
 <?php
 /**
- * Tine 2.0
+ * tine Groupware
  * 
  * @package     Tinebase
  * @subpackage  Record
- * @license     http://www.gnu.org/licenses/agpl.html AGPL Version 3
- * @copyright   Copyright (c) 2007-2025 Metaways Infosystems GmbH (http://www.metaways.de)
+ * @license     https://www.gnu.org/licenses/agpl.html AGPL Version 3
+ * @copyright   Copyright (c) 2007-2026 Metaways Infosystems GmbH (https://www.metaways.de)
  * @author      Cornelius Weiss <c.weiss@metaways.de>
  */
 
 /**
  * class to hold a list of records
  * 
- * records are held as a unsorted set with a autoasigned numeric index.
+ * records are held as a unsorted set with a auto-assigned numeric index.
  * NOTE: the index of an record is _not_ related to the record and/or its identifier!
  * 
  * @package     Tinebase
@@ -49,7 +49,7 @@ class Tinebase_Record_RecordSet implements IteratorAggregate, Countable, ArrayAc
     protected $_idMap = array();
     
     /**
-     * holds offsets of idless (new) records in $_listOfRecords
+     * holds offsets of id-less (new) records in $_listOfRecords
      * @var array
      */
     protected $_idLess = array();
@@ -167,9 +167,9 @@ class Tinebase_Record_RecordSet implements IteratorAggregate, Countable, ArrayAc
      */
     public function removeAll()
     {
-        foreach ($this->_listOfRecords as $record) {
-            $this->removeRecord($record);
-        }
+        $this->_listOfRecords = [];
+        $this->_idMap = [];
+        $this->_idLess = [];
     }
     
     /**
@@ -264,12 +264,12 @@ class Tinebase_Record_RecordSet implements IteratorAggregate, Countable, ArrayAc
     /**
      * returns index of record identified by its id
      * 
-     * @param  string $_id id of record
+     * @param  ?string $_id id of record <- this should not be nullable ... but it is: legacy
      * @return int|false    index of record or false if not in set
      */
     public function getIndexById($_id)
     {
-        return $this->_idMap[$_id] ?? (is_numeric($_id) ?
+        return $this->_idMap[$_id ?? ''] ?? (is_numeric($_id) ?
             (is_string($_id) ? ($this->_idMap[intval($_id)] ?? false) : ($this->_idMap[(string)$_id] ?? false))
             : false);
     }
@@ -419,14 +419,14 @@ class Tinebase_Record_RecordSet implements IteratorAggregate, Countable, ArrayAc
      * @param array $_arguments
      * @return array array index => return value
      */
-    public function __call($_fname, $_arguments)
+    public function __call(string $_fname, array $_arguments): array
     {
-        $returnValues = array();
-        foreach ($this->_listOfRecords as $index => $record) {
-            $returnValues[$index] = call_user_func_array(array($record, $_fname), $_arguments);
-        }
-        
-        return $returnValues;
+        return array_map(function ($record) use ($_arguments, $_fname) {
+            if (! method_exists($record, $_fname)) {
+                throw new BadMethodCallException(get_class($record) . '::' . $_fname . '() does not exist');
+            }
+            return call_user_func_array([$record, $_fname], $_arguments);
+        }, $this->_listOfRecords);
     }
     
    /** convert this to string
@@ -435,7 +435,7 @@ class Tinebase_Record_RecordSet implements IteratorAggregate, Countable, ArrayAc
     */
     public function __toString(): string
     {
-       return print_r($this->toArray(), TRUE);
+       return print_r($this->toArray(), true);
     }
     
     /**
@@ -958,7 +958,7 @@ class Tinebase_Record_RecordSet implements IteratorAggregate, Countable, ArrayAc
 
     public function removeById($id)
     {
-        if (isset($this->_idMap[$id])) {
+        if (null !== $id && isset($this->_idMap[$id])) {
             unset($this->_listOfRecords[$this->_idMap[$id]]);
             unset($this->_idMap[$id]);
         }

@@ -110,7 +110,7 @@ Tine.Filemanager.nodeActions.actionUpdater = function(action, grants, records, i
     Tine.widgets.ActionUpdater.prototype.defaultUpdater(action, grants, records, isFilterSelect);
     
     // check filtered node if nothing is selected
-    action.initialConfig.filteredContainer = null;
+    Ext.Action.setInitialConfig(action, 'filteredContainer', null);
     if (! _.get(records, 'length') && filteredContainers) {
         const filteredContainer = Tine.Tinebase.data.Record.setFromJson(filteredContainers[0], Tine.Filemanager.Model.Node);
         const filteredContainerGrants = _.get(filteredContainers,'[0].account_grants',{});
@@ -118,7 +118,7 @@ Tine.Filemanager.nodeActions.actionUpdater = function(action, grants, records, i
         records = [filteredContainer];
         Tine.widgets.ActionUpdater.prototype.defaultUpdater(action, filteredContainerGrants, records, false);
 
-        action.initialConfig.filteredContainer = filteredContainer;
+        Ext.Action.setInitialConfig(action, 'filteredContainer', filteredContainer);
     }
 
     let disabled = _.isFunction(action.isDisabled) ? action.isDisabled() : action.disabled;
@@ -189,11 +189,6 @@ Tine.Filemanager.nodeActions.CreateFolder = {
 
             gridWdgt.newInlineRecord(newRecord, 'name', async (localRecord) => {
                 let text = localRecord.get('name');
-                
-                if (!Tine.Filemanager.Model.Node.isNameValid(text)) {
-                    Ext.Msg.alert(String.format(app.i18n._('Not renamed {0}'), nodeName), app.i18n._('Illegal characters: ') + text);
-                    return;
-                }
 
                 return await Tine.Filemanager.nodeBackend.createFolder(`${currentPath}${localRecord.get('name')}/`)
                     .then((result) => {
@@ -231,8 +226,8 @@ Tine.Filemanager.nodeActions.CreateFolder = {
 
         if (! _.get(records, 'length') && filteredContainers) {
             enabled = _.get(filteredContainers, '[0].account_grants.addGrant', false);
-            action.initialConfig.filteredContainer = Tine.Tinebase.data.Record.setFromJson(filteredContainers[0], Tine.Filemanager.Model.Node);
-        
+            Ext.Action.setInitialConfig(action, 'filteredContainer', Tine.Tinebase.data.Record.setFromJson(filteredContainers[0], Tine.Filemanager.Model.Node));
+
             enabled = Tine.Filemanager.nodeActionsMgr.checkConstraints('create', action.initialConfig.filteredContainer, [{type: 'folder'}]) && enabled;
         }
         action.setDisabled(!enabled || this.editing);
@@ -269,8 +264,8 @@ Tine.Filemanager.nodeActions.Edit = {
     },
     actionUpdater: function(action, grants, records, isFilterSelect, filteredContainers) {
         Tine.Filemanager.nodeActions.actionUpdater(action, grants, records, isFilterSelect, filteredContainers);
-        
-        const record = records[0];
+
+        const record = records[0] ?? action?.initialConfig?.filteredContainer;
         const disabledNodeIds = ['myUser', 'shared', 'otherUsers'];
         if (!record) return;
         if (disabledNodeIds.includes(record.id)) {
@@ -313,9 +308,10 @@ Tine.Filemanager.nodeActions.Rename = {
                         Ext.Msg.alert(String.format(i18n._('Not renamed {0}'), nodeName), String.format(i18n._('You must enter a {0} name!'), nodeName));
                         return;
                     }
-                    
-                    if (!Tine.Filemanager.Model.Node.isNameValid(text)) {
-                        Ext.Msg.alert(String.format(app.i18n._('Not renamed {0}'), nodeName), app.i18n._('Illegal characters: ') + text);
+
+                    const invalidChar = Tine.Filemanager.Model.Node.checkForInvalidChars(text);
+                    if (invalidChar) {
+                        Ext.Msg.alert(String.format(this.app.i18n._('No {0} added'), nodeName), this.app.i18n._('Illegal character found:') + ` ${invalidChar}`);
                         return;
                     }
 

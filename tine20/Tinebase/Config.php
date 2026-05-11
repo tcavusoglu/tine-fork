@@ -238,6 +238,8 @@ class Tinebase_Config extends Tinebase_Config_Abstract
 
     const BATCH_JOB_MAX_CONCURRENCY = 'batchJobMaxConcurrency';
 
+    public const SESSION = 'session';
+
     /**
      * smtp conf name
      * 
@@ -462,6 +464,7 @@ class Tinebase_Config extends Tinebase_Config_Abstract
      */
     public const LDAP_OVERWRITE_CONTACT_FIELDS = 'ldapOverwriteContactFields';
 
+    public const NO_OWNCLOUD_PERMISSIONS = 'noOwnCloudPermissions';
     public const REPORT_WEBDAV = 'reportWebdav';
     public const REPORT_WEBDAV_USER_LIST = 'userList';
     public const REPORT_WEBDAV_AFFECTED_USER = 'affectedUser';
@@ -821,6 +824,7 @@ class Tinebase_Config extends Tinebase_Config_Abstract
     public const MAINTENANCE_MODE_FLAG_SKIP_APPS = 'skipApps';
     public const MAINTENANCE_MODE_FLAG_ONLY_APPS = 'onlyApps';
     public const MAINTENANCE_MODE_FLAG_ALLOW_ADMIN_LOGIN = 'allowAdminLogin';
+    public const MAINTENANCE_MODE_HEALTH_CHECK = 'maintenanceModeHealthCheck';
 
     /**
      * @var string
@@ -1161,6 +1165,16 @@ class Tinebase_Config extends Tinebase_Config_Abstract
             self::SETBYADMINMODULE => false,
             self::SETBYSETUPMODULE => false,
         ],
+        self::SESSION => [
+            //_('Session Configuration')
+            self::LABEL => 'Session Configuration',
+            self::DESCRIPTION => 'Session Configuration',
+            self::TYPE => self::TYPE_OBJECT,
+            self::CLASSNAME => Tinebase_Config_Struct::class,
+            self::CLIENTREGISTRYINCLUDE => false,
+            self::SETBYADMINMODULE => false,
+            self::SETBYSETUPMODULE => false,
+        ],
         /**
          * example:
          *
@@ -1367,7 +1381,7 @@ class Tinebase_Config extends Tinebase_Config_Abstract
          * domain (string)
          * instanceName (string)
          * useEmailAsUsername (bool) - default: false
-         * preventSecondaryDomainUsername (bool) - default: false
+         * "preventSecondaryDomainUsername": false (boolean) - false be default (see \Tinebase_User_Plugin_Abstract::getLoginName)
          * host (string)
          * port (integer)
          * ssl (bool)
@@ -1375,7 +1389,6 @@ class Tinebase_Config extends Tinebase_Config_Abstract
          * backend (string) - see Tinebase_EmailUser::$_supportedBackends
          * verifyPeer (bool)
          * "allowOverwrite": false (bool)
-         * "allowExternalEmail": false (bool) // deprecated, please use smtp.allowAnyExternalDomains instead
          *
          * TODO make this a structured config with subconfig keys
          */
@@ -1402,12 +1415,12 @@ class Tinebase_Config extends Tinebase_Config_Abstract
          * "secondarydomains":"second.test,third.test" (string - comma separated) - secondarydomains that are handled by tine & allowed in tine user email addresses
          * "additionalexternaldomains":"another.test,onemore.test" (string - comma separated) - additional domains that are allowed in tine user email addresses (but not handled by tine)
          * "instanceName":"tine.test" (string)
-         * "accountnamedestination":true (boolean) - false by default (see \Tinebase_EmailUser_Smtp_Postfix::_createDefaultDestinations)
+         * "accountnamedestination": true (boolean) - true by default (see \Tinebase_EmailUser_Smtp_Postfix::_createDefaultDestinations)
          * "destinationisusername": false (boolean) - false by default (see \Tinebase_EmailUser_Smtp_Postfix::_createAliasDestinations)
          * "checkduplicatealias": true (boolean) - true by default (see \Tinebase_EmailUser_Smtp_Postfix::_checkIfDestinationExists)
          * "from":"notifications@tine.test" (string) - notification sender address
          * "allowOverwrite": false (bool)
-         * "preventSecondaryDomainUsername": true
+         * "preventSecondaryDomainUsername": false (boolean) - false be default (see \Tinebase_User_Plugin_Abstract::getLoginName)
          * "allowAnyExternalDomains": false
          *
          * TODO make this a structured config with subconfig keys
@@ -1534,6 +1547,15 @@ class Tinebase_Config extends Tinebase_Config_Abstract
                 ],
             ),
         ),
+        self::NO_OWNCLOUD_PERMISSIONS => [
+            self::LABEL => 'Disable Owncloud permissions support', //_('Disable Owncloud permissions support')
+            self::DESCRIPTION => 'Disable Owncloud permissions support',
+            self::TYPE => self::TYPE_BOOL,
+            self::CLIENTREGISTRYINCLUDE => false,
+            self::SETBYADMINMODULE => true,
+            self::SETBYSETUPMODULE => true,
+            self::DEFAULT_STR => false,
+        ],
         self::REPORT_WEBDAV => [
             self::LABEL => 'Report WebDAV issues', //_('Report WebDAV issues')
             self::DESCRIPTION => 'Report WebDAV issues',
@@ -2936,6 +2958,17 @@ class Tinebase_Config extends Tinebase_Config_Abstract
             self::SETBYADMINMODULE => TRUE,
             self::SETBYSETUPMODULE => TRUE,
         ),
+        self::MAINTENANCE_MODE_HEALTH_CHECK => array(
+            //_('Maintenance mode for health check')
+            self::LABEL => 'Maintenance mode for health check',
+            //_('If this is true, the tine health check is also in maintenance and returns http code 503')
+            self::DESCRIPTION => 'If this is true, the tine health check is also in maintenance and returns http code 503',
+            self::TYPE => self::TYPE_BOOL,
+            self::DEFAULT_STR => false,
+            self::CLIENTREGISTRYINCLUDE => false,
+            self::SETBYADMINMODULE => true,
+            self::SETBYSETUPMODULE => true,
+        ),
         self::VERSION_CHECK => array(
             //_('Version check enabled')
             self::LABEL => 'Version check enabled',
@@ -3047,7 +3080,7 @@ class Tinebase_Config extends Tinebase_Config_Abstract
             //_('Custom web URL for branding.')
             self::DESCRIPTION => 'Custom web URL for branding.',
             self::TYPE => 'string',
-            self::DEFAULT_STR => 'https://github.com/tine20/tine20',
+            self::DEFAULT_STR => 'https://github.com/tine-groupware/tine',
             self::CLIENTREGISTRYINCLUDE => true,
             self::SETBYADMINMODULE => FALSE,
             self::SETBYSETUPMODULE => FALSE
@@ -3058,7 +3091,7 @@ class Tinebase_Config extends Tinebase_Config_Abstract
             //_('Custom url for help.')
             self::DESCRIPTION => 'Custom URL for help.',
             self::TYPE => 'string',
-            self::DEFAULT_STR => 'https://tine-docu.s3web.rz1.metaways.net/',
+            self::DEFAULT_STR => 'https://docs.tine-groupware.de/',
             self::CLIENTREGISTRYINCLUDE => true,
             self::SETBYADMINMODULE => FALSE,
             self::SETBYSETUPMODULE => FALSE
@@ -3127,7 +3160,7 @@ class Tinebase_Config extends Tinebase_Config_Abstract
             //_('Installation logo')
             self::LABEL => 'Installation logo (legacy, use light/dark variants)',
             //_('Path to custom installation logo.')
-            self::DESCRIPTION => 'Path to custom installation logo.',
+            self::DESCRIPTION => 'Path to custom installation logo. Supported formats: GIF, PNG, JPG. Use INSTALL_LOGO_xxx_SVG for SVG logos.',
             self::TYPE => 'string',
             self::DEFAULT_STR => false,
             self::CLIENTREGISTRYINCLUDE => true,
@@ -4191,9 +4224,40 @@ class Tinebase_Config extends Tinebase_Config_Abstract
             /** @noinspection PhpUndefinedMethodInspection */
             return $configClassName::getInstance();
         } else {
-            if (Tinebase_Core::isLogLevel(Zend_Log::INFO)) Tinebase_Core::getLogger()->info(__METHOD__ . '::' . __LINE__
-                . ' Application ' . $applicationName . ' has no config.');
+            if (Tinebase_Core::isLogLevel(Zend_Log::INFO)) {
+                Tinebase_Core::getLogger()->info(__METHOD__ . '::' . __LINE__
+                    . ' Application ' . $applicationName . ' has no config.');
+            }
             return NULL;
+        }
+    }
+
+    /**
+     * @throws Tinebase_Exception_InvalidArgument
+     * @see Tinebase_Frontend_Http_SinglePageApplication::getHeaders()
+     */
+    public function registerCspSources(): void
+    {
+        $url = $this->get(Tinebase_Config::BROADCASTHUB)->{Tinebase_Config::BROADCASTHUB_URL};
+
+        if (!empty($url)) {
+            $parsed = parse_url(rtrim($url, '/'));
+            if ($parsed) {
+                $origin = $parsed['scheme'] . '://' . $parsed['host']
+                    . (isset($parsed['port']) ? ':' . $parsed['port'] : '');
+
+                $wsScheme = $parsed['scheme'] === 'https' ? 'wss' : 'ws';
+                $wsOrigin = $wsScheme . '://' . $parsed['host']
+                    . (isset($parsed['port']) ? ':' . $parsed['port'] : '');
+
+                Tinebase_Frontend_Http_CspRegistry::getInstance()->addSource('connect-src', $origin);
+                Tinebase_Frontend_Http_CspRegistry::getInstance()->addSource('connect-src', $wsOrigin);
+            } else {
+                if (Tinebase_Core::isLogLevel(Zend_Log::NOTICE)) {
+                    Tinebase_Core::getLogger()->notice(__METHOD__ . '::' . __LINE__
+                        . ' Broadcasthub URL could not be parsed: ' . $url);
+                }
+            }
         }
     }
 }

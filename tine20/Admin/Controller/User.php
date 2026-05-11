@@ -88,70 +88,21 @@ class Admin_Controller_User extends Tinebase_Controller_Abstract
 
         $allIds = null;
         $unsortedUserIds = [];
-        if ('filesystemSize' === $_sort) {
-            if (Tinebase_Application::getInstance()->isInstalled('Filemanager')) {
-                $unsortedUserIds = $this->_userBackend->getUsersIds($_filter);
-                $sortProperty = Tinebase_Config::getInstance()->{Tinebase_Config::QUOTA}->{Tinebase_Config::QUOTA_INCLUDE_REVISION} ? 'revision_size' : 'size';
-                $allIds = Tinebase_FileSystem::getInstance()->searchNodes(new Tinebase_Model_Tree_Node_Filter([
-                    ['field' => 'path', 'operator' => 'equals', 'value' => '/Filemanager/folders/personal'],
-                    ['field' => 'name', 'operator' => 'in', 'value' => $unsortedUserIds]
-                ], _options: ['ignoreAcl' => true]), new Tinebase_Model_Pagination([
-                    Tinebase_Model_Pagination::FLD_SORT => $sortProperty,
-                    Tinebase_Model_Pagination::FLD_DIR => $_dir !== 'ASC' ? 'DESC' : $_dir,
-                ]))->name;
-            }
-        } elseif ('emailUser' === $_sort) {
-            if (Tinebase_EmailUser::manages(Tinebase_Config::IMAP)) {
-                $emailUserBackend = null;
-                try {
-                    $emailUserBackend = Tinebase_EmailUser::getInstance();
-                } catch (Tinebase_Exception_NotFound) {}
 
-                if (null !== $emailUserBackend && $emailUserBackend instanceof Tinebase_EmailUser_Sql) {
+        if ('filesystemSize' === $_sort && Tinebase_Application::getInstance()->isInstalled('Filemanager')) {
+            $unsortedUserIds = $this->_userBackend->getUsersIds($_filter);
+            $sortProperty = Tinebase_Config::getInstance()->{Tinebase_Config::QUOTA}
+                ->{Tinebase_Config::QUOTA_INCLUDE_REVISION} ? 'revision_size' : 'size';
+            $allIds = Tinebase_FileSystem::getInstance()->searchNodes(new Tinebase_Model_Tree_Node_Filter([
+                ['field' => 'path', 'operator' => 'equals', 'value' => '/Filemanager/folders/personal'],
+                ['field' => 'name', 'operator' => 'in', 'value' => $unsortedUserIds]
+            ], _options: ['ignoreAcl' => true]), new Tinebase_Model_Pagination([
+                Tinebase_Model_Pagination::FLD_SORT => $sortProperty,
+                Tinebase_Model_Pagination::FLD_DIR => $_dir !== 'ASC' ? 'DESC' : $_dir,
+            ]))->name;
 
-                    $unsortedUserIds = $this->_userBackend->getUsersIds($_filter);
-                    $userXprops = $this->_userBackend->getUsersXprops($unsortedUserIds);
-                    $emailUserIdAccountId = [];
-
-                    $fAccountTblName = SQL_TABLE_PREFIX . Felamimail_Controller_Account::getInstance()->getBackend()->getTableName();
-                    $db = Tinebase_Core::getDb();
-                    foreach ($db->query('SELECT id, user_id, `type`, xprops FROM ' . $fAccountTblName . $db->quoteInto(' WHERE `type` IN (?)', [
-                                Felamimail_Model_Account::TYPE_SYSTEM,
-                                //Felamimail_Model_Account::TYPE_USER_INTERNAL,
-                            // only show / sort by system accounts
-                            ]) . $db->quoteInto(' AND user_id IN (?)', $unsortedUserIds))->fetchAll(Zend_Db::FETCH_ASSOC) as $row) {
-                        if (Felamimail_Model_Account::TYPE_SYSTEM === $row['type']) {
-                            $emailUserId = Tinebase_EmailUser_XpropsFacade::getEmailUserId(new Tinebase_Model_FullUser([
-                                'id' => $row['user_id'],
-                                'xprops' => $userXprops[$row['user_id']],
-                            ], true));
-                        } else {
-                            $emailUserId = Tinebase_EmailUser_XpropsFacade::getEmailUserId(new Felamimail_Model_Account([
-                                'id' => $row['id'],
-                                'xprops' => $row['xprops'],
-                            ], true));
-                        }
-                        $emailUserIdAccountId[$emailUserId] = $row['user_id'];
-                    }
-                    unset($userXprops);
-
-                    $mailSizes = [];
-                    foreach ($emailUserBackend->getUserIdsMailSize(array_keys($emailUserIdAccountId)) as $emailUserId => $mailSize) {
-                        $userId = $emailUserIdAccountId[$emailUserId];
-                            $mailSizes[$userId] ?? $mailSizes[$userId] = 0;
-                        $mailSizes[$userId] += (int)$mailSize;
-                    }
-                    unset($emailUserIdAccountId);
-
-                    $allIds = array_keys($mailSizes);
-                    if ('ASC' === $_dir) {
-                        usort($allIds, fn($a, $b) => $mailSizes[$a] < $mailSizes[$b] ? -1 : ($mailSizes[$a] === $mailSizes[$b] ? 0 : 1));
-                    } else {
-                        usort($allIds, fn($a, $b) => $mailSizes[$a] < $mailSizes[$b] ? 1 : ($mailSizes[$a] === $mailSizes[$b] ? 0 : -1));
-                    }
-                    unset($mailSizes);
-                }
-            }
+        } elseif ('emailUser' === $_sort && Tinebase_EmailUser::manages(Tinebase_Config::IMAP)) {
+            $allIds = $this->_sortByEmailUsage($_filter, $_dir);
         }
 
         $_start ??= 0;
@@ -192,6 +143,66 @@ class Admin_Controller_User extends Tinebase_Controller_Abstract
         }
         
         return $result;
+    }
+
+    protected function _sortByEmailUsage($_filter, $_dir): ?array
+    {
+        $emailUserBackend = null;
+        try {
+            $emailUserBackend = Tinebase_EmailUser::getInstance();
+        } catch (Tinebase_Exception_NotFound) {}
+
+        if (null !== $emailUserBackend && $emailUserBackend instanceof Tinebase_EmailUser_Sql) {
+            $unsortedUserIds = $this->_userBackend->getUsersIds($_filter);
+            if (empty($unsortedUserIds)) {
+                return null;
+            }
+            $userXprops = $this->_userBackend->getUsersXprops($unsortedUserIds);
+            $emailUserIdAccountId = [];
+
+            $fAccountTblName = SQL_TABLE_PREFIX . Felamimail_Controller_Account::getInstance()->getBackend()->getTableName();
+            $db = Tinebase_Core::getDb();
+            foreach ($db->query('SELECT id, user_id, `type`, xprops FROM ' . $fAccountTblName
+                . $db->quoteInto(' WHERE `type` IN (?)', [
+                    // only show / sort by system accounts
+                    Felamimail_Model_Account::TYPE_SYSTEM,
+                ]) . $db->quoteInto(' AND user_id IN (?)', $unsortedUserIds))->fetchAll(Zend_Db::FETCH_ASSOC) as $row) {
+                if (Felamimail_Model_Account::TYPE_SYSTEM === $row['type']) {
+                    $emailUserId = Tinebase_EmailUser_XpropsFacade::getEmailUserId(new Tinebase_Model_FullUser([
+                        'id' => $row['user_id'],
+                        'xprops' => $userXprops[$row['user_id']],
+                    ], true));
+                } else {
+                    $emailUserId = Tinebase_EmailUser_XpropsFacade::getEmailUserId(new Felamimail_Model_Account([
+                        'id' => $row['id'],
+                        'xprops' => $row['xprops'],
+                    ], true));
+                }
+                $emailUserIdAccountId[$emailUserId] = $row['user_id'];
+            }
+            unset($userXprops);
+
+            $mailSizes = [];
+            foreach ($emailUserBackend->getUserIdsMailSize(array_keys($emailUserIdAccountId)) as $emailUserId => $mailSize) {
+                $userId = $emailUserIdAccountId[$emailUserId];
+                    $mailSizes[$userId] ?? $mailSizes[$userId] = 0;
+                $mailSizes[$userId] += (int)$mailSize;
+            }
+            unset($emailUserIdAccountId);
+
+            $allIds = array_keys($mailSizes);
+            if ('ASC' === $_dir) {
+                usort($allIds, fn($a, $b)
+                => $mailSizes[$a] < $mailSizes[$b] ? -1 : ($mailSizes[$a] === $mailSizes[$b] ? 0 : 1));
+            } else {
+                usort($allIds, fn($a, $b)
+                => $mailSizes[$a] < $mailSizes[$b] ? 1 : ($mailSizes[$a] === $mailSizes[$b] ? 0 : -1));
+            }
+            unset($mailSizes);
+            return $allIds;
+        }
+
+        return null;
     }
     
     /**
@@ -285,17 +296,6 @@ class Admin_Controller_User extends Tinebase_Controller_Abstract
         if (!empty($_password) && !empty($smsPhoneNumber)) {
             $smsPhoneNumber = rawurldecode($smsPhoneNumber);
             $mobilePhoneNumber = Addressbook_Model_Contact::normalizeTelephoneNum($smsPhoneNumber);
-            $smsAdapterConfigs = Tinebase_Config::getInstance()->{Tinebase_Config::SMS}->{Tinebase_Config::SMS_ADAPTERS}
-                ?->{Tinebase_Model_Sms_AdapterConfigs::FLD_ADAPTER_CONFIGS};
-
-            if (!$smsAdapterConfigs || count($smsAdapterConfigs) === 0) {
-                if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(
-                    __METHOD__ . '::' . __LINE__ . ' sms adapter configs is not found , skip sending new password message');
-                return;
-            }
-
-            $smsAdapterClass = $smsAdapterConfigs->getFirstRecord()->{Tinebase_Model_Sms_AdapterConfig::FLD_ADAPTER_CLASS};
-            $smsAdapterConfig = $smsAdapterConfigs->getFirstRecord()->{Tinebase_Model_Sms_AdapterConfig::FLD_ADAPTER_CONFIG};
 
             $template = $customTemplate ? rawurldecode($customTemplate) : Tinebase_Config::getInstance()->{Tinebase_Config::SMS}
                         ->{Tinebase_Config::SMS_MESSAGE_TEMPLATES}->get(Tinebase_Config::SMS_NEW_PASSWORD_TEMPLATE);
@@ -307,19 +307,17 @@ class Admin_Controller_User extends Tinebase_Controller_Abstract
                     })
             ]);
 
-            $message = $twig->load(__METHOD__ . 'password')->render(array_merge($smsAdapterConfig->getTwigContext(), [
+            $message = $twig->load(__METHOD__ . 'password')->render([
                 'password'  => $_password,
                 'user'      => $_account->accountDisplayName,
                 'contact'   => $_account->contact_id
-            ]));
+            ]);
 
             $message = str_replace("\n", '\n', $message);
 
             $smsSendConfig = new Tinebase_Model_Sms_SendConfig([
                 Tinebase_Model_Sms_SendConfig::FLD_MESSAGE => $message,
                 Tinebase_Model_Sms_SendConfig::FLD_RECIPIENT_NUMBER => $mobilePhoneNumber,
-                Tinebase_Model_Sms_SendConfig::FLD_ADAPTER_CLASS => $smsAdapterClass,
-                Tinebase_Model_Sms_SendConfig::FLD_ADAPTER_CONFIG => $smsAdapterConfig,
             ]);
 
             try {
@@ -563,8 +561,10 @@ class Admin_Controller_User extends Tinebase_Controller_Abstract
         ]);
         Tinebase_Event::fireEvent($event);
         
-        if (Tinebase_Core::isLogLevel(Zend_Log::INFO)) Tinebase_Core::getLogger()->info(
-            __METHOD__ . '::' . __LINE__ . ' Create new user ' . $_user->accountLoginName);
+        if (Tinebase_Core::isLogLevel(Zend_Log::INFO)) {
+            Tinebase_Core::getLogger()->info(
+                __METHOD__ . '::' . __LINE__ . ' Create new user ' . $_user->accountLoginName);
+        }
 
         if ($_password != $_passwordRepeat) {
             throw new Admin_Exception("Passwords don't match.");
@@ -579,7 +579,9 @@ class Admin_Controller_User extends Tinebase_Controller_Abstract
         try {
             $transactionId = Tinebase_TransactionManager::getInstance()->startTransaction(Tinebase_Core::getDb());
 
-            $this->_checkMaxUsers();
+            if (!in_array($_user->accountLoginName, Tinebase_User::getSystemUsernames())) {
+                $this->_checkMaxUsers();
+            }
             $this->_checkLoginNameExistance($_user);
             $this->_checkLoginNameLength($_user);
             $this->_checkPrimaryGroupExistance($_user);
@@ -864,8 +866,6 @@ class Admin_Controller_User extends Tinebase_Controller_Abstract
                         $text = Tinebase_Config::getInstance()->get(Tinebase_Config::ACCOUNT_DELETION_EVENTCONFIGURATION)->{$key};
                         $userData .= "<br /> $text <br />";
                         break;
-                    default;
-                        break;
                 }
             }
 
@@ -905,11 +905,17 @@ class Admin_Controller_User extends Tinebase_Controller_Abstract
     private function _checkExtendExpiration(Tinebase_Model_FullUser $user, Tinebase_Model_FullUser|Tinebase_Model_User $oldUser): void
     {
         if ($oldUser->accountStatus === Tinebase_Model_FullUser::ACCOUNT_STATUS_EXPIRED &&
-            $user->accountExpires !== null &&
-            !$oldUser->accountExpires->equals($user->accountExpires))
+            $user->accountExpires !== null)
         {
-            if ($user->accountExpires->isLater(new Tinebase_DateTime())) {
+            if (!$oldUser->accountExpires->equals($user->accountExpires)
+                && $user->accountExpires->isLater(new Tinebase_DateTime()))
+            {
                 $user->accountStatus = Tinebase_Model_FullUser::ACCOUNT_STATUS_ENABLED;
+            }
+            if ($user->accountStatus === Tinebase_Model_FullUser::ACCOUNT_STATUS_ENABLED)
+            {
+                $user->accountStatus = Tinebase_Model_FullUser::ACCOUNT_STATUS_ENABLED;
+                $user->accountExpires = null;
             }
         }
     }

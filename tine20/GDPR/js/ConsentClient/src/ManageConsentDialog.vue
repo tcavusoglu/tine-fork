@@ -2,6 +2,7 @@
     <BModal v-model="modalTrigger" :title="dialogTitle"
         :noCloseOnBackdrop="true"
         :noCloseOnEsc="true"
+            centered
     >
         <!-- :footerClass="consentStatus === 'UNDECIDED' ? 'justify-content-end': 'justify-content-between'" -->
         <template #default v-if="record">
@@ -79,8 +80,7 @@ const postConsent = async () => {
             break;
     }
 
-    const contactId = window.location.href.split('/').pop();
-    await fetch(`/GDPR/manageConsent/${contactId}`, {
+    await fetch(window.location.pathname.replace('/view/', '/'), {
         method: 'POST',
         body: JSON.stringify(body)
     }).then(resp => resp.json())

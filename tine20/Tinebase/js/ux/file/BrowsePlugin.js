@@ -234,7 +234,7 @@ Ext.ux.file.BrowsePlugin.prototype = {
             console.error(e);
         }
 
-        if (this.files.length > 1 && !this.multiple) {
+        if (this.files && this.files.length > 1 && !this.multiple) {
             await Ext.MessageBox.show({
                 buttons: Ext.Msg.OK,
                 icon: Ext.MessageBox.INFO_FAILURE,
@@ -247,7 +247,7 @@ Ext.ux.file.BrowsePlugin.prototype = {
 
         if (Ext.isArray(this.allowedTypes) && !_.reduce(this.files, (allowed, file) => {
             return allowed && _.find(this.allowedTypes, (type) => {
-                return type.match(/\//) ? file.type === type : file.name.match(new RegExp(_.escapeRegExp(type) + '$'))
+                return type.match(/\//) ? file.type === type : file.name.match(new RegExp(_.escapeRegExp(type) + '$', 'i'))
             })
         }, true)) {
             await Ext.MessageBox.show({

@@ -52,7 +52,10 @@ class Tinebase_EmailUser_Smtp_PostfixCombined extends Tinebase_EmailUser_Sql imp
         'emailForwardOnly'  => 'forward_only',
         'emailUsername'     => 'loginname',
         'emailAliases'      => 'aliases',
-        'emailForwards'     => 'forwards'
+        'emailForwards'     => 'forwards',
+        'emailStatus'       => 'status',
+        'emailExpiryDate'   => 'expiry_date',
+        'emailLastModified' => 'last_modified_time',
     );
     
     protected $_defaults = array(
@@ -426,7 +429,7 @@ class Tinebase_EmailUser_Smtp_PostfixCombined extends Tinebase_EmailUser_Sql imp
      */
     protected function _checkDomain($_email, $_throwException = false)
     {
-        return Tinebase_EmailUser::checkAllowedDomain($_email, $_throwException, $this->_config['alloweddomains'], _includeExternalDomains: true);
+        return Tinebase_EmailUser::checkAllowedDomain($_email, $_throwException, $this->_config['alloweddomains']);
     }
     
     /**

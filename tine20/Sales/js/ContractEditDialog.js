@@ -32,7 +32,7 @@ Ext.namespace('Tine.Sales');
  * Create a new Tine.Sales.ContractGridPanel
  */
 Tine.Sales.ContractEditDialog = Ext.extend(Tine.widgets.dialog.EditDialog, {
-    windowWidth: 800,
+    windowWidth: 900,
     windowHeight: 600,
     displayNotes: true,
 
@@ -236,6 +236,7 @@ Tine.Sales.ContractEditDialog = Ext.extend(Tine.widgets.dialog.EditDialog, {
     getFormItems: function() {
         
         this.productGridPanel = new Tine.Sales.ProductAggregateGridPanel({
+            pos: 200,
             app: this.app,
             editDialog: this,
             title: this.app.i18n._('Positions'),
@@ -268,7 +269,8 @@ Tine.Sales.ContractEditDialog = Ext.extend(Tine.widgets.dialog.EditDialog, {
             ref: '../../../../../customerPicker',
             fieldLabel: this.app.i18n._('Customer')
         }], [
-            this.fieldManager('buyer_reference', { columnWidth: 0.5 }),
+            this.fieldManager('buyer_contract_number', { columnWidth: 0.25 }),
+            this.fieldManager('buyer_reference', { columnWidth: 0.25 }),
             this.fieldManager('purchase_order_reference', { columnWidth: 0.25 }),
             this.fieldManager('project_reference', { columnWidth: 0.25 })
         ], [ Tine.widgets.form.RecordPickerManager.get('Sales', 'Address', {
@@ -346,6 +348,9 @@ Tine.Sales.ContractEditDialog = Ext.extend(Tine.widgets.dialog.EditDialog, {
             },
             plugins: [{
                 ptype : 'ux.tabpanelkeyplugin'
+            }, {
+                ptype: 'ux.itemregistry',
+                key:   [this.app.appName, this.recordClass.getMeta('modelName'), 'EditDialog-TabPanel'].join('-')
             }],
             items:[
                 {

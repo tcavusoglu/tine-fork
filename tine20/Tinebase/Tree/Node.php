@@ -145,35 +145,33 @@ class Tinebase_Tree_Node extends Tinebase_Backend_Sql_Abstract
     protected function _getSelect($_cols = '*', $_getDeleted = FALSE)
     {
         $select = parent::_getSelect($_cols, $_getDeleted);
-        
+
+        $onlyId = self::IDCOL === $_cols;
         $select
             ->joinLeft(
                 /* table  */ array('tree_fileobjects' => $this->_tablePrefix . 'tree_fileobjects'), 
                 /* on     */ $this->_db->quoteIdentifier($this->_tableName . '.object_id') . ' = ' . $this->_db->quoteIdentifier('tree_fileobjects.id'),
-                /* select */ array('type', 'flysystem', 'flypath', 'created_by', 'creation_time', 'last_modified_by', 'last_modified_time', 'seq', 'contenttype', 'revision_size', 'indexed_hash', 'description')
+                /* select */ $onlyId ? [] : array('type', 'flysystem', 'flypath', 'created_by', 'creation_time', 'last_modified_by', 'last_modified_time', 'seq', 'contenttype', 'revision_size', 'indexed_hash', 'description')
             )
             ->joinLeft(
                 /* table  */ array('tree_filerevisions' => $this->_tablePrefix . 'tree_filerevisions'), 
                 /* on     */ $this->_db->quoteIdentifier('tree_fileobjects.id') . ' = ' . $this->_db->quoteIdentifier('tree_filerevisions.id') . ' AND ' .
                 $this->_db->quoteIdentifier('tree_filerevisions.revision') . ' = ' . (null !== $this->_revision ? (int)$this->_revision : $this->_db->quoteIdentifier('tree_fileobjects.revision')),
-                /* select */ array('hash', 'size', 'preview_count', 'preview_status', 'preview_error_count', 'lastavscan_time', 'is_quarantined', 'revision')
-            )->joinLeft(
-            /* table  */ array('tree_filerevisions2' => $this->_tablePrefix . 'tree_filerevisions'),
+                /* select */ $onlyId ? [] : array('hash', 'size', 'preview_count', 'preview_status', 'preview_error_count', 'lastavscan_time', 'is_quarantined', 'revision')
+            );
+        if (!$onlyId) {
+            $select->joinLeft(
+                /* table  */ array('tree_filerevisions2' => $this->_tablePrefix . 'tree_filerevisions'),
                 /* on     */ $this->_db->quoteIdentifier('tree_fileobjects.id') . ' = ' . $this->_db->quoteIdentifier('tree_filerevisions2.id'),
                 /* select */ array('available_revisions' => Tinebase_Backend_Sql_Command::factory($select->getAdapter())->getAggregate('tree_filerevisions2.revision'))
-            )->group($this->_tableName . '.object_id'
-        );
+            )->group($this->_tableName . '.object_id');
+            $select->columns(new Zend_Db_Expr('IF (' . $this->_db->quoteIdentifier('tree_fileobjects.indexed_hash') . ' = ' . $this->_db->quoteIdentifier('tree_filerevisions.hash') . ', TRUE, FALSE) AS ' . $this->_db->quoteIdentifier('isIndexed')));
+        }
 
         // NOTE: we need to do it here if $this->_modlogActive is false
         if (false === $this->_modlogActive && !$_getDeleted) {
             // don't fetch deleted objects
             $select->where($this->_db->quoteIdentifier($this->_tableName . '.is_deleted') . ' = 0');
-        }
-
-        if ($this->_db instanceof Zend_Db_Adapter_Pdo_Pgsql) {
-            $select->columns(new Zend_Db_Expr('CAST(MIN(' . $this->_db->quoteIdentifier('tree_fileobjects.indexed_hash') . ') = MIN(' . $this->_db->quoteIdentifier('tree_filerevisions.hash') . ') AS int) AS ' . $this->_db->quoteIdentifier('isIndexed')));
-        } else {
-            $select->columns(new Zend_Db_Expr('IF (' . $this->_db->quoteIdentifier('tree_fileobjects.indexed_hash') . ' = ' . $this->_db->quoteIdentifier('tree_filerevisions.hash') . ', TRUE, FALSE) AS ' . $this->_db->quoteIdentifier('isIndexed')));
         }
             
         return $select;
@@ -731,10 +729,14 @@ class Tinebase_Tree_Node extends Tinebase_Backend_Sql_Abstract
      */
     public function recalculateFolderSize(Tinebase_Tree_FileObject $_fileObjectBackend)
     {
+        if (class_exists('Tideways\Profiler')) {
+            \Tideways\Profiler::ignoreTransaction();
+        }
+
         // no transactions yet
         // get root node ids
         $searchFilter = Tinebase_Model_Tree_Node_Filter::getFolderParentIdFilterIgnoringAcl(null);
-        $result = $this->_recalculateFolderSize($_fileObjectBackend, $this->_getIdsOfDeepestFolders($this->search($searchFilter, null, true), true));
+        $result = $this->_walkLowFoldersFirst($this->search($searchFilter, null, true), fn (string $id) => $this->_recalculateFolderSize($id, $_fileObjectBackend), true);
 
         $size = 0;
         $revisionSize = 0;
@@ -752,115 +754,86 @@ class Tinebase_Tree_Node extends Tinebase_Backend_Sql_Abstract
         return $result;
     }
 
-    /**
-     * @param Tinebase_Tree_FileObject $_fileObjectBackend
-     * @param array $_folderIds
-     * @return bool
-     */
-    protected function _recalculateFolderSize(Tinebase_Tree_FileObject $_fileObjectBackend, array $_folderIds)
+    protected function _recalculateFolderSize(string $_folderId, Tinebase_Tree_FileObject $_fileObjectBackend): bool
     {
-        $success = true;
-        $parentIds = array();
         $transactionManager = Tinebase_TransactionManager::getInstance();
-        $modlogFileObjects = $_fileObjectBackend->modlogActive(false);
 
-        $dataSelect = $this->_db->select()
-            ->from(['n' => $this->_tablePrefix . $this->_tableName], ['parent_id', 'object_id'])
-            ->join(['o' => $this->_tablePrefix . 'tree_fileobjects'], 'n.object_id = o.id', ['revision_size'])
+        static $dataSelect = null;
+        static $sizeSelect = null;
+        static $revisionSizeSelect = null;
+
+        if (null === $dataSelect) $dataSelect = $this->_db->select()
+            ->from(['n' => $this->_tablePrefix . $this->_tableName], ['object_id'])
+            ->join(['o' => $this->_tablePrefix . 'tree_fileobjects'], 'n.object_id = o.id', ['revision_size', 'revision'])
             ->join(['r' => $this->_tablePrefix . 'tree_filerevisions'], 'o.id = r.id AND o.revision = r.revision', ['size']);
 
-        $sizeSelect = $this->_db->select()
+        if (null === $sizeSelect) $sizeSelect = $this->_db->select()
             ->from(['n' => $this->_tablePrefix . $this->_tableName], [new Zend_Db_Expr('SUM(r.size)')])
             ->join(['o' => $this->_tablePrefix . 'tree_fileobjects'], 'n.object_id = o.id AND n.is_deleted = 0 AND o.is_deleted = 0', [])
             ->join(['r' => $this->_tablePrefix . 'tree_filerevisions'], 'o.id = r.id AND o.revision = r.revision', []);
 
-        $revisionSizeSelect = $this->_db->select()
+        if (null === $revisionSizeSelect) $revisionSizeSelect = $this->_db->select()
             ->from(['n' => $this->_tablePrefix . $this->_tableName], [new Zend_Db_Expr('SUM(o.revision_size)')])
             ->join(['o' => $this->_tablePrefix . 'tree_fileobjects'], 'n.object_id = o.id', []);
 
-        foreach($_folderIds as $id) {
-            $transactionId = $transactionManager->startTransaction($this->_db);
-
-            try {
-                $dataSelect->reset(Zend_Db_Select::WHERE);
-                $dataSelect->where('n.id = ?', $id);
-                if (!($data = $dataSelect->query()->fetch(Zend_Db::FETCH_ASSOC))) {
-                    $transactionManager->commitTransaction($transactionId);
-                    continue;
-                }
-
-                if (!empty($data['parent_id']) && !isset($parentIds[$data['parent_id']])) {
-                    $parentIds[$data['parent_id']] = $data['parent_id'];
-                }
-
-                $revisionSizeSelect->reset(Zend_Db_Select::WHERE);
-                $revisionSizeSelect->where('n.parent_id = ?', $id);
-                $revision_size = intval($revisionSizeSelect->query()->fetchColumn(0));
-
-                $sizeSelect->reset(Zend_Db_Select::WHERE);
-                $sizeSelect->where('n.parent_id = ?', $id);
-                $size = intval($sizeSelect->query()->fetchColumn(0));
-
-
-                if ($size !== (int)$data['size'] || $revision_size !== (int)$data['revision_size']) {
-                    /** @var Tinebase_Model_Tree_FileObject $fileObject */
-                    try {
-                        $fileObject = $_fileObjectBackend->get($data['object_id'], true);
-                    } catch (Tinebase_Exception_NotFound) {
-                        $transactionManager->commitTransaction($transactionId);
-                        continue;
-                    }
-                    $fileObject->size = $size;
-                    $fileObject->revision_size = $revision_size;
-                    $_fileObjectBackend->update($fileObject);
-                }
-
+        $transactionId = $transactionManager->startTransaction($this->_db);
+        try {
+            $dataSelect->reset(Zend_Db_Select::WHERE);
+            $dataSelect->where('n.id = ?', $_folderId);
+            if (!($data = $dataSelect->query()->fetch(Zend_Db::FETCH_ASSOC))) {
                 $transactionManager->commitTransaction($transactionId);
-
-            // this shouldn't happen
-            } catch (Exception $e) {
-                $transactionManager->rollBack();
-                Tinebase_Exception::log($e);
-                $success = false;
+                return true;
             }
 
-            Tinebase_Lock::keepLocksAlive();
+            $revisionSizeSelect->reset(Zend_Db_Select::WHERE);
+            $revisionSizeSelect->where('n.parent_id = ?', $_folderId);
+            $revision_size = intval($revisionSizeSelect->query()->fetchColumn(0));
+
+            $sizeSelect->reset(Zend_Db_Select::WHERE);
+            $sizeSelect->where('n.parent_id = ?', $_folderId);
+            $size = intval($sizeSelect->query()->fetchColumn(0));
+
+            if ($size !== (int)$data['size'] || $revision_size !== (int)$data['revision_size']) {
+
+                $this->_db->update($_fileObjectBackend->getPrefixedTableName(), ['revision_size' => $revision_size], $this->_db->quoteInto('id = ?', $data['object_id']));
+                $this->_db->update($this->_tablePrefix . 'tree_filerevisions', ['size' => $size], $this->_db->quoteInto('id = ?', $data['object_id']) . $this->_db->quoteInto(' AND revision = ?', $data['revision']));
+            }
+
+            $transactionManager->commitTransaction($transactionId);
+        } catch (Exception $e) {
+            $transactionManager->rollBack();
+            Tinebase_Exception::log($e);
+            return false;
         }
-
-        $_fileObjectBackend->modlogActive($modlogFileObjects);
-
-        if (!empty($parentIds)) {
-            $success = $this->_recalculateFolderSize($_fileObjectBackend, $parentIds) && $success;
-        }
-
-        return $success;
+        return true;
     }
 
-    /**
-     * returns ids of folders that do not have any sub folders
-     *
-     * @param array $_folderIds
-     * @param boolean $_getDeleted
-     * @return array
-     */
-    protected function _getIdsOfDeepestFolders(array $_folderIds, $_getDeleted = false)
+    protected function _walkLowFoldersFirst(array $_folderIds, Closure $callable, bool $_getDeleted = false): bool
     {
-        $result = array();
-        $subFolderIds = array();
+        static $filters = [];
+        static $counter = 0;
+        if (null === ($searchFilter = ($filters[$_getDeleted] ?? null))) {
+            $searchFilter = $filters[$_getDeleted] = Tinebase_Model_Tree_Node_Filter::getFolderParentIdFilterIgnoringAcl('a', $_getDeleted);
+        }
+        $filter = $searchFilter->findFilterWithoutOr('parent_id');
+        $result = true;
         foreach($_folderIds as $folderId) {
-            // children folders
-            $searchFilter = Tinebase_Model_Tree_Node_Filter::getFolderParentIdFilterIgnoringAcl($folderId, $_getDeleted);
-            $nodeIds = $this->search($searchFilter, null, true);
-            if (empty($nodeIds)) {
-                // no children, this is a result
-                $result[] = $folderId;
-            } else {
-                $subFolderIds = array_merge($subFolderIds, $nodeIds);
+            if (0 === (++$counter % 100000)) {
+                gc_enable();
+                gc_collect_cycles();
+                gc_mem_caches();
+                Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . ' ' . memory_get_usage(true) . ' ' . memory_get_peak_usage(true));
             }
+            $filter->setValue($folderId);
+            $nodeIds = $this->search($searchFilter, null, true);
+            if (!empty($nodeIds)) {
+                $result = $this->_walkLowFoldersFirst($nodeIds, $callable, $_getDeleted) && $result;
+            }
+            $result = $callable($folderId) && $result;
         }
 
-        if (!empty($subFolderIds)) {
-            $result = array_merge($result, $this->_getIdsOfDeepestFolders($subFolderIds, $_getDeleted));
+        if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG) && 'recalculateFolderSize' === debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS,2)[1]['function']) {
+            Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . ' examined ' . $counter . ' nodes');
         }
 
         return $result;

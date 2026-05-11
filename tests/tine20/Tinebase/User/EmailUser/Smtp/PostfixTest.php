@@ -136,6 +136,8 @@ class Tinebase_User_EmailUser_Smtp_PostfixTest extends TestCase
 
     /**
      * try to update an email account
+     *
+     * @group noupdate
      */
     public function testUpdateUser()
     {
@@ -163,6 +165,9 @@ class Tinebase_User_EmailUser_Smtp_PostfixTest extends TestCase
         $this->assertEquals('j.smith@' . $this->_mailDomain, $testUser->smtpUser->emailAddress);
         $this->assertEquals($testUser->smtpUser->emailAliases->email, $testUser->emailUser->emailAliases->email,
             'smtp user data needs to be merged in email user: ' . print_r($testUser->emailUser->toArray(), TRUE));
+        $this->assertEquals('enabled', $testUser->smtpUser->emailStatus);
+        $this->assertEquals(null , $testUser->smtpUser->emailExpiryDate);
+        $this->assertNotEmpty($testUser->smtpUser->emailLastModified);
     }
 
     /**

@@ -614,6 +614,7 @@ viewConfig: {
                 p.id = c.id;
                 p.css = i === 0 ? 'x-grid3-cell-first ' : (i == last ? 'x-grid3-cell-last ' : '');
                 p.attr = p.cellAttr = '';
+                this.transformMetaData(r.data[c.name], p, r, rowIndex, i, ds)
                 p.value = c.renderer.call(c.scope, r.data[c.name], p, r, rowIndex, i, ds);
                 p.style = c.style;
                 if(Ext.isEmpty(p.value)){
@@ -640,6 +641,32 @@ viewConfig: {
             buf[buf.length] =  rt.apply(rp);
         }
         return buf.join('');
+    },
+
+    transformMetaData: function (value, metaData, record, rowIndex, colIndex, store) {
+        try {
+            if (store.proxy) {
+                const appName = store.proxy.appName;
+                const modelName = store.proxy.modelName;
+                const stateId = `${appName}-${modelName}`;
+                let regionConfigStateId = `${stateId}_region_config`;
+                let regionconfig = null;
+
+                if (Ext.state.Manager.getProvider()) {
+                    regionconfig = Ext.state.Manager.get(regionConfigStateId);
+                }
+
+                if (regionconfig && regionconfig.showFullText) {
+                    metaData.showFullText = true;
+                    metaData.maxRowHeight = 'none';
+                } else {
+                    metaData.showFullText = false;
+                    metaData.maxRowHeight = '1.2em';
+                }
+            }
+        } catch (e) {
+            console.error("transformMetaData has the following error: " + e);
+        }
     },
 
     // private
@@ -781,7 +808,7 @@ viewConfig: {
             g.enableResponsive = g.ownerCt.enableResponsive;
         }
 
-        if (g.enableResponsive) g.autoHeight = g.ownerCt.autoHeight
+        if (g.enableResponsive) g.autoHeight = g.autoHeight || g.ownerCt.autoHeight
 
         const csize = c.getSize(true);
         const vw = csize.width;
@@ -799,10 +826,8 @@ viewConfig: {
             if(Ext.isWebKit){
                 this.scroller.dom.style.position = 'static';
             }
-            if (g.enableResponsive) {
-                this.el.setSize(csize.width, 'auto');
-                this.scroller.setSize(vw, 'auto');
-            }
+            this.el.setSize(csize.width, 'auto');
+            this.scroller.setSize(vw, 'auto');
         }else{
             this.el.setSize(csize.width, csize.height);
 
@@ -1211,7 +1236,7 @@ viewConfig: {
                 widthExtra = 0; 
             }
         }
-        const currentGridStateId = this.resolveStateIdResponsiveMode(this.grid?.stateId);
+        const currentGridStateId = this.resolveStateIdResponsiveMode(this.grid?.getStateId());
         const currentGridState = Ext.state.Manager.get(currentGridStateId);
         const isStateIdChanged = !!(!this.latestGridStateId && currentGridStateId)
             || !!((this.latestGridStateId && currentGridStateId) && (this.latestGridStateId !== currentGridStateId));
@@ -1329,7 +1354,7 @@ viewConfig: {
             cm.setColumnWidth(colIdxResolvedAutoExpand, Math.max(this.grid.minColumnWidth,  width + diff), true);
         }
         
-        if (this.grid?.stateId && this.grid.stateId === this.latestGridStateId) {
+        if (this.grid?.getStateId() && this.grid.getStateId() === this.latestGridStateId) {
             this.grid.saveState();
         }
         
@@ -1667,8 +1692,8 @@ viewConfig: {
      * @return {String}
      */
     oneColumnRenderer: function(recordId, metadata, record, rowIndex, colIndex, store) {
-        if (this?.grid?.stateId) {
-            const stateIdDefault = this.grid.stateId;
+        if (this?.grid?.getStateId()) {
+            const stateIdDefault = this.grid.getStateId();
             if (!Ext.state.Manager.get(stateIdDefault)) this.grid.saveState();
         }
         const block =  document.createElement('div');

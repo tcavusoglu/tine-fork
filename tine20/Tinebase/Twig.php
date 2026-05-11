@@ -110,24 +110,40 @@ class Tinebase_Twig
         $enablePublicPages = Tinebase_Application::getInstance()->isInstalled(GDPR_Config::APP_NAME, true) &&
             GDPR_Config::getInstance()->get(GDPR_Config::ENABLE_PUBLIC_PAGES);
 
-        if ($enablePublicPages) {
-            Addressbook_Controller_Contact::getInstance()->doContainerACLChecks(false);
+        $logoContent = [
+            'b' => null,
+            'i' => null,
+        ];
+        foreach (array_keys($logoContent) as $logoType) {
+            try {
+                $logoContent[$logoType] = Tinebase_Controller::getInstance()->getLogo($logoType);
+            } catch (Exception $e) {
+                if (Tinebase_Core::isLogLevel(Tinebase_Log::ERR)) {
+                    Tinebase_Core::getLogger()->err(__METHOD__ . '::' . __LINE__
+                        . ' ' . ($logoType === 'i' ? 'Installation' : 'Branding') .  ' logo broken');
+                }
+                $response = new \Laminas\Diactoros\Response();
+                $logoContent[$logoType] = $response;
+                Tinebase_Exception::log($e);
+            }
         }
 
         $globals = [
-            Addressbook_Config::INSTALLATION_REPRESENTATIVE => $enablePublicPages ? Addressbook_Config::getInstallationRepresentative() : null,
+            Addressbook_Config::INSTALLATION_REPRESENTATIVE => $enablePublicPages
+                ? Addressbook_Config::getInstallationRepresentative()
+                : null,
             'websiteUrl'        => $tbConfig->{Tinebase_Config::WEBSITE_URL},
             GDPR_Config::ENABLE_PUBLIC_PAGES =>  $enablePublicPages,
             'branding'          => [
-                'logo'              => Tinebase_Core::getLogo('b'),
-                'logoContent'       => Tinebase_Controller::getInstance()->getLogo('b'),
+                'logo'              => Tinebase_Core::getLogo(),
+                'logoContent'       => $logoContent['b'],
                 'title'             => $tbConfig->{Tinebase_Config::BRANDING_TITLE},
                 'description'       => $tbConfig->{Tinebase_Config::BRANDING_DESCRIPTION},
                 'weburl'            => $tbConfig->{Tinebase_Config::BRANDING_WEBURL},
             ],
             'installation'      => [
                 'logo'              => Tinebase_Core::getLogo('i'),
-                'logoContent'       => Tinebase_Controller::getInstance()->getLogo('i'),
+                'logoContent'       => $logoContent['i'],
                 'weburl'            => $tbConfig->{Tinebase_Config::WEBSITE_URL},
             ],
             'user'              => [
@@ -142,7 +158,7 @@ class Tinebase_Twig
         $this->_twigEnvironment->addGlobal('app', $globals);
     }
 
-    public static function getTemplateContent(string $path, string $locale): ?Tinebase_Model_TwigTemplate
+    public static function getTemplateContent(string $path, string $locale):  ?Tinebase_Model_TwigTemplate
     {
         $path = ltrim($path, '/');
         $filename = basename($path);
@@ -276,7 +292,10 @@ class Tinebase_Twig
             function ($str) use($locale, $translate) {
                 $translatedStr = $translate->translate($str, $locale);
                 if ($translatedStr == $str) {
-                    $translatedStr = Tinebase_Translation::getTranslation('Tinebase', $locale)->translate($str, $locale);
+                    $TBTranslatedStr = Tinebase_Translation::getTranslation('Tinebase', $locale)->translate($str, $locale);
+                    if (!empty($TBTranslatedStr)) {
+                        $translatedStr = $TBTranslatedStr;
+                    }
                 }
 
                 return $translatedStr;
@@ -360,6 +379,31 @@ class Tinebase_Twig
             }));
         $this->_twigEnvironment->addFunction(new \Twig\TwigFunction('localizeString', function ($records, $locale = null) {
             $language = is_string($locale) ? $locale : $locale->getLanguage();
+
+            if (is_array($records)) {
+                // Find by language in plain array
+                $record = array_filter($records, fn($r) =>
+                    (is_array($r) ? $r[Tinebase_Record_PropertyLocalization::FLD_LANGUAGE] ?? null
+                        : $r->{Tinebase_Record_PropertyLocalization::FLD_LANGUAGE} ?? null) === $language
+                );
+                $record = array_values($record)[0] ?? null;
+
+                // Fallback to 'en'
+                if (!$record) {
+                    $record = array_filter($records, fn($r) =>
+                        (is_array($r) ? $r[Tinebase_Record_PropertyLocalization::FLD_LANGUAGE] ?? null
+                            : $r->{Tinebase_Record_PropertyLocalization::FLD_LANGUAGE} ?? null) === 'en'
+                    );
+                    $record = array_values($record)[0] ?? null;
+                }
+
+                if (!$record) {
+                    return '';
+                }
+
+                return $record[Tinebase_Record_PropertyLocalization::FLD_TEXT] ?? '';
+            }
+
             $record = $records?->find(Tinebase_Record_PropertyLocalization::FLD_LANGUAGE, $language);
 
             if (!$record) {

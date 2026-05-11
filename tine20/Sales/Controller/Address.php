@@ -149,8 +149,15 @@ class Sales_Controller_Address extends Tinebase_Controller_Record_Abstract
 
     protected function _inspectBeforeCreate(Tinebase_Record_Interface $_record)
     {
+        /** @var Sales_Model_Address $_record */
+
         parent::_inspectBeforeCreate($_record);
         $this->_validateParentAndType($_record);
+        $rel = $_record->relations?->filter('type', 'CONTACTADDRESS')->getFirstRecord();
+        if ($rel) {
+            $contact = Addressbook_Controller_Contact::getInstance()->get($rel->related_id);
+            $_record->setFromContact( $contact );
+        }
     }
 
     protected function _inspectBeforeUpdate($_record, $_oldRecord)
@@ -173,69 +180,23 @@ class Sales_Controller_Address extends Tinebase_Controller_Record_Abstract
 
     protected function _validateParentAndType(Sales_Model_Address $address): void
     {
-        if (!$address->{Sales_Model_Address::FLD_CUSTOMER_ID} && !$address->{Sales_Model_Address::FLD_DEBITOR_ID}) {
-            throw new Tinebase_Exception_Record_Validation('either ' . Sales_Model_Address::FLD_CUSTOMER_ID . ' or '
-                . Sales_Model_Address::FLD_DEBITOR_ID . ' need to be set');
-        }
-        if ($address->{Sales_Model_Address::FLD_CUSTOMER_ID} && $address->{Sales_Model_Address::FLD_DEBITOR_ID}) {
-            throw new Tinebase_Exception_Record_Validation('only one of ' . Sales_Model_Address::FLD_CUSTOMER_ID
-                . ' and ' . Sales_Model_Address::FLD_DEBITOR_ID . ' must be set');
-        }
-        if ($address->{Sales_Model_Address::FLD_CUSTOMER_ID} && $address->{Sales_Model_Address::FLD_TYPE} &&
-                Sales_Model_Address::TYPE_POSTAL !== $address->{Sales_Model_Address::FLD_TYPE}) {
-            throw new Tinebase_Exception_Record_Validation('if ' . Sales_Model_Address::FLD_CUSTOMER_ID . ' is set '
-                . Sales_Model_Address::FLD_TYPE . ' needs to be ' . Sales_Model_Address::TYPE_POSTAL);
-        }
-    }
-
-
-    /**
-     * handle address
-     * save properties in record
-     * @param Tinebase_Record_Interface $_record the record
-     * @return  Tinebase_Record_Interface
-     *
-     */
-    public function resolvePostalAddress($_record) {
-        $postalAddress = [];
-        
-        foreach( $_record as $field => $value) {
-            if (strpos($field, 'adr_') !== FALSE) {
-                $postalAddress[substr($field, 4)] = $value;
+        $countSet = 0;
+        foreach([Sales_Model_Address::FLD_CUSTOMER_ID, Sales_Model_Address::FLD_DEBITOR_ID, Sales_Model_Address::FLD_SUPPLIER_ID] as $field) {
+            if ($address->$field) {
+                $countSet++;
             }
         }
-
-        //its only for the occasion after resolveVirtualFields
-        if (!isset($postalAddress['seq']) && isset($_record['postal_id']) && isset($_record['postal_id']['seq'])) {
-            $postalAddress['seq'] = $_record['postal_id']['seq'];
+        if (1 !== $countSet) {
+            throw new Tinebase_Exception_Record_Validation('exactly one of ' . Sales_Model_Address::FLD_CUSTOMER_ID . ', '
+                . Sales_Model_Address::FLD_DEBITOR_ID . ', ' . Sales_Model_Address::FLD_SUPPLIER_ID . ' needs to be set');
         }
 
-        $postalAddress['customer_id'] = isset($_record['id']) ? $_record['id'] : $_record['name'];
-        $postalAddress['type'] = 'postal';
-
-        $_record['postal_id'] = $postalAddress;
-
-        $filter = Tinebase_Model_Filter_FilterGroup::getFilterForModel(Sales_Model_Address::class, array(array('field' => 'type', 'operator' => 'equals', 'value' => 'postal')));
-        $filter->addFilter(new Tinebase_Model_Filter_Text(array('field' => 'customer_id', 'operator' => 'equals', 'value' => $_record['id'])));
-
-        $postalAddressRecord = Sales_Controller_Address::getInstance()->search($filter)->getFirstRecord();
-
-        // create if none has been found
-        if (! $postalAddressRecord) {
-            $postalAddressRecord = Sales_Controller_Address::getInstance()->create(new Sales_Model_Address($_record['postal_id']));
-        } else {
-            // update if it has changed
-            $recordData = $_record->toArray();
-            foreach ($postalAddressRecord as $field => $value) {
-                if (array_key_exists("adr_$field", $recordData)) {
-                    $postalAddressRecord[$field] = $recordData["adr_$field"];
-                }
-            }
-
-            $postalAddressRecord = Sales_Controller_Address::getInstance()->update($postalAddressRecord);
+        if (($address->{Sales_Model_Address::FLD_CUSTOMER_ID} || $address->{Sales_Model_Address::FLD_SUPPLIER_ID})
+                && $address->{Sales_Model_Address::FLD_TYPE} && Sales_Model_Address::TYPE_POSTAL !== $address->{Sales_Model_Address::FLD_TYPE}) {
+            throw new Tinebase_Exception_Record_Validation('if ' . Sales_Model_Address::FLD_CUSTOMER_ID . ' or '
+                . Sales_Model_Address::FLD_SUPPLIER_ID . ' is set ' . Sales_Model_Address::FLD_TYPE . ' needs to be '
+                . Sales_Model_Address::TYPE_POSTAL);
         }
-        
-        return $_record;
     }
 
     /**
@@ -246,38 +207,18 @@ class Sales_Controller_Address extends Tinebase_Controller_Record_Abstract
      * @throws Tinebase_Exception_AccessDenied
      * @throws Tinebase_Exception_NotFound
      */
-    public function contactToCustomerAddress(Sales_Model_Address $address, Addressbook_Model_Contact $contact): void
+    public function contactToCustomerAddress(Sales_Model_Address $address, Addressbook_Model_Contact $contact): Sales_Model_Address
     {
-        $language = Sales_Controller::getInstance()->getContactDefaultLanguage($contact);
-        if ($address->customer_id) {
-            $customer = Sales_Controller_Customer::getInstance()->get($address->customer_id);
-        } else {
-            $customer = Sales_Controller_Customer::getInstance()->get(
-                Sales_Controller_Debitor::getInstance()->get($address->{Sales_Model_Address::FLD_DEBITOR_ID})
-                    ->{Sales_Model_Debitor::FLD_CUSTOMER_ID}
-            );
-        }
-        $fullName = $this->getContactFullName($contact, $language);
-        
         //Update Address
         $oldAddress = clone $address;
-        $address->name =  $customer->name;
-        $address->street = $contact->adr_one_street;
-        $address->postalcode  = $contact->adr_one_postalcode;
-        $address->locality = $contact->adr_one_locality;
-        $address->region = $contact->adr_one_region;
-        $address->countryname = $contact->adr_one_countryname;
-        $address->prefix1 = $contact->org_name;
-        $address->prefix2 = $contact->org_unit;
-        $address->prefix3 = $fullName;
-        $address->language = $language;
-        $address->email = $contact->email;
+        $address->setFromContact( $contact );
 
         /** @var Tinebase_Model_Diff $diff */
         $diff = $oldAddress->diff($address);
         if (!$diff->isEmpty()) {
-            Sales_Controller_Address::getInstance()->update($address);
+            $address = Sales_Controller_Address::getInstance()->update($address);
         }
+        return $address;
     }
 
     /**

@@ -280,7 +280,7 @@ class Calendar_Controller_MSEventFacade implements Tinebase_Controller_Record_In
 
         foreach($exceptionMap as $exception) {
             $baseEventId = $exception->base_event_id;
-            $baseEvent = array_key_exists($baseEventId, $baseEventMap) ? $baseEventMap[$baseEventId] : false;
+            $baseEvent = null !== $baseEventId && array_key_exists($baseEventId, $baseEventMap) ? $baseEventMap[$baseEventId] : false;
             if ($baseEvent) {
                 $exceptionSet = $exceptionSets[$baseEventId];
                 $exceptionSet->addRecord($exception);
@@ -300,6 +300,8 @@ class Calendar_Controller_MSEventFacade implements Tinebase_Controller_Record_In
     protected function _assertCalUser(Calendar_Model_Event $event): void
     {
         if ($this->_assertCalUserAttendee) {
+            /** @var ?Tinebase_Model_Container $container */
+            $container = null;
             if ($event->container_id &&
                     ($container = Tinebase_Container::getInstance()->get($event->getIdFromProperty($event::FLD_CONTAINER_ID)))
                     && ($resourceId = ($container->xprops()[Calendar_Config::APP_NAME][Calendar_Model_Resource::MODEL_NAME_PART]['resource_id'] ?? null))) {
@@ -308,6 +310,13 @@ class Calendar_Controller_MSEventFacade implements Tinebase_Controller_Record_In
                     'user_id' => $resourceId,
                 ]));
             } else {
+                if (null === $container) {
+                    $container = $this->_currentEventFacadeContainer;
+                }
+                if (null !== $container && Tinebase_Model_Container::TYPE_SHARED === $container->type &&
+                        $this->_calendarUser->user_id === Tinebase_Core::getUser()->contact_id) {
+                    return;
+                }
                 $event->assertAttendee($this->_calendarUser);
             }
         }
@@ -1224,13 +1233,6 @@ class Calendar_Controller_MSEventFacade implements Tinebase_Controller_Record_In
             }
         }
 
-        if (null === $result && $_event->getId()) {
-            try {
-                $result = $this->get($_event->getId(), $_getDeleted);
-                $checkGrantFun(true);
-            } catch (Tinebase_Exception_NotFound|Tinebase_Exception_AccessDenied) {}
-        }
-
         if (null === $result) {
             $filter = new Calendar_Model_EventFilter([
                 [TMFA::FIELD => 'uid', TMFA::OPERATOR => TMFA::OP_EQUALS, TMFA::VALUE => $_event->uid],
@@ -1270,6 +1272,13 @@ class Calendar_Controller_MSEventFacade implements Tinebase_Controller_Record_In
                 if ($result = $this->search($filter, _action: $_action)->getFirstRecord()) {
                     $checkGrantFun(false);
                 }
+            }
+
+            if (null === $result && $_event->getId()) {
+                try {
+                    $result = $this->get($_event->getId(), $_getDeleted);
+                    $checkGrantFun(true);
+                } catch (Tinebase_Exception_NotFound|Tinebase_Exception_AccessDenied) {}
             }
         }
         if (null === $result && $foundWithoutGrant) {

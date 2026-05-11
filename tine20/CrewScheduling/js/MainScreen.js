@@ -276,7 +276,7 @@ Tine.CrewScheduling.MainScreen = Ext.extend(Ext.Panel, {
                         handler: this.onButtonFilter,
                         iconCls: 'action_filter'
                     }, {
-                        // @TODO enable if user has at least createPollGrant for one schedulingRole
+                        // @TODO enable if user has at least managePollGrant for one schedulingRole
                         text: this.app.i18n._('Polls'),
                         ref: '../../../buttonPolls',
                         tooltip: this.app.i18n._('Manage Polls'),
@@ -395,9 +395,10 @@ Tine.CrewScheduling.MainScreen = Ext.extend(Ext.Panel, {
             })
             .then(_.bind(me.loadRuntimeData, me))
             .then(async () => {
-                const siteRecords = _.map(_.find(filters, {field: 'event_site'})?.value || [], (siteData) => {
+                const siteFilter = _.get(_.find(_.get(filters, '[0].filters[0].filters'), {field: 'event_site'}), 'value[0]');
+                const siteRecords = siteFilter && siteFilter.field === ':id' && siteFilter.operator === 'in' ? _.map(siteFilter.value, (siteData) => {
                     return Tine.Tinebase.data.Record.setFromJson(siteData, 'Addressbook.Contact')
-                });
+                }) : [];
 
                 this.membersGrid.setGrouping(siteRecords.length ? 'event_site' : '', siteRecords);
             })

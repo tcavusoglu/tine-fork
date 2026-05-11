@@ -186,17 +186,17 @@ parameters:
 			path: tine20/Admin/Controller/EmailAccount.php
 
 		-
-			message: "#^Method Tinebase_Backend_Sql_Abstract\\:\\:search\\(\\) invoked with 5 parameters, 0\\-3 required\\.$#"
+			message: "#^Method Tinebase_Backend_Sql_Abstract\\<Tinebase_Record_Interface\\>\\:\\:search\\(\\) invoked with 5 parameters, 0\\-3 required\\.$#"
 			count: 1
 			path: tine20/Admin/Controller/ImportExportDefinition.php
 
 		-
-			message: "#^Method Tinebase_Backend_Sql_Abstract\\:\\:searchCount\\(\\) invoked with 2 parameters, 1 required\\.$#"
+			message: "#^Method Tinebase_Backend_Sql_Abstract\\<Tinebase_Record_Interface\\>\\:\\:searchCount\\(\\) invoked with 2 parameters, 1 required\\.$#"
 			count: 1
 			path: tine20/Admin/Controller/ImportExportDefinition.php
 
 		-
-			message: "#^Method Tinebase_Backend_Sql_Abstract\\:\\:update\\(\\) invoked with 3 parameters, 1 required\\.$#"
+			message: "#^Method Tinebase_Backend_Sql_Abstract\\<Tinebase_Record_Interface\\>\\:\\:update\\(\\) invoked with 3 parameters, 1 required\\.$#"
 			count: 1
 			path: tine20/Admin/Controller/ImportExportDefinition.php
 
@@ -206,17 +206,17 @@ parameters:
 			path: tine20/Admin/Controller/ImportExportDefinition.php
 
 		-
-			message: "#^Method Tinebase_Backend_Sql_Abstract\\:\\:search\\(\\) invoked with 5 parameters, 0\\-3 required\\.$#"
+			message: "#^Method Tinebase_Backend_Sql_Abstract\\<Tinebase_Record_Interface\\>\\:\\:search\\(\\) invoked with 5 parameters, 0\\-3 required\\.$#"
 			count: 1
 			path: tine20/Admin/Controller/LogEntry.php
 
 		-
-			message: "#^Method Tinebase_Backend_Sql_Abstract\\:\\:searchCount\\(\\) invoked with 2 parameters, 1 required\\.$#"
+			message: "#^Method Tinebase_Backend_Sql_Abstract\\<Tinebase_Record_Interface\\>\\:\\:searchCount\\(\\) invoked with 2 parameters, 1 required\\.$#"
 			count: 1
 			path: tine20/Admin/Controller/LogEntry.php
 
 		-
-			message: "#^Method Tinebase_Backend_Sql_Abstract\\:\\:update\\(\\) invoked with 3 parameters, 1 required\\.$#"
+			message: "#^Method Tinebase_Backend_Sql_Abstract\\<Tinebase_Record_Interface\\>\\:\\:update\\(\\) invoked with 3 parameters, 1 required\\.$#"
 			count: 1
 			path: tine20/Admin/Controller/LogEntry.php
 
@@ -4331,61 +4331,6 @@ parameters:
 			path: tine20/Tinebase/Helper/ZendConfig.php
 
 		-
-			message: "#^Call to an undefined method Zend_Server_Reflection_Class\\:\\:getConstructor\\(\\)\\.$#"
-			count: 1
-			path: tine20/Tinebase/Http/Server.php
-
-		-
-			message: "#^Call to an undefined method Zend_Server_Reflection_Class\\:\\:getName\\(\\)\\.$#"
-			count: 1
-			path: tine20/Tinebase/Http/Server.php
-
-		-
-			message: "#^Call to an undefined method Zend_Server_Reflection_Class\\:\\:newInstance\\(\\)\\.$#"
-			count: 1
-			path: tine20/Tinebase/Http/Server.php
-
-		-
-			message: "#^Call to an undefined method Zend_Server_Reflection_Class\\:\\:newInstanceArgs\\(\\)\\.$#"
-			count: 1
-			path: tine20/Tinebase/Http/Server.php
-
-		-
-			message: "#^Call to an undefined method Zend_Server_Reflection_Function\\:\\:getName\\(\\)\\.$#"
-			count: 1
-			path: tine20/Tinebase/Http/Server.php
-
-		-
-			message: "#^Call to an undefined method Zend_Server_Reflection_Function\\|Zend_Server_Reflection_Method\\:\\:getParameters\\(\\)\\.$#"
-			count: 1
-			path: tine20/Tinebase/Http/Server.php
-
-		-
-			message: "#^Call to an undefined method Zend_Server_Reflection_Method\\:\\:getName\\(\\)\\.$#"
-			count: 3
-			path: tine20/Tinebase/Http/Server.php
-
-		-
-			message: "#^Call to an undefined method Zend_Server_Reflection_Method\\:\\:invokeArgs\\(\\)\\.$#"
-			count: 1
-			path: tine20/Tinebase/Http/Server.php
-
-		-
-			message: "#^Call to an undefined method Zend_Server_Reflection_Method\\:\\:isPublic\\(\\)\\.$#"
-			count: 1
-			path: tine20/Tinebase/Http/Server.php
-
-		-
-			message: "#^Call to an undefined method Zend_Server_Reflection_Method\\:\\:isStatic\\(\\)\\.$#"
-			count: 1
-			path: tine20/Tinebase/Http/Server.php
-
-		-
-			message: "#^PHPDoc tag @param references unknown parameter\\: \\$string$#"
-			count: 1
-			path: tine20/Tinebase/Http/Server.php
-
-		-
 			message: "#^Call to an undefined method Tinebase_Controller_Abstract\\:\\:create\\(\\)\\.$#"
 			count: 1
 			path: tine20/Tinebase/Import/Abstract.php
@@ -4849,11 +4794,6 @@ parameters:
 			message: "#^Call to an undefined method Tinebase_Controller_Abstract\\:\\:getMultiple\\(\\)\\.$#"
 			count: 1
 			path: tine20/Tinebase/Model/Filter/CustomField.php
-
-		-
-			message: "#^Binary operation \"\\-\" between string and 1 results in an error\\.$#"
-			count: 1
-			path: tine20/Tinebase/Model/Filter/Date.php
 
 		-
 			message: "#^Call to an undefined method Tinebase_Log\\:\\:NOTICE\\(\\)\\.$#"
@@ -6249,26 +6189,6 @@ parameters:
 			message: "#^Variable \\$this might not be defined\\.$#"
 			count: 5
 			path: tine20/Tinebase/views/deactivationNotification.php
-
-		-
-			message: "#^Unsafe access to private property UserManual_Controller_ManualContext\\:\\:\\$_instance through static\\:\\:\\.$#"
-			count: 3
-			path: tine20/UserManual/Controller/ManualContext.php
-
-		-
-			message: "#^Call to an undefined method Tinebase_Backend_Sql_Abstract\\:\\:clearTable\\(\\)\\.$#"
-			count: 1
-			path: tine20/UserManual/Controller/ManualPage.php
-
-		-
-			message: "#^Unsafe access to private property UserManual_Controller_ManualPage\\:\\:\\$_instance through static\\:\\:\\.$#"
-			count: 3
-			path: tine20/UserManual/Controller/ManualPage.php
-
-		-
-			message: "#^Variable \\$title in empty\\(\\) always exists and is always falsy\\.$#"
-			count: 1
-			path: tine20/UserManual/Import/ManualPage.php
 
 		-
 			message: "#^Function generateNewTranslationFile not found\\.$#"

@@ -61,13 +61,10 @@ class Tinebase_ModelConfiguration_Const {
      * evaluated from doctrine only! has nothing to do with record validation default or empty value
      */
     public const DEFAULT_VAL = 'default';
-    /**
-     * config for default value
-     */
-    public const DEFAULT_VAL_CONFIG = 'defaultValConfig';
     public const DEGREE = 'degree';
     public const DELEGATED_ACL_FIELD = 'delegateAclField';
     public const DENORMALIZATION_CONFIG = 'denormalizationConfig';
+    public const DENORMALIZATION_DIFF_OMIT_FIELDS = 'denormalizationDiffOmitFields';
     public const DENORMALIZATION_OF = 'denormalizationOf';
     /**
      * valid vor type 'records' - means records are governed (not independent)
@@ -131,6 +128,10 @@ class Tinebase_ModelConfiguration_Const {
     public const FLD_RELATIONS = 'relations';
     public const FLD_TAGS = 'tags';
     public const FLD_XPROPS = 'xprops';
+    /**
+     * if a field has special type PREFERENCE_OVERRIDE, add FOLLOW_PREFERENCE as an option
+     */
+    public const FOLLOW_PREFERENCE = 'follow_preference';
     public const FORCE_VALUES = 'forceValues';
     /**
      * valid for the config of fields of type record(s). Defines virtual field in foreign record which holds own record(s)
@@ -249,8 +250,12 @@ class Tinebase_ModelConfiguration_Const {
     public const SPECIAL_TYPE_URL = 'url';
     public const SPECIAL_TYPE_COUNTRY = 'country';
     public const SPECIAL_TYPE_CURRENCY = 'currency';
+
+    public const SPECIAL_TYPE_TIMEZONE = 'timezone';
     public const SPECIAL_TYPE_MINUTES = 'minutes';
     public const SPECIAL_TYPE_MONTH = 'month';
+    public const SPECIAL_TYPE_MARKDOWN = 'markdown';
+    public const SPECIAL_TYPE_PREFERENCE_OVERRIDE = 'preferenceOverride';
     public const STORAGE = 'storage';
     public const SUPPORTED_FORMATS = 'supportedFormats';
     /**

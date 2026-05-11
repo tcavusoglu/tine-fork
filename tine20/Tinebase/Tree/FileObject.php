@@ -15,7 +15,7 @@
  * @package     Tinebase
  * @subpackage  Backend
  *
- * TODO refactor to Tinebase_Tree_Backend_FileObject
+ * @extends Tinebase_Backend_Sql_Abstract<Tinebase_Model_Tree_FileObject>
  */
 class Tinebase_Tree_FileObject extends Tinebase_Backend_Sql_Abstract
 {
@@ -224,7 +224,7 @@ class Tinebase_Tree_FileObject extends Tinebase_Backend_Sql_Abstract
         $transactionId = Tinebase_TransactionManager::getInstance()->startTransaction(Tinebase_Core::getDb());
 
         // lock row first
-        $select = $this->_db->select()->from($this->_tablePrefix . $this->_tableName)
+        $select = $this->_db->select()->forUpdate()->from($this->_tablePrefix . $this->_tableName)
             ->where($this->_db->quoteIdentifier($this->_tablePrefix . $this->_tableName . '.id') . ' = ?', $objectId);
         $stmt = $this->_db->query($select);
         $stmt->fetchAll();
@@ -565,29 +565,17 @@ class Tinebase_Tree_FileObject extends Tinebase_Backend_Sql_Abstract
         foreach ($ids as $id) {
             $transactionId = $transactionManager->startTransaction($this->_db);
             try {
-                try {
-                    /** @var Tinebase_Model_Tree_FileObject $record */
-                    $record = $this->get($id);
-                } catch (Tinebase_Exception_NotFound) {
-                    $transactionManager->commitTransaction($transactionId);
-                    continue;
-                }
-
-                $stmt = $this->_db->query($this->_db->select()->from($this->_tablePrefix . $this->_revisionsTableName, array($dbExpr))
-                    ->where('id = ?', $id));
-                if (($row = $stmt->fetch(Zend_Db::FETCH_NUM)) && ((int)$row[0]) !== ((int)$record->revision_size)) {
-
-                    $stmt->closeCursor();
+                if (false !== ($revisionSize = $this->_db->query($this->_db->select()->from($this->_tablePrefix . $this->_tableName, array('revision_size'))
+                        ->where('id = ?', $id))->fetchColumn()) &&
+                    false !== ($revisionSum = $this->_db->query($this->_db->select()->from($this->_tablePrefix . $this->_revisionsTableName, array($dbExpr))
+                        ->where('id = ?', $id))->fetchColumn()) && intval($revisionSize) !== intval($revisionSum)) {
 
                     if (Tinebase_Core::isLogLevel(Zend_Log::INFO)) Tinebase_Core::getLogger()->info(__METHOD__ . '::' . __LINE__
-                        . ' revision size mismatch on ' . $id . ': ' . $row[0] .' != ' . $record->revision_size);
+                        . ' revision size mismatch on ' . $id . ': ' . $revisionSum .' != ' . $revisionSize);
 
-                    $record->revision_size = $row[0];
-                    $this->update($record);
-                } else {
-                    $stmt->closeCursor();
+                    $this->_db->update($this->_tablePrefix . $this->_tableName, ['revision_size' => intval($revisionSum)], $this->_db->quoteInto('id = ?', $id));
                 }
-
+                
                 $transactionManager->commitTransaction($transactionId);
 
             // this shouldn't happen

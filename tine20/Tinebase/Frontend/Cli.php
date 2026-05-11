@@ -8,6 +8,8 @@
  * @copyright   Copyright (c) 2008-2023 Metaways Infosystems GmbH (http://www.metaways.de)
  */
 
+use Firebase\JWT\JWT;
+
 /**
  * cli server
  *
@@ -835,7 +837,7 @@ class Tinebase_Frontend_Cli extends Tinebase_Frontend_Cli_Abstract
             ]);
             foreach (Tinebase_Model_Grants::getAllGrants() as $possibleGrant) {
                 if (isset($grant[$possibleGrant])) {
-                    $grantRecord->{$possibleGrant} = (boolean) $grant[$possibleGrant];
+                    $grantRecord->{$possibleGrant} = (bool) $grant[$possibleGrant];
                 }
             }
             $grantsToSet->addRecord($grantRecord);
@@ -1961,17 +1963,30 @@ fi';
 
         $user = Tinebase_User::getInstance()->getFullUserByLoginName($data['user']);
 
-        $pwd =  Tinebase_Record_Abstract::generateUID(Tinebase_Controller_AppPassword::PWD_LENGTH - Tinebase_Controller_AppPassword::PWD_SUFFIX_LENGTH) . Tinebase_Controller_AppPassword::PWD_SUFFIX;
-        Tinebase_Controller_AppPassword::getInstance()->create(new Tinebase_Model_AppPassword([
-            Tinebase_Model_AppPassword::FLD_ACCOUNT_ID => $user->getId(),
-            Tinebase_Model_AppPassword::FLD_AUTH_TOKEN => $pwd,
-            Tinebase_Model_AppPassword::FLD_VALID_UNTIL => Tinebase_DateTime::now()->addYear(10),
-            Tinebase_Model_AppPassword::FLD_CHANNELS => array_fill_keys((array)$data['channels'], true),
-            Tinebase_Model_AppPassword::FLD_ALLOW_GET => (bool)($data['allow_get'] ?? false),
-        ]));
-        $pwd = base64_encode($user->accountLoginName . ':' . $pwd);
+        if ($data['jwt'] ?? false) {
+            $pwd = Tinebase_Record_Abstract::generateUID();
 
-        echo PHP_EOL . 'generated pwd: ' . $pwd . PHP_EOL . PHP_EOL;
+            $token = Tinebase_Controller_AppPassword::getInstance()->getNewJwtToken([
+                Tinebase_Model_AppPassword::FLD_ACCOUNT_ID => $user->getId(),
+                Tinebase_Model_AppPassword::FLD_CHANNELS => array_fill_keys((array)$data['channels'], true),
+                Tinebase_Model_AppPassword::FLD_ALLOW_GET => (bool)($data['allow_get'] ?? false),
+                Tinebase_Model_AppPassword::FLD_JWT_PRIVAT_KEY => $pwd,
+            ]);
+
+            echo PHP_EOL . 'generated jwt: ' . $token . PHP_EOL . PHP_EOL;
+        } else {
+            $pwd = Tinebase_Record_Abstract::generateUID(Tinebase_Controller_AppPassword::PWD_LENGTH);
+            Tinebase_Controller_AppPassword::getInstance()->create(new Tinebase_Model_AppPassword([
+                Tinebase_Model_AppPassword::FLD_ACCOUNT_ID => $user->getId(),
+                Tinebase_Model_AppPassword::FLD_AUTH_TOKEN => $pwd,
+                Tinebase_Model_AppPassword::FLD_VALID_UNTIL => Tinebase_DateTime::now()->addYear(10),
+                Tinebase_Model_AppPassword::FLD_CHANNELS => array_fill_keys((array)$data['channels'], true),
+                Tinebase_Model_AppPassword::FLD_ALLOW_GET => (bool)($data['allow_get'] ?? false),
+            ]));
+            $pwd = base64_encode($user->accountLoginName . ':' . $pwd);
+
+            echo PHP_EOL . 'generated pwd: ' . $pwd . PHP_EOL . PHP_EOL;
+        }
 
         return 0;
     }
@@ -2358,6 +2373,31 @@ fi';
         return 0;
     }
 
+    public function importInstances(Zend_Console_Getopt $opts): int
+    {
+        $this->_checkAdminRight();
+
+        $data = $this->_parseArgs($opts);
+        if (!isset($data['path']) || empty($data['path'])) {
+            echo 'mandatory argument "path" missing' . PHP_EOL;
+            return 1;
+        }
+
+        $importer = new Tinebase_Import_Instance_Yaml([
+            'model' => Tinebase_Model_Instance::class
+        ]);
+
+        $importResult = $importer->importFile($data['path']);
+
+        if ($importResult) {
+            echo 'import instances: ' . print_r($importResult, true) . PHP_EOL;
+        } else {
+            echo 'instances import failed' . PHP_EOL;
+        }
+
+        return 0;
+    }
+
     public function syncFileTreeFromBackupDB(Zend_Console_Getopt $opts)
     {
         $this->_checkAdminRight();
@@ -2698,7 +2738,7 @@ fi';
         
         $db = Tinebase_Core::getDb();
 
-        while ($row = fgetcsv($fh, separator: ';')) {
+        while ($row = fgetcsv($fh, separator: ';', escape: '\\')) {
             $transaction = Tinebase_RAII::getTransactionManagerRAII();
             $groupId = $row[0];
             $listId = $row[1];

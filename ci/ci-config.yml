@@ -42,7 +42,7 @@ variables:
   PHPUNIT_FILTER: ""
   
   # "Php version to use."
-  PHP_VERSION: "8.3"
+  PHP_VERSION: "8.4"
 
   # "Codename for build"
   CODENAME: "Mats"
@@ -103,7 +103,10 @@ variables:
   #CUSTOMER_IMAGE_REGISTRY_REPO: ""
 
   PUSH_TO_VPACKAGES: "true"
+
+  DOCS_S3_BUCKET: docs-tine-groupware-de.s3web.rz1.metaways.net
+  DOCS_URL: https://docs.tine-groupware.de
   
-  TEST_IMAGE_VERSION: "3"
+  TEST_IMAGE_VERSION: "4"
   TEST_IMAGE_REGISTRY: ${CI_REGISTRY}/${CI_PROJECT_NAMESPACE}/tine20/test
   TEST_IMAGE: ${TEST_IMAGE_REGISTRY}:${BASE_MAJOR_COMMIT_REF_NAME}-${PHP_VERSION}-${TEST_IMAGE_VERSION}

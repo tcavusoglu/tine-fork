@@ -333,14 +333,14 @@ Tine.Tinebase.MainMenu = Ext.extend(Ext.Toolbar, {
      * the logout button handler function
      * @private
      */
-    onLogout: function() {
-        if (Tine.Tinebase.registry.get('confirmLogout') != '0') {
-            Ext.MessageBox.confirm(i18n._('Confirm'), i18n._('Are you sure you want to log out?'), function(btn, text) {
-                if (btn == 'yes') {
-                    this._doLogout();
-                }
-            }, this);
-        } else {
+    onLogout: async function () {
+        if (await Ext.MessageBox.confirm(
+            i18n._('Confirm'),
+            i18n._('Are you sure you want to log out?'),
+            null,
+            null,
+            'Confirm-Dialog-logout'
+        ) === 'yes') {
             this._doLogout();
         }
     },
@@ -350,7 +350,7 @@ Tine.Tinebase.MainMenu = Ext.extend(Ext.Toolbar, {
      * @static
      */
     _doLogout: async function() {
-        Ext.MessageBox.wait(i18n._('Logging you out...'), i18n._('Please wait!'));
+        Ext.MessageBox.wait(i18n._('Logging you out...'), i18n._('Please wait!'), { estimate: 30000 });
         const response = await Tine.Tinebase.logout();
         // clear the authenticated mod_ssl session
         if (window.crypto && Ext.isFunction(window.crypto.logout)) {

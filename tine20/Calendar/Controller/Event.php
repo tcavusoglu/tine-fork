@@ -5,7 +5,7 @@
  * @package     Calendar
  * @license     http://www.gnu.org/licenses/agpl.html AGPL Version 3
  * @author      Cornelius Weiss <c.weiss@metaways.de>
- * @copyright   Copyright (c) 2010-2025 Metaways Infosystems GmbH (http://www.metaways.de)
+ * @copyright   Copyright (c) 2010-2026 Metaways Infosystems GmbH (https://www.metaways.de)
  */
 
 use Tinebase_Model_Filter_Abstract as TMFA;
@@ -293,7 +293,16 @@ class Calendar_Controller_Event extends Tinebase_Controller_Record_Abstract impl
 
             Tinebase_TransactionManager::getInstance()->commitTransaction($transactionId);
         } catch (Calendar_Exception_InSyncContainer $e) {
-            return $this->_writeSyncContainer($_record, $e->syncContainerConfig);
+            $tm = Tinebase_TransactionManager::getInstance();
+            if (!$tm->unitTestForceSkipRollBack()) {
+                if (1 !== ($c = count($tm->getOpenTransactionIds()))) {
+                    throw new Tinebase_Exception('exactly one open transaction expected! ' . $c);
+                }
+                foreach ($tm->getOpenTransactionIds() as $transactionId) {
+                    $tm->commitTransaction($transactionId);
+                }
+            }
+            $createdEvent =  $this->_writeSyncContainer($_record, $e->syncContainerConfig);
         } catch (Exception $e) {
             Tinebase_TransactionManager::getInstance()->rollBack();
             throw $e;
@@ -315,8 +324,21 @@ class Calendar_Controller_Event extends Tinebase_Controller_Record_Abstract impl
         return $createdEvent;
     }
 
+    protected function _handleRecordCreateOrUpdateException(\Throwable $e, ?string $transactionId = null): void
+    {
+        if ($e instanceof Calendar_Exception_InSyncContainer) {
+            Tinebase_TransactionManager::getInstance()->commitTransaction($transactionId);
+            throw $e;
+        }
+        parent::_handleRecordCreateOrUpdateException($e);
+    }
+
     protected function _writeSyncContainer(Calendar_Model_Event $event, Calendar_Model_SyncContainerConfig $config): Calendar_Model_Event
     {
+        if (!$event->creation_time) {
+            $event->creation_time = Tinebase_DateTime::now();
+        }
+
         Tinebase_Record_Expander::expandRecord($config);
         $cloudAccount = $config->{Calendar_Model_SyncContainerConfig::FLD_CLOUD_ACCOUNT_ID};
         if (Tinebase_Model_CloudAccount_CalDAV::class !== $cloudAccount->{Tinebase_Model_CloudAccount::FLD_TYPE}) {
@@ -328,9 +350,15 @@ class Calendar_Controller_Event extends Tinebase_Controller_Record_Abstract impl
         $client = $cloudConfig->getClient();
         $client->getDecorator()->initCalendarImport();
 
-        if (null === ($result = $client->writeEvent($config->{Calendar_Model_SyncContainerConfig::FLD_CALENDAR_PATH}, $event))) {
-            // TODO FIXME be verbose
-            throw new Tinebase_Exception();
+        $event->organizer = null;
+        $event->organizer_type = Calendar_Model_Event::ORGANIZER_TYPE_EMAIL;
+        $event->organizer_email = $config->{Calendar_Model_SyncContainerConfig::FLD_CALENDAR_OWNER};
+
+        if ($event->is_deleted) {
+            $client->deleteEventRemotelyStoreLocally($config->{Calendar_Model_SyncContainerConfig::FLD_CALENDAR_PATH}, $event);
+            return $event;
+        } elseif (null === ($result = $client->writeEventRemotelyStoreLocally($config->{Calendar_Model_SyncContainerConfig::FLD_CALENDAR_PATH}, $event))) {
+            throw new Tinebase_Exception('writeEvent to caldav client did not return locally stored copy');
         }
 
         return $result;
@@ -545,11 +573,11 @@ class Calendar_Controller_Event extends Tinebase_Controller_Record_Abstract impl
      * @todo merge overlapping events to one freebusy entry
      * 
      * @param  Calendar_Model_EventFilter                           $_periods
-     * @param  Tinebase_Record_RecordSet                            $_attendee
-     * @param  array                                                $_ignoreUIDs
-     * @return Tinebase_Record_RecordSet of Calendar_Model_FreeBusy
+     * @param  Tinebase_Record_RecordSet<Calendar_Model_Attender>   $_attendee
+     * @param  array<int, string>                                   $_ignoreUIDs
+     * @return Tinebase_Record_RecordSet<Calendar_Model_FreeBusy>
      */
-    public function getFreeBusyInfo($_periods, $_attendee, $_ignoreUIDs = array())
+    public function getFreeBusyInfo(Calendar_Model_EventFilter $_periods, Tinebase_Record_RecordSet $_attendee, array $_ignoreUIDs = [], bool $_getExternal = false)
     {
         $fbInfoSet = new Tinebase_Record_RecordSet('Calendar_Model_FreeBusy');
         
@@ -1033,13 +1061,12 @@ class Calendar_Controller_Event extends Tinebase_Controller_Record_Abstract impl
             Tinebase_FileSystem::getInstance()->fileExists($path);
         }
 
+        $sendNotifications = $this->sendNotifications(false);
         /** @var Calendar_Model_Event $_record */
         try {
             $declineResources = [];
             $db = $this->_backend->getAdapter();
             $transactionId = Tinebase_TransactionManager::getInstance()->startTransaction($db);
-            
-            $sendNotifications = $this->sendNotifications(FALSE);
 
             $doAclChecks = $this->doContainerACLChecks(false);
             $event = $this->get($_record->getId());
@@ -1077,10 +1104,14 @@ class Calendar_Controller_Event extends Tinebase_Controller_Record_Abstract impl
                     // ensure resources with busy_type "busy unavailable" do not get overbooked
                     $declineResources = $this->_checkResourceAvailability($_record);
                 }
-                
+
                 parent::update($_record);
 
             } else if ($_record->attendee instanceof Tinebase_Record_RecordSet) {
+
+                // TODO FIXME !!!!
+                $this->_inspectSyncContainer($_record);
+
                 if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__
                     . " user has no editGrant for event: {$_record->id}, updating attendee status with valid authKey only");
                 foreach ($_record->attendee as $attender) {
@@ -1092,7 +1123,19 @@ class Calendar_Controller_Event extends Tinebase_Controller_Record_Abstract impl
 
             Tinebase_TransactionManager::getInstance()->commitTransaction($transactionId);
         } catch (Calendar_Exception_InSyncContainer $e) {
-            return $this->_writeSyncContainer($_record, $e->syncContainerConfig);
+            $tm = Tinebase_TransactionManager::getInstance();
+            if (!$tm->unitTestForceSkipRollBack()) {
+                if (2 !== ($c = count($tm->getOpenTransactionIds())) && 3 !== $c) {
+                    throw new Tinebase_Exception('exactly two open transaction expected! ' . $c);
+                }
+                foreach ($tm->getOpenTransactionIds() as $transactionId) {
+                    $tm->commitTransaction($transactionId);
+                }
+            }
+            $existingRecord = $this->get($_record->getId());
+            $_record->etag = $existingRecord->etag;
+            $_record->external_id = $existingRecord->external_id;
+            $event = $this->_writeSyncContainer($_record, $e->syncContainerConfig);
         } catch (Exception $e) {
             if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . ' Rolling back because: ' . $e);
             Tinebase_TransactionManager::getInstance()->rollBack();
@@ -1265,6 +1308,24 @@ class Calendar_Controller_Event extends Tinebase_Controller_Record_Abstract impl
             if ($this->_doContainerACLChecks === FALSE || $record->hasGrant(Tinebase_Model_Grants::GRANT_DELETE)) {
                 // NOTE delete needs to update sequence otherwise iTIP based protocolls ignore the delete
                 $record->status = Calendar_Model_Event::STATUS_CANCELED;
+
+                try {
+                    $this->_inspectSyncContainer($record);
+                } catch (Calendar_Exception_InSyncContainer $e) {
+                    $tm = Tinebase_TransactionManager::getInstance();
+                    if (!$tm->unitTestForceSkipRollBack()) {
+                        if (1 !== count($tm->getOpenTransactionIds())) {
+                            throw new Tinebase_Exception('exactly one open transaction expected! ' . count($tm->getOpenTransactionIds()));
+                        }
+                        foreach ($tm->getOpenTransactionIds() as $transactionId) {
+                            $tm->commitTransaction($transactionId);
+                        }
+                    }
+                    $record->is_deleted = 1;
+                    $this->_writeSyncContainer($record, $e->syncContainerConfig);
+                    continue;
+                }
+
                 $this->_touch($record);
                 if ($record->isRecurException()) {
                     try {
@@ -1324,7 +1385,7 @@ class Calendar_Controller_Event extends Tinebase_Controller_Record_Abstract impl
         } else if ($range === Calendar_Model_Event::RANGE_THISANDFUTURE) {
             $nextRegularRecurEvent = Calendar_Model_Rrule::computeNextOccurrence($baseEvent, new Tinebase_Record_RecordSet('Calendar_Model_Event'), $exdate->dtstart);
             
-            if ($nextRegularRecurEvent == $baseEvent) {
+            if ($nextRegularRecurEvent?->getId() === $baseEvent->getId()) {
                 // NOTE if a fist instance exception takes place before the
                 //      series would start normally, $nextOccurence is the
                 //      baseEvent of the series. As createRecurException can't
@@ -1589,6 +1650,7 @@ class Calendar_Controller_Event extends Tinebase_Controller_Record_Abstract impl
                         $attendees->cal_event_id = $persistentExceptionEvent->getId();
                         $calendar = Tinebase_Container::getInstance()->getContainerById($_event->container_id);
                         foreach ($attendees as $attendee) {
+                            //todo: fe sometimes send attendeeData without valid user_id, if user_id is not set , skip _createAttender , just continue
                             $this->_createAttender($attendee, $_event, TRUE, $calendar);
                             $this->_increaseDisplayContainerContentSequence($attendee, $persistentExceptionEvent, Tinebase_Model_ContainerContent::ACTION_CREATE);
                         }
@@ -2009,10 +2071,11 @@ class Calendar_Controller_Event extends Tinebase_Controller_Record_Abstract impl
             return;
         }
 
+        /** @var Tinebase_Model_Container $container */
         $container = $currentEvent?->container_id ?: Tinebase_Container::getInstance()->get($event->container_id);
-        if ($config = ($container->xprops()[self::SYNC_CONTAINER] ?? false)) {
+        if ($config = $container->getRecordFromXProps([self::SYNC_CONTAINER], Calendar_Model_SyncContainerConfig::class)) {
             $e = new Calendar_Exception_InSyncContainer();
-            $e->syncContainerConfig = new Calendar_Model_SyncContainerConfig($config);
+            $e->syncContainerConfig = $config;
             throw $e;
         }
     }
@@ -2027,6 +2090,7 @@ class Calendar_Controller_Event extends Tinebase_Controller_Record_Abstract impl
     {
         $_record = $this->_updateGeoLocations($_record);
 
+        // TODO FIXME here? or after poll inspect?
         $this->_inspectSyncContainer($_record);
 
         Calendar_Controller_Poll::getInstance()->inspectBeforeCreateEvent($_record);
@@ -2044,6 +2108,7 @@ class Calendar_Controller_Event extends Tinebase_Controller_Record_Abstract impl
     {
         $_record = $this->_updateGeoLocations($_record);
 
+        // TODO FIXME here?! or at the end of the method?
         $this->_inspectSyncContainer($_record);
         
         if ($this->_skipRecurAdoptions) {
@@ -2464,10 +2529,13 @@ class Calendar_Controller_Event extends Tinebase_Controller_Record_Abstract impl
 
         $this->_inspectOriginatorTZ($_record);
 
-        if ($_record->hasExternalOrganizer() && $this->_moveExternalOrganizerToContainer) {
+        while ($_record->hasExternalOrganizer() && $this->_moveExternalOrganizerToContainer) {
             // assert calendarUser as attendee. This is important to keep the event in the loop via its displaycontianer(s)
             try {
                 $container = Tinebase_Container::getInstance()->getContainerById($_record->container_id);
+                if (isset($container->xprops()[self::SYNC_CONTAINER])) {
+                    break;
+                }
                 $owner = $container->getOwner();
                 $calendarUserId = Addressbook_Controller_Contact::getInstance()->getContactByUserId($owner, true)->getId();
             } catch (Exception $e) {
@@ -2499,6 +2567,7 @@ class Calendar_Controller_Event extends Tinebase_Controller_Record_Abstract impl
                     }
                 }
             }
+            break;
         }
         
         if ($_record->is_all_day_event) {
@@ -2650,31 +2719,55 @@ class Calendar_Controller_Event extends Tinebase_Controller_Record_Abstract impl
                 $container = Tinebase_Container::getInstance()->get($containerId);
                 if (Tinebase_Model_Container::TYPE_PERSONAL === $container->type) {
                     try {
-                        $_filter->addFilterGroup(new Calendar_Model_EventFilter([
+                        $innerFilter = new Calendar_Model_EventFilter([], _condition: Calendar_Model_EventFilter::CONDITION_OR);
+                        $innerFilter->addFilterGroup(new Calendar_Model_EventFilter([
                             [TMFA::FIELD => 'attender', TMFA::OPERATOR => TMFA::OP_EQUALS, TMFA::VALUE => [
                                 'user_id' => Tinebase_User::getInstance()->getUserById($container->owner_id)->contact_id,
                                 'user_type' => Calendar_Model_Attender::USERTYPE_USER,
                             ]],
                             [TMFA::FIELD => 'attender_status', TMFA::OPERATOR => 'notin', TMFA::VALUE => [Calendar_Model_Attender::STATUS_DECLINED]],
                         ]));
+                        $innerFilter->addFilterGroup(new Calendar_Model_EventFilter([
+                            [TMFA::FIELD => 'attender', TMFA::OPERATOR => 'not', TMFA::VALUE => [
+                                'user_id' => Tinebase_User::getInstance()->getUserById($container->owner_id)->contact_id,
+                                'user_type' => Calendar_Model_Attender::USERTYPE_USER,
+                            ]],
+                        ]));
+                        $_filter->addFilterGroup($innerFilter);
                     } catch (Tinebase_Exception_NotFound) {}
                 } elseif (Tinebase_Model_Container::TYPE_SHARED === $container->type) {
                     if ($resourceId = ($container->xprops()['Calendar']['Resource']['resource_id'] ?? false)) {
-                        $_filter->addFilterGroup(new Calendar_Model_EventFilter([
+                        $innerFilter = new Calendar_Model_EventFilter([], _condition: Calendar_Model_EventFilter::CONDITION_OR);
+                        $innerFilter->addFilterGroup(new Calendar_Model_EventFilter([
                             [TMFA::FIELD => 'attender', TMFA::OPERATOR => TMFA::OP_EQUALS, TMFA::VALUE => [
                                 'user_id' => $resourceId,
                                 'user_type' => Calendar_Model_Attender::USERTYPE_RESOURCE,
                             ]],
                             [TMFA::FIELD => 'attender_status', TMFA::OPERATOR => 'notin', TMFA::VALUE => [Calendar_Model_Attender::STATUS_DECLINED]],
                         ]));
+                        $innerFilter->addFilterGroup(new Calendar_Model_EventFilter([
+                            [TMFA::FIELD => 'attender', TMFA::OPERATOR => 'not', TMFA::VALUE => [
+                                'user_id' => $resourceId,
+                                'user_type' => Calendar_Model_Attender::USERTYPE_RESOURCE,
+                            ]],
+                        ]));
+                        $_filter->addFilterGroup($innerFilter);
                     } else {
-                        $_filter->addFilterGroup(new Calendar_Model_EventFilter([
+                        $innerFilter = new Calendar_Model_EventFilter([], _condition: Calendar_Model_EventFilter::CONDITION_OR);
+                        $innerFilter->addFilterGroup(new Calendar_Model_EventFilter([
                             [TMFA::FIELD => 'attender', TMFA::OPERATOR => TMFA::OP_EQUALS, TMFA::VALUE => [
                                 'user_id' => Tinebase_Core::getUser()->contact_id, // TODO FIXME calendar user?!
                                 'user_type' => Calendar_Model_Attender::USERTYPE_USER,
                             ]],
                             [TMFA::FIELD => 'attender_status', TMFA::OPERATOR => 'notin', TMFA::VALUE => [Calendar_Model_Attender::STATUS_DECLINED]],
                         ]));
+                        $innerFilter->addFilterGroup(new Calendar_Model_EventFilter([
+                            [TMFA::FIELD => 'attender', TMFA::OPERATOR => 'not', TMFA::VALUE => [
+                                'user_id' => Tinebase_Core::getUser()->contact_id, // TODO FIXME calendar user?!
+                                'user_type' => Calendar_Model_Attender::USERTYPE_USER,
+                            ]],
+                        ]));
+                        $_filter->addFilterGroup($innerFilter);
                     }
                 }
             }
@@ -3046,7 +3139,35 @@ class Calendar_Controller_Event extends Tinebase_Controller_Record_Abstract impl
         
         return $updatedAttender;
     }
-    
+
+    public function counterEvent(Calendar_Model_Event $currentEvent, Calendar_Model_Event $counterEvent, array $options = []): bool|Felamimail_Model_Message
+    {
+        $onlyGenerateRaii = null;
+        if (true === ($options['composeEmail'] ?? false)) {
+            Calendar_Controller_EventNotifications::getInstance()->resetGeneratedEmails();
+            $oldOnlyGenerate = Calendar_Controller_EventNotifications::getInstance()->onlyGenerateNotificationsNoSend(true);
+            $onlyGenerateRaii = new Tinebase_RAII(function() use ($oldOnlyGenerate) {
+                Calendar_Controller_EventNotifications::getInstance()->resetGeneratedEmails();
+                Calendar_Controller_EventNotifications::getInstance()->onlyGenerateNotificationsNoSend($oldOnlyGenerate);
+            });
+        }
+
+        // ensure counterEvent contains necessary infos:
+        foreach (['uid', 'organizer', 'organizer_type', 'organizer_email', 'organizer_displayname', 'recurid'] as $property) {
+            $counterEvent->$property = $currentEvent->$property;
+        }
+
+        $result = true;
+        Calendar_Controller_EventNotifications::getInstance()->doSendNotifications($counterEvent, Tinebase_Core::getUser(), 'counter');
+
+        if (null !== $onlyGenerateRaii) {
+            $result = current(Calendar_Controller_EventNotifications::getInstance()->getGeneratedEmails());
+            unset($onlyGenerateRaii);
+        }
+
+        return $result;
+    }
+
     /**
      * saves all attendee of given event
      * 
@@ -3438,7 +3559,59 @@ class Calendar_Controller_Event extends Tinebase_Controller_Record_Abstract impl
         
         Calendar_Controller_EventNotifications::getInstance()->doSendNotifications($event, Tinebase_Core::getUser(), 'alarm', NULL, array('alarm' => $_alarm));
     }
-    
+
+    public function syncCloudAccountContainers(): bool
+    {
+        if (!Tinebase_Core::acquireMultiServerLock(__METHOD__)) {
+            return true;
+        }
+
+        $containerCtrl = Tinebase_Container::getInstance();
+        $oldSearchAcl = $containerCtrl->doSearchAclFilter(false);
+        $resetContainerSearchAcl = new Tinebase_RAII(fn() => $containerCtrl->doSearchAclFilter($oldSearchAcl));
+        $cloudAccountContainers = $containerCtrl->search(new Tinebase_Model_ContainerFilter([
+            [TMFA::FIELD => 'application_id', TMFA::OPERATOR => TMFA::OP_EQUALS, TMFA::VALUE => Tinebase_Application::getInstance()->getApplicationByName(Calendar_Config::APP_NAME)->getId()],
+            [TMFA::FIELD => 'xprops', TMFA::OPERATOR => 'contains', TMFA::VALUE => '"' . self::SYNC_CONTAINER . '"' ],
+        ]));
+        unset($resetContainerSearchAcl);
+
+        foreach ($cloudAccountContainers as $cloudContainer) {
+            if (!($syncCfg = $cloudContainer->getRecordFromXProps([self::SYNC_CONTAINER], Calendar_Model_SyncContainerConfig::class))) {
+                continue;
+            }
+
+            if ($syncCfg->{Calendar_Model_SyncContainerConfig::FLD_LAST_SUCCESSFUL_SYNC} instanceof Tinebase_DateTime &&
+                    Tinebase_DateTime::now()->getTimestamp() - $syncCfg->{Calendar_Model_SyncContainerConfig::FLD_LAST_SUCCESSFUL_SYNC}->getTimestamp() < 300) {
+                continue;
+            }
+            if ($syncCfg->{Calendar_Model_SyncContainerConfig::FLD_LAST_FAILED_SYNC} instanceof Tinebase_DateTime &&
+                    Tinebase_DateTime::now()->getTimestamp() - $syncCfg->{Calendar_Model_SyncContainerConfig::FLD_LAST_FAILED_SYNC}->getTimestamp() < 300) {
+                continue;
+            }
+
+            try {
+                $syncCfg->sync($cloudContainer);
+                $syncState = $cloudContainer->xprops()[Calendar_Backend_CalDav_SyncState::class];
+
+                $transaction = Tinebase_RAII::getTransactionManagerRAII();
+
+                $selectForUpdate = Tinebase_Backend_Sql_SelectForUpdateHook::getRAII($containerCtrl);
+                $cloudContainer = $containerCtrl->get($cloudContainer->getId());
+                unset($selectForUpdate);
+
+                $cloudContainer->xprops()[Calendar_Backend_CalDav_SyncState::class] = $syncState;
+                $cloudContainer->xprops()[self::SYNC_CONTAINER] = $syncCfg->dehydrate();
+                $containerCtrl->update($cloudContainer);
+
+                $transaction->release();
+            } catch (Throwable $e) {
+                Tinebase_Exception::log($e);
+            }
+        }
+
+        return true;
+    }
+
     /**
      * send notifications 
      * 
@@ -3854,6 +4027,26 @@ class Calendar_Controller_Event extends Tinebase_Controller_Record_Abstract impl
             parent::deleteContainerContents($_container, $_ignoreAcl, $_filter);
         } else {
             parent::deleteContainerContents($_container, $_ignoreAcl, $_filter);
+        }
+    }
+
+    protected function _handleEvent(Tinebase_Event_Abstract $_eventObject)
+    {
+        if ($_eventObject instanceof Tinebase_Event_Record_BeforeUpdate && $_eventObject->observable instanceof Tinebase_Model_Container
+                && $syncConfig = $_eventObject->observable->getRecordFromXProps([self::SYNC_CONTAINER], Calendar_Model_SyncContainerConfig::class)) {
+
+            // if container name or container colour deviates from external values we need to make sure to set the overwritten flag
+            if (!$syncConfig->{Calendar_Model_SyncContainerConfig::FLD_CONTAINER_NAME_LOCALLY_OVERWRITTEN} &&
+                    $_eventObject->observable->name !== $syncConfig->{Calendar_Model_SyncContainerConfig::FLD_EXTERNAL_CONTAINER_NAME}) {
+                $syncConfig->{Calendar_Model_SyncContainerConfig::FLD_CONTAINER_NAME_LOCALLY_OVERWRITTEN} = true;
+            }
+            if (!$syncConfig->{Calendar_Model_SyncContainerConfig::FLD_CONTAINER_COLOR_LOCALLY_OVERWRITTEN} &&
+                    $_eventObject->observable->color !== $syncConfig->{Calendar_Model_SyncContainerConfig::FLD_EXTERNAL_CONTAINER_COLOR}) {
+                $syncConfig->{Calendar_Model_SyncContainerConfig::FLD_CONTAINER_COLOR_LOCALLY_OVERWRITTEN} = true;
+            }
+            if ($syncConfig->isDirty()) {
+                $_eventObject->observable->xprops()[self::SYNC_CONTAINER] = $syncConfig->dehydrate();
+            }
         }
     }
 }

@@ -7,6 +7,7 @@
  */
 import waitFor from "util/waitFor.es6"
 import asString from "../../ux/asString"
+import * as markdown from 'util/markdown'
 
 Ext.ns('Tine.widgets.dialog');
 
@@ -334,6 +335,10 @@ Tine.widgets.dialog.EditDialog = Ext.extend(Ext.FormPanel, {
             'change'
         );
 
+        this.fieldDefaults = Ext.applyIf(this.fieldDefaults || {}, {
+            showDirtyUI: true
+        });
+
         if (Ext.isString(this.modelConfig)) {
             this.modelConfig = Ext.decode(this.modelConfig);
         }
@@ -425,6 +430,36 @@ Tine.widgets.dialog.EditDialog = Ext.extend(Ext.FormPanel, {
         // get items for this dialog
         this.items = this.getFormItems();
 
+        if (this.denormalizationRecordClass) {
+            this.afterIsRendered().then(async () => {
+                this.insert(0, {
+                    xtype: 'v-alert',
+                    variant: 'info',
+                    columnWidth: 1,
+                    label: await markdown.parse(this.app.formatMessage('Notice: Changes to {recordGender, select, male {this} female {this} other {this}} {recordName} apply only to {contextRecordGender, select, male {the associated} female {the associated} other {the associated}} {contextRecordName}. {recordGender, select, male {The} female {The} other {The}} [original {recordName}]() remains unchanged.', {
+                        recordName: markdown.escapeMarkdown(this.i18nRecordName),
+                        recordGender: markdown.escapeMarkdown(this.recordClass.getRecordGender()),
+                        contextRecordName: markdown.escapeMarkdown(this.contextRecordClass.getRecordName()),
+                        contextRecordGender: markdown.escapeMarkdown(this.contextRecordClass.getRecordGender()),
+                    })),
+                    listeners: {
+                        scope: this,
+                        render: function (cmp){
+                            cmp.getEl().on('click', async e => {
+                                e.stopEvent();
+                                if (! e.getTarget('a')) return;
+                                const originalId = this.record.json.original_id
+                                const EditDialog = Tine.widgets.dialog.EditDialog.getConstructor(this.recordClass)
+                                if (originalId && EditDialog?.openWindow) {
+                                    EditDialog.openWindow({recordId: originalId, record: { id: originalId }, mode: 'remote'});
+                                }
+
+                            })
+                        }
+                    }
+                })
+            })
+        }
         // init relations panel if relations are defined
         this.initRelationsPanel();
         // init attachments panel
@@ -445,6 +480,7 @@ Tine.widgets.dialog.EditDialog = Ext.extend(Ext.FormPanel, {
         }
 
         Tine.widgets.dialog.EditDialog.superclass.initComponent.call(this);
+        this.getForm().trackResetOnLoad = true;
 
         // set fields readOnly if set
         this.fixFields();
@@ -526,7 +562,7 @@ Tine.widgets.dialog.EditDialog = Ext.extend(Ext.FormPanel, {
                                 : this.responsiveBreakpointOverrides),
                     },
                     defaults: { autoScroll: true },
-                    items: [Ext.applyIf(this.getRecordFormItems (plugin), {
+                    items: [Ext.applyIf(this.getRecordFormItems(plugin), {
                         region: 'center',
                         xtype: 'columnform',
                         labelAlign: 'top',
@@ -603,9 +639,10 @@ Tine.widgets.dialog.EditDialog = Ext.extend(Ext.FormPanel, {
 
     getRecordFormItems: function(plugin) {
         return new Tine.widgets.form.RecordForm({
+            ref: '../../../../recordForm',
             recordClass: this.recordClass,
             editDialog: this,
-            tapPanelPlugin: plugin
+            tabPanelPlugin: plugin
         });
     },
 
@@ -854,7 +891,7 @@ Tine.widgets.dialog.EditDialog = Ext.extend(Ext.FormPanel, {
      * init container selector
      */
     initContainerSelector: function() {
-        if (this.showContainerSelector) {
+        if (this.showContainerSelector && !this.denormalizationRecordClass) {
             this.containerSelectCombo = new Tine.widgets.container.SelectionComboBox({
                 id: this.app.appName + 'EditDialogContainerSelector-' + Ext.id(),
                 fieldLabel: i18n._('Saved in'),
@@ -1082,7 +1119,7 @@ Tine.widgets.dialog.EditDialog = Ext.extend(Ext.FormPanel, {
         Tine.log.debug(this.record);
 
 
-        if (!this.record.id || this.recordClass.getMeta('containerProperty') && !_.get(this.record, 'data.' + this.recordClass.getMeta('containerProperty'), false)) {
+        if (!this.record.id || this.record.phantom || this.recordClass.getMeta('containerProperty') && !_.get(this.record, 'data.' + this.recordClass.getMeta('containerProperty'), false)) {
             _.set(this.record, this.recordClass.getMeta('grantsPath') + '.deleteGrant', true);
             _.set(this.record, this.recordClass.getMeta('grantsPath') + '.addGrant', true);
             _.set(this.record, this.recordClass.getMeta('grantsPath') + '.editGrant', true);
@@ -1110,9 +1147,7 @@ Tine.widgets.dialog.EditDialog = Ext.extend(Ext.FormPanel, {
                 })();
 
                 if (! this.el.findParent('.x-window')) {
-                    if (_.get(Tine.Tinebase.router.routes, `${this.appName}.${this.recordClass.getMeta('recordName')}`)) {
-                        Tine.Tinebase.router.setRoute(`${this.appName}/${this.recordClass.getMeta('recordName')}/${this.record.get(this.recordClass.getMeta('idProperty'))}`);
-                    }
+                    this.setRouteLink();
                 }
             }
         }
@@ -1122,6 +1157,13 @@ Tine.widgets.dialog.EditDialog = Ext.extend(Ext.FormPanel, {
 
         this.fireEvent('load', this, this.record, ticketFn);
         wrapTicket();
+    },
+
+    setRouteLink() {
+        const recordId = this.record.get(this.recordClass.getMeta('idProperty'));
+        if (Ext.isString(recordId) && ! recordId.match('^[0-9a-f-]{40,}$')) return;
+        Tine.Tinebase.router.on([`/${this.appName}/${this.recordClass.getMeta('modelName')}/(.*)`], () => {});
+        Tine.Tinebase.router.setRoute(`${this.appName}/${this.recordClass.getMeta('modelName')}/${recordId}`);
     },
 
     /**
@@ -1184,7 +1226,7 @@ Tine.widgets.dialog.EditDialog = Ext.extend(Ext.FormPanel, {
                         (_.get(this.record, `${grantsPath}.${f.requiredGrant}`) || _.get(this.record, `${grantsPath}.adminGrant`));
                 }
 
-                _.isFunction(f.setReadOnly) ? f.setReadOnly(!hasRequiredGrants) : f.setDisabled(!hasRequiredGrants);
+                _.isFunction(f.setReadOnly) ? f.setReadOnly(!hasRequiredGrants || f.initialConfig.readOnly) : f.setDisabled(!hasRequiredGrants || f.initialConfig.disabled);
             }, this);
         }
 

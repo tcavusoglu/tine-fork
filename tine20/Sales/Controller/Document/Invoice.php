@@ -19,6 +19,7 @@
  */
 class Sales_Controller_Document_Invoice extends Sales_Controller_Document_Abstract
 {
+    /** @use Tinebase_Controller_SingletonTrait<Sales_Controller_Document_Invoice> */
     use Tinebase_Controller_SingletonTrait;
 
     protected static $_adminGrant = Sales_Model_DivisionGrants::GRANT_ADMIN_DOCUMENT_INVOICE;
@@ -57,6 +58,7 @@ class Sales_Controller_Document_Invoice extends Sales_Controller_Document_Abstra
             Sales_Model_Document_Abstract::FLD_PROJECT_REFERENCE,
             Sales_Model_Document_Abstract::FLD_CONTACT_ID,
             Sales_Model_Document_Abstract::FLD_CONTRACT_NUMBER,
+            Sales_Model_Document_Invoice::FLD_PAYMENT_REMINDERS,
             'tags', 'attachments', 'relations',
         ];
         $this->_bookRecordRequiredFields = [

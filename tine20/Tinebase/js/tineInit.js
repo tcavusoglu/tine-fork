@@ -651,17 +651,37 @@ Tine.Tinebase.tineInit = {
             if (areaLockException) {
                 // login from post - user is authenticated but mfa is required
                 return Tine.Tinebase.areaLocks.handleAreaLockException(areaLockException).then(() => {
-                    Ext.MessageBox.wait(String.format(i18n._('Login successful. Loading {0}...'), Tine.title), i18n._('Please wait!'));
+                    Ext.MessageBox.wait(String.format(i18n._('Login successful. Loading {0}...'), Tine.title), i18n._('Please wait!'), { estimate: 5000 });
                     Tine.Tinebase.tineInit.initRegistry(true, Tine.Tinebase.tineInit.renderWindow, Tine.Tinebase.tineInit);
                 }).catch(async (error) => {
-                    Ext.MessageBox.wait(i18n._('Logging you out...'), i18n._('Please wait!'));
+                    Ext.MessageBox.wait(i18n._('Logging you out...'), i18n._('Please wait!'), { estimate: 3000 });
                     await Tine.Tinebase.logout();
                     return Tine.Tinebase.common.reload({
                         keepRegistry: false,
                         clearCache: true
                     });
-
                 });
+            }
+            const isInMaintenanceMode = Tine.Tinebase.registry.get('isInMaintenanceMode');
+            if (isInMaintenanceMode) {
+                Ext.MessageBox.show({
+                    title : i18n._('Please wait or contact your administrator'),
+                    msg : i18n._('Installation is in maintenance mode. Please try again later'),
+                    buttons: false,
+                    closable:false,
+                    wait:true,
+                    modal:true,
+                    icon: Ext.MessageBox.WARNING,
+                    minWidth: Ext.MessageBox.minProgressWidth
+                });
+
+                window.setTimeout(() => {
+                    Tine.Tinebase.common.reload({
+                        keepRegistry: false,
+                        clearCache: true
+                    });
+                }, 20000);
+                return;
             }
             Tine.Tinebase.tineInit.showLoginBox(function(response){
                 Tine.log.info('tineInit::renderWindow -fetch users registry');
@@ -706,19 +726,7 @@ Tine.Tinebase.tineInit = {
                 Tine.Tinebase.router.setRoute(defaultApp.getRoute());
             }
         }});
-    
-        if (! window.isMainWindow) {
-            Tine.Tinebase.appMgr.apps.each((app) => {
-                const initRoutes = _.get(window, `Tine.${app.appName}.Application.prototype.initRoutes`);
-                if(_.isFunction(initRoutes)) {
-                    initRoutes.call(Object.assign({
-                        appName: app.appName,
-                        routes: app.routes
-                    }, _.get(window, `Tine.${app.appName}.Application.prototype`)));
-                }
-            })
-        }
-        
+
         var route = Tine.Tinebase.router.getRoute(),
             winConfig = Ext.ux.PopupWindowMgr.get(window);
 
@@ -1280,7 +1288,6 @@ Tine.Tinebase.tineInit = {
 
         switch (key) {
             case 'windowtype':
-            case 'confirmLogout':
             case 'timezone':
             case 'locale':
                 Tine.log.info('tineInit::onPreferenceChange - reload mainscreen');
@@ -1416,7 +1423,16 @@ Tine.Tinebase.tineInit = {
      * add provider to Ext.Direct based on Tine servicemap
      */
     initExtDirect: function () {
-        var sam = Tine.Tinebase.registry.get('serviceMap');
+        const sam = Tine.Tinebase.registry.get('serviceMap');
+
+        if (!sam) {
+            // TODO improve this by clearing the cookie and return to the login screen
+            Ext.MessageBox.alert(
+                formatMessage('Could not load service map'),
+                formatMessage('You might have to clear the session/cookies and do the login again')
+            );
+            return;
+        }
 
         Ext.Direct.addProvider(Ext.apply(sam, {
             'type'     : 'jsonrpcprovider',

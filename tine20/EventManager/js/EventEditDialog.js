@@ -1,14 +1,15 @@
 /*
- * Tine 2.0
+ * tine Groupware
  *
  * @package     EventManager
- * @license     http://www.gnu.org/licenses/agpl.html AGPL Version 3
- * @author      Stefanie Stamer <s.stamer@metaways.de> Tonia Wulff <t.leuschel@metaways.de>
- * @copyright   Copyright (c) 2021-2025 Metaways Infosystems GmbH (http://www.metaways.de)
+ * @license     https://www.gnu.org/licenses/agpl.html AGPL Version 3
+ * @author      Stefanie Stamer <s.stamer@metaways.de> Tonia Wulff <t.wulff@metaways.de>
+ * @copyright   Copyright (c) 2021-2026 Metaways Infosystems GmbH (https://www.metaways.de)
  *
  */
 import './filePanel';
 import EvaluationDimensionForm from "../../Tinebase/js/widgets/form/EvaluationDimensionForm";
+import ContactFieldsFieldset from "../../Tinebase/js/widgets/form/ContactFieldsFieldset";
 
 Ext.namespace('Tine.EventManager');
 
@@ -21,8 +22,8 @@ Tine.EventManager.EventEditDialog = Ext.extend(Tine.widgets.dialog.EditDialog, {
     windowNamePrefix: 'EventEditWindow_',
 
     initComponent: function () {
-        this.supr().initComponent.apply(this, arguments);
         this.app = Tine.Tinebase.appMgr.get('EventManager');
+        this.supr().initComponent.apply(this, arguments);
 
         this.rrulePanel = new Tine.Calendar.RrulePanel({
             eventEditDialog : this
@@ -100,7 +101,13 @@ Tine.EventManager.EventEditDialog = Ext.extend(Tine.widgets.dialog.EditDialog, {
                                         fieldManager('status'),
                                     ],
                                     [
-                                        fieldManager('total_places'),
+                                        fieldManager('total_places', {
+                                            checkState: function () {
+                                                const total = me.form.findField('total_places').getValue() || 0;
+                                                const booked = me.form.findField('booked_places').getValue() || 0;
+                                                me.form.findField('available_places').setValue(total - booked);
+                                            }
+                                        }),
                                         fieldManager('booked_places'),
                                         fieldManager('available_places'),
                                     ],
@@ -121,11 +128,12 @@ Tine.EventManager.EventEditDialog = Ext.extend(Tine.widgets.dialog.EditDialog, {
                                                 }
                                             }
                                         }),
-                                        [ new EvaluationDimensionForm({
-                                            maxItemsPerRow: 2,
-                                            recordClass: this.recordClass
-                                        })]
+                                        fieldManager('register_others'),
                                     ],
+                                    [ new EvaluationDimensionForm({
+                                        maxItemsPerRow: 2,
+                                        recordClass: this.recordClass
+                                    })]
                                 ]
                             }]
                         }]
@@ -289,51 +297,117 @@ Tine.EventManager.EventEditDialog = Ext.extend(Tine.widgets.dialog.EditDialog, {
                         fieldManager('appointments', {
                             checkState: function () {
                                 let sessions = me.form.findField('appointments').getValue()
-                                sessions.sort((session1, session2) => {
-                                    if (session1['start_time'] < session2['start_time']) {
-                                        return -1;
-                                    }
-                                    if (session1['start_time'] > session2['start_time']) {
-                                        return 1;
-                                    }
-                                    return 0;
-                                })
                                 let counter = 0;
                                 sessions.forEach((session) => {
                                     session['session_number'] = counter + 1;
                                     counter += 1;
-                                    if (me.form.findField('end').getValue() && session['end_time'] && (me.form.findField('end').getValue() >= session['end_time'])) {
-                                        session['end_time'] = me.form.findField('end').getValue();
-                                        Ext.MessageBox.show({
-                                            buttons: Ext.Msg.OK,
-                                            icon: Ext.MessageBox.WARNING,
-                                            title: me.app.i18n._('Registration'),
-                                            msg: me.app.i18n._('The session should take place before the end date. Please change the date or it would be change automatically')
-                                        });
-                                    }
-                                    if (session['start_time'] && me.form.findField('start').getValue() && (session['start_time'] < me.form.findField('start').getValue())) {
-                                        session['start_time'] = me.form.findField('start').getValue();
-                                        Ext.MessageBox.show({
-                                            buttons: Ext.Msg.OK,
-                                            icon: Ext.MessageBox.WARNING,
-                                            title: me.app.i18n._('Registration'),
-                                            msg: me.app.i18n._('The session should start on the same date or after the event started. Please change the date or it would be change automatically')
-                                        });
-                                    }
-                                    if (session['start_time'] && session['end_time'] && (session['start_time'] > session['end_time'])) {
-                                        session['end_time'] = '';
-                                        Ext.MessageBox.show({
-                                            buttons: Ext.Msg.OK,
-                                            icon: Ext.MessageBox.WARNING,
-                                            title: me.app.i18n._('Registration'),
-                                            msg: me.app.i18n._('The session should end after it begun. Please change the end time, or it would be deleted')
-                                        });
-                                    }
+
+                                    const combineDateTime = (sessionDate, time) => {
+                                        if (!sessionDate || !time || time === '') {
+                                            return null;
+                                        }
+
+                                        const dateStr = (sessionDate instanceof Date)
+                                            ? `${sessionDate.getFullYear()}-${String(sessionDate.getMonth() + 1).padStart(2, '0')}-${String(sessionDate.getDate()).padStart(2, '0')}`
+                                            : sessionDate.substring(0, 10);
+
+                                        let timeStr;
+                                        if (time instanceof Date) {
+                                            timeStr = time.toTimeString().substring(0, 8);
+                                        } else if (time.length > 8) {
+                                            timeStr = time.substring(11, 19);
+                                        } else {
+                                            timeStr = time;
+                                        }
+
+                                        return new Date(`${dateStr}T${timeStr}`);
+                                    };
+
+                                    sessions.sort((session1, session2) => {
+                                        const start1 = combineDateTime(session1['session_date'], session1['start_time']);
+                                        const start2 = combineDateTime(session2['session_date'], session2['start_time']);
+                                        if (start1 === null && start2 === null) {
+                                            return 0;
+                                        }
+                                        if (start1 === null) {
+                                            return 1;
+                                        }
+                                        if (start2 === null) {
+                                            return -1;
+                                        }
+                                        return start1 - start2;
+                                    });
+
+                                    const eventStart = me.form.findField('start').getValue();
+                                    const eventEnd   = me.form.findField('end').getValue();
+                                    const sessStart  = combineDateTime(session['session_date'], session['start_time']);
+                                    const sessEnd    = combineDateTime(session['session_date'], session['end_time']);
+
+                                if (eventEnd && sessEnd && sessEnd > eventEnd) {
+                                    session['end_time'] = me.form.findField('end').getValue();
+                                    Ext.MessageBox.show({
+                                        buttons: Ext.Msg.OK,
+                                        icon: Ext.MessageBox.WARNING,
+                                        title: me.app.i18n._('Registration'),
+                                        msg: me.app.i18n._('The session should take place before the end date. Please change the date or it would be change automatically')
+                                    });
+                                }
+                                if (sessStart && eventStart && sessStart < eventStart) {
+                                    session['start_time'] = me.form.findField('start').getValue();
+                                    Ext.MessageBox.show({
+                                        buttons: Ext.Msg.OK,
+                                        icon: Ext.MessageBox.WARNING,
+                                        title: me.app.i18n._('Registration'),
+                                        msg: me.app.i18n._('The session should start on the same date or after the event started. Please change the date or it would be change automatically')
+                                    });
+                                }
+                                if (sessStart && sessEnd && sessStart > sessEnd) {
+                                    session['end_time'] = '';
+                                    Ext.MessageBox.show({
+                                        buttons: Ext.Msg.OK,
+                                        icon: Ext.MessageBox.WARNING,
+                                        title: me.app.i18n._('Registration'),
+                                        msg: me.app.i18n._('The session should end after it begun. Please change the end time, or it would be deleted')
+                                    });
+                                }
                                 })
                             }
                         })
                     ]
                 }
+                ]
+            }, {
+                title: this.app.i18n._('Registration Contact Fields'),
+                autoScroll: true,
+                border: false,
+                frame: true,
+                layout: 'form',
+                items: [
+                    new ContactFieldsFieldset({
+                        title: this.app.i18n._('Contact Fields'),
+                        name: 'contact_fields',
+                        unwantedFields: ['account_id', 'color', 'groups', 'language', 'org_unit', 'pubkey',
+                            'syncBackendIds', 'tel_other', 'tel_pager_normalized', 'type',
+                            'tel_cell_private_normalized', 'tel_fax_home_normalized', 'cat_id',
+                            'GDPR_DataEditingReason', 'customfields', 'attachments', 'creation_time',
+                            'last_modified', 'deleted_by', 'is_deleted', 'deleted_time',
+                            'adr_one_lon', 'adr_one_lat', 'adr_two_lon', 'adr_two_lat',
+                            'calendar_uri', 'groups_diff', 'note', 'paths', 'tel_prefer',
+                            'tel_other_normalized', 'tel_home_normalized', 'sites',
+                            'GDPR_DataProvenance', 'GDPR_DataIntendedPurposeRecord', 'relations',
+                            'xprops', 'last_modified_by', 'freebusy_uri', 'preferred_address',
+                            'room', 'tel_car', 'tel_assistent_normalized', 'tel_prefer_normalized',
+                            'tel_cell_normalized', 'tel_work_normalized', 'tel_fax_normalized',
+                            'ical_fb_urls', 'GDPR_DataExpiryDate', 'container_id', 'notes',
+                            'last_modified_time', 'assistent', 'geo', 'tel_car_normalized',
+                            'label', 'id', 'matrix_id', 'GDPR_Blacklist', 'tags', 'created_by',
+                            'seq', 'test'],
+                        defaultCheckedFields: ['n_given', 'n_middle', 'n_family', 'bday', 'email',
+                            'tel_cell', 'tel_work', 'adr_one_street', 'adr_one_street2',
+                            'adr_one_postalcode', 'adr_one_locality', 'adr_one_region',
+                            'adr_one_countryname'],
+                        defaultRequiredFields: ['n_given','n_family', 'email'],
+                    })
                 ]
             }, new Tine.widgets.activities.ActivitiesTabPanel({
                 app: this.appName,
@@ -353,12 +427,12 @@ Tine.EventManager.EventEditDialog = Ext.extend(Tine.widgets.dialog.EditDialog, {
                 registrations_count++;
             }
         });
-        if (available_places <= 0 && total_places < registrations_count) {
+        if (available_places <= 0 && total_places !== 0 && total_places <= registrations_count) {
             Ext.MessageBox.show({
                 buttons: Ext.Msg.OK,
                 icon: Ext.MessageBox.INFO,
                 title: this.app.i18n._('Waiting List'),
-                msg: this.app.i18n._('Since there are no more available places, this registration is on the waiting list.'),
+                msg: this.app.i18n._('This event is fully booked. The person you are registering will be placed on the waiting list.'),
                 fn: () => this.supr().onSaveAndClose.apply(this, arguments)
             });
         } else {

@@ -12,6 +12,8 @@
 
 const { isObject, isArray, map, isString, get, escapeRegExp, each, find, compact, cloneDeep } = require('lodash')
 const { htmlEncode, htmlDecode, date: dateFormat, number, round, capitalize} = require('Ext/util/Format')
+const { parse, parsePurified, parseInline, parseInlinePurified } = require('util/markdown')
+
 /**
  * static common helpers
  */
@@ -235,24 +237,30 @@ const common = {
     /**
      * format byte values
      * @param {String} value
-     * @param {Boolean} forceUnit
+     * @param {String} forceUnit
      * @param {Integer} decimals
      * @param {Boolean} useDecimalValues
      */
     byteFormatter: function(value, forceUnit, decimals, useDecimalValues) {
         value = parseInt(value, 10);
         decimals = Ext.isNumber(decimals) ? decimals : 2;
-        var decimalSeparator = Tine.Tinebase.registry.get('decimalSeparator'),
-            suffix = useDecimalValues ?
-                ['Bytes', 'Bytes', 'kB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'] :
-                ['Bytes', 'Bytes', 'kiB', 'MiB', 'GiB', 'TiB', 'PiB', 'EiB', 'ZiB', 'YiB'] ,
-            divisor = useDecimalValues ? 1000 : 1024;
+        const decimalUnits = ['Bytes', 'Bytes', 'kB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
+        const binaryUnits = ['Bytes', 'Bytes', 'kiB', 'MiB', 'GiB', 'TiB', 'PiB', 'EiB', 'ZiB', 'YiB'];
+        const decimalSeparator = Tine.Tinebase.registry.get('decimalSeparator');
+
+        if (decimalUnits.includes(forceUnit)) {
+            useDecimalValues = true;
+        }
+
+        const suffix = useDecimalValues ? decimalUnits : binaryUnits;
+        const divisor = useDecimalValues ? 1000 : 1024;
+        let i = 0;
 
         if (forceUnit) {
-            var i = suffix.indexOf(forceUnit);
-            i = (i == -1) ? 0 : i;
+            i = suffix.indexOf(forceUnit);
+            i = (i === -1) ? 0 : i;
         } else {
-            for (var i=0,j; i<suffix.length; i++) {
+            for (; i<suffix.length; i++) {
                 if (value < Math.pow(divisor, i)) break;
             }
         }
@@ -334,6 +342,59 @@ const common = {
         }
 
         return result;
+    },
+
+    /**
+     * markdown renderer - fulltext, special type
+     * @param {String} v The string to format.
+     * @param {Object} metaData Grid metadata object
+     * @param {Object} record Grid record
+     * @return {String} The formatted string.
+     */
+    markdownRenderer: function(v, metaData, record) {
+        if ([null, undefined].indexOf(v) >= 0) {
+            return '';
+        }
+
+        const cellId = `markdown-cell-${Ext.id()}`;
+        const maxHeight = metaData?.maxRowHeight || 'none';
+        const qtip = i18n._('This field supports Markdown formatting. For more information check the user manual');
+        const initialContent = `<div ext:qtip="${qtip}" id="${cellId}" class="tb-markdown-loading">
+        ${Ext.util.Format.htmlEncode(v)}
+        </div>`;
+
+        parsePurified(v).then(html => {
+            const element = document.getElementById(cellId);
+            if (element) {
+                if (maxHeight === 'none') {
+                    element.style.maxHeight = 'none';
+                    element.style.overflow = 'visible';
+                    element.style.whiteSpace = 'normal';
+                } else {
+                    element.style.maxHeight = maxHeight;
+                    element.style.overflow = 'hidden';
+                    element.style.whiteSpace = 'nowrap';
+                    element.style.textOverflow = 'ellipsis';
+                }
+
+                element.innerHTML = html;
+
+                if (maxHeight !== 'none') {
+                    element.querySelectorAll('*').forEach(child => {
+                        child.style.display = 'inline';
+                    });
+                }
+            }
+        }).catch(err => {
+            console.error('Markdown rendering error:', err);
+            const element = document.getElementById(cellId);
+            if (element) {
+                element.className = 'tb-markdown-error';
+                element.innerHTML = Ext.util.Format.htmlEncode(v);
+            }
+        });
+
+        return initialContent;
     },
 
     /**

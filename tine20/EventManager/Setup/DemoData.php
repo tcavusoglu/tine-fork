@@ -1,12 +1,14 @@
 <?php
 
+declare(strict_types=1);
+
 /**
- * Tine 2.0
+ * tine Groupware
  *
  * @package     EventManager
- * @license     http://www.gnu.org/licenses/agpl.html AGPL Version 3
- * @author      Tonia Wulff <t.leuschel@metaways.de>
- * @copyright   Copyright (c) 2025 Metaways Infosystems GmbH (http://www.metaways.de)
+ * @license     https://www.gnu.org/licenses/agpl.html AGPL Version 3
+ * @author      Tonia Wulff <t.wulff@metaways.de>
+ * @copyright   Copyright (c) 2025-2026 Metaways Infosystems GmbH (https://www.metaways.de)
  *
  */
 
@@ -128,8 +130,6 @@ class EventManager_Setup_DemoData extends Tinebase_Setup_DemoData_Abstract
         EventManager_Config::getInstance()
             ->set(EventManager_Config::JWT_SECRET, 'jwtSecretCreatedFromEventManagerDemoData');
 
-        $container_id = EventManager_Setup_Initialize::getContactEventContainer()->getId();
-
         $location = $this->getLocation(
             'Familienferienstätte St. Ursula',
             'Ribnitzer Str. 1',
@@ -156,26 +156,37 @@ class EventManager_Setup_DemoData extends Tinebase_Setup_DemoData_Abstract
         $fileoption_upload = $this->setOptionConfigFileDemoData(false);
 
         //text input
-        $allergien = $this->setOptionConfigTextInputDemoData('Allergien: ', true, 50);
+        $allergien = $this->setOptionConfigTextInputDemoData(null, true, 50);
 
         //text output
         $unterscheriben = $this->setOptionConfigTextDemoData('Bitte laden Sie das unterschriebene Dokument hoch');
-
-        // registrations
-        $christoph = $this->getContact('Christoph', 'Riethmüller', $container_id);
-        $daniela = $this->getContact('Daniela', 'Braker', $container_id);
-        $heiner = $this->getContact('Heiner', 'Arden', $container_id);
-        $alexandra = $this->getContact('Alexandra', 'Avermiddig', $container_id);
 
         //appointments
         $appointment_status = EventManager_Config::getInstance()->get(EventManager_Config::APPOINTMENT_STATUS)
             ->records->getById('1');
 
+        //contact_fields
+        $defaultContactFields = [
+            'n_given'               => true,
+            'n_middle'              => true,
+            'n_family'              => true,
+            'bday'                  => true,
+            'email'                 => true,
+            'tel_cell'              => true,
+            'tel_work'              => true,
+            'adr_one_street'        => true,
+            'adr_one_street2'       => true,
+            'adr_one_postalcode'    => true,
+            'adr_one_locality'      => true,
+            'adr_one_region'        => true,
+            'adr_one_countryname'   => true,
+        ];
+
         EventManager_Controller_Event::getInstance()->create(new EventManager_Model_Event([
-            EventManager_Model_Event::FLD_NAME                          => 'Familienexerzitien 2025',
-            EventManager_Model_Event::FLD_START                         => new Tinebase_DateTime("2025-10-20 17:00:00"),
-            EventManager_Model_Event::FLD_END                           => new Tinebase_DateTime("2025-10-24 13:00:00"),
-            EventManager_Model_Event::FLD_REGISTRATION_POSSIBLE_UNTIL   => new Tinebase_DateTime("2025-09-21"),
+            EventManager_Model_Event::FLD_NAME                          => 'Familienexerzitien 2027',
+            EventManager_Model_Event::FLD_START                         => new Tinebase_DateTime("2027-10-20 17:00:00"),
+            EventManager_Model_Event::FLD_END                           => new Tinebase_DateTime("2027-10-24 13:00:00"),
+            EventManager_Model_Event::FLD_REGISTRATION_POSSIBLE_UNTIL   => new Tinebase_DateTime("2027-09-21"),
             EventManager_Model_Event::FLD_LOCATION                      => $location,
             EventManager_Model_Event::FLD_TYPE                          => $event_type,
             EventManager_Model_Event::FLD_STATUS                        => $event_status,
@@ -183,6 +194,7 @@ class EventManager_Setup_DemoData extends Tinebase_Setup_DemoData_Abstract
             EventManager_Model_Event::FLD_TOTAL_PLACES                  => 39,
             EventManager_Model_Event::FLD_BOOKED_PLACES                 => '',
             EventManager_Model_Event::FLD_AVAILABLE_PLACES              => '',
+            EventManager_Model_Event::FLD_CONTACT_FIELDS                => $defaultContactFields,
             EventManager_Model_Event::FLD_OPTIONS                       => [
                 [
                     EventManager_Model_Option::FLD_NAME_OPTION => 'Erwachsene',
@@ -209,9 +221,7 @@ class EventManager_Setup_DemoData extends Tinebase_Setup_DemoData_Abstract
                     EventManager_Model_Option::FLD_GROUP => 'Kosten',
                 ],
             ],
-            EventManager_Model_Event::FLD_REGISTRATIONS                 => [[
-                EventManager_Model_Registration::FLD_PARTICIPANT => $christoph,
-            ]],
+            EventManager_Model_Event::FLD_REGISTRATIONS                 => [],
             EventManager_Model_Event::FLD_APPOINTMENTS                  => [],
             EventManager_Model_Event::FLD_DESCRIPTION                   => 'Wir laden Sie herzlich zu unseren Familienexerzitien im Erzbistum Hamburg ein!
 HIER EINIGE STICHWORTE, WAS SIE ERWARTET
@@ -273,20 +283,19 @@ Christoph Riethmüller; Telefon: 0151 65020455; christoph.riethmueller@erzbistum
         // event 2
         EventManager_Controller_Event::getInstance()->create(new EventManager_Model_Event([
             EventManager_Model_Event::FLD_NAME                          => 'Ausbildungskurs für Gottesdienstbeauftragte',
-            EventManager_Model_Event::FLD_START                         => '',
-            EventManager_Model_Event::FLD_END                           => '',
+            EventManager_Model_Event::FLD_START                         => new Tinebase_DateTime("2025-09-16 13:00:00"),
+            EventManager_Model_Event::FLD_END                           => new Tinebase_DateTime("2025-09-18 13:00:00"),
             EventManager_Model_Event::FLD_REGISTRATION_POSSIBLE_UNTIL   => new Tinebase_DateTime("2025-09-15"),
             EventManager_Model_Event::FLD_LOCATION                      => '',
             EventManager_Model_Event::FLD_TYPE                          => $event_type,
             EventManager_Model_Event::FLD_STATUS                        => $event_status,
             EventManager_Model_Event::FLD_FEE                           => 250,
-            EventManager_Model_Event::FLD_TOTAL_PLACES                  => '',
+            EventManager_Model_Event::FLD_TOTAL_PLACES                  => 10,
             EventManager_Model_Event::FLD_BOOKED_PLACES                 => '',
             EventManager_Model_Event::FLD_AVAILABLE_PLACES              => '',
             EventManager_Model_Event::FLD_OPTIONS                       => [],
-            EventManager_Model_Event::FLD_REGISTRATIONS                 => [[
-                EventManager_Model_Registration::FLD_PARTICIPANT => $daniela,
-            ]],
+            EventManager_Model_Event::FLD_CONTACT_FIELDS                => $defaultContactFields,
+            EventManager_Model_Event::FLD_REGISTRATIONS                 => [],
             EventManager_Model_Event::FLD_APPOINTMENTS                  => [],
             EventManager_Model_Event::FLD_DESCRIPTION                   => 'Das gottesdienstliche Leben hat seit dem II. Vatikanischen Konzil eine grundlegende Veränderung erfahren - mit ihr auch die Rolle der Gläubigen, da das Konzil eine volle, bewusste und tätige Teilnahme an den liturgischen Feiern unterstützt, wie sie das Wesen der Liturgie selbst verlangt und zu der das christliche Volk - kraft der Taufe - berechtigt und verpflichtet ist. (SC 14)
 
@@ -314,9 +323,9 @@ Die Teilnehmer_innen müssen im Besitz der kirchlichen Rechte sein, getauft und 
 
         EventManager_Controller_Event::getInstance()->create(new EventManager_Model_Event([
             EventManager_Model_Event::FLD_NAME                          => 'Modul 1',
-            EventManager_Model_Event::FLD_START                         => new Tinebase_DateTime("2025-10-17 18:00:00"),
-            EventManager_Model_Event::FLD_END                           => new Tinebase_DateTime("2025-10-18 18:00:00"),
-            EventManager_Model_Event::FLD_REGISTRATION_POSSIBLE_UNTIL   => new Tinebase_DateTime("2025-09-15"),
+            EventManager_Model_Event::FLD_START                         => new Tinebase_DateTime("2027-10-17 18:00:00"),
+            EventManager_Model_Event::FLD_END                           => new Tinebase_DateTime("2027-10-18 18:00:00"),
+            EventManager_Model_Event::FLD_REGISTRATION_POSSIBLE_UNTIL   => new Tinebase_DateTime("2027-09-15"),
             EventManager_Model_Event::FLD_LOCATION                      => $location,
             EventManager_Model_Event::FLD_TYPE                          => $event_type,
             EventManager_Model_Event::FLD_STATUS                        => $event_status,
@@ -325,9 +334,8 @@ Die Teilnehmer_innen müssen im Besitz der kirchlichen Rechte sein, getauft und 
             EventManager_Model_Event::FLD_BOOKED_PLACES                 => '',
             EventManager_Model_Event::FLD_AVAILABLE_PLACES              => '',
             EventManager_Model_Event::FLD_OPTIONS                       => [],
-            EventManager_Model_Event::FLD_REGISTRATIONS                 => [[
-                EventManager_Model_Registration::FLD_PARTICIPANT => $daniela,
-            ]],
+            EventManager_Model_Event::FLD_CONTACT_FIELDS                => $defaultContactFields,
+            EventManager_Model_Event::FLD_REGISTRATIONS                 => [],
             EventManager_Model_Event::FLD_APPOINTMENTS                  => [],
             EventManager_Model_Event::FLD_DESCRIPTION                   => 'folgt.',
         ]));
@@ -344,8 +352,8 @@ Die Teilnehmer_innen müssen im Besitz der kirchlichen Rechte sein, getauft und 
 
         EventManager_Controller_Event::getInstance()->create(new EventManager_Model_Event([
             EventManager_Model_Event::FLD_NAME                          => 'Modul 2',
-            EventManager_Model_Event::FLD_START                         => new Tinebase_DateTime("2025-11-07 18:00:00"),
-            EventManager_Model_Event::FLD_END                           => new Tinebase_DateTime("2025-11-09 18:00:00"),
+            EventManager_Model_Event::FLD_START                         => new Tinebase_DateTime("2027-11-07 18:00:00"),
+            EventManager_Model_Event::FLD_END                           => new Tinebase_DateTime("2027-11-09 18:00:00"),
             EventManager_Model_Event::FLD_LOCATION                      => $location,
             EventManager_Model_Event::FLD_TYPE                          => $event_type,
             EventManager_Model_Event::FLD_STATUS                        => $event_status,
@@ -354,9 +362,8 @@ Die Teilnehmer_innen müssen im Besitz der kirchlichen Rechte sein, getauft und 
             EventManager_Model_Event::FLD_BOOKED_PLACES                 => '',
             EventManager_Model_Event::FLD_AVAILABLE_PLACES              => '',
             EventManager_Model_Event::FLD_OPTIONS                       => [],
-            EventManager_Model_Event::FLD_REGISTRATIONS                 => [[
-                EventManager_Model_Registration::FLD_PARTICIPANT => $daniela,
-            ]],
+            EventManager_Model_Event::FLD_CONTACT_FIELDS                => $defaultContactFields,
+            EventManager_Model_Event::FLD_REGISTRATIONS                 => [],
             EventManager_Model_Event::FLD_APPOINTMENTS                  => [],
             EventManager_Model_Event::FLD_DESCRIPTION                   => 'folgt.',
         ]));
@@ -372,8 +379,8 @@ Die Teilnehmer_innen müssen im Besitz der kirchlichen Rechte sein, getauft und 
 
         EventManager_Controller_Event::getInstance()->create(new EventManager_Model_Event([
             EventManager_Model_Event::FLD_NAME                          => 'Modul 3',
-            EventManager_Model_Event::FLD_START                         => new Tinebase_DateTime("2025-10-17 15:00:00"),
-            EventManager_Model_Event::FLD_END                           => new Tinebase_DateTime("2025-10-18 16:00:00"),
+            EventManager_Model_Event::FLD_START                         => new Tinebase_DateTime("2027-10-17 15:00:00"),
+            EventManager_Model_Event::FLD_END                           => new Tinebase_DateTime("2027-10-18 16:00:00"),
             EventManager_Model_Event::FLD_LOCATION                      => $location,
             EventManager_Model_Event::FLD_TYPE                          => $event_type,
             EventManager_Model_Event::FLD_STATUS                        => $event_status,
@@ -382,9 +389,8 @@ Die Teilnehmer_innen müssen im Besitz der kirchlichen Rechte sein, getauft und 
             EventManager_Model_Event::FLD_BOOKED_PLACES                 => '',
             EventManager_Model_Event::FLD_AVAILABLE_PLACES              => '',
             EventManager_Model_Event::FLD_OPTIONS                       => [],
-            EventManager_Model_Event::FLD_REGISTRATIONS                 => [[
-                EventManager_Model_Registration::FLD_PARTICIPANT => $daniela,
-            ]],
+            EventManager_Model_Event::FLD_CONTACT_FIELDS                => $defaultContactFields,
+            EventManager_Model_Event::FLD_REGISTRATIONS                 => [],
             EventManager_Model_Event::FLD_APPOINTMENTS                  => [],
             EventManager_Model_Event::FLD_DESCRIPTION                   => 'folgt.',
         ]));
@@ -392,9 +398,9 @@ Die Teilnehmer_innen müssen im Besitz der kirchlichen Rechte sein, getauft und 
         // event 6
         EventManager_Controller_Event::getInstance()->create(new EventManager_Model_Event([
             EventManager_Model_Event::FLD_NAME                          => 'Gesänge für die Advents- und Weihnachtszeit',
-            EventManager_Model_Event::FLD_START                         => new Tinebase_DateTime("2025-11-08 10:00:00"),
-            EventManager_Model_Event::FLD_END                           => new Tinebase_DateTime("2025-11-08 17:00:00"),
-            EventManager_Model_Event::FLD_REGISTRATION_POSSIBLE_UNTIL   => new Tinebase_DateTime("2025-09-15"),
+            EventManager_Model_Event::FLD_START                         => new Tinebase_DateTime("2027-11-08 10:00:00"),
+            EventManager_Model_Event::FLD_END                           => new Tinebase_DateTime("2027-11-08 17:00:00"),
+            EventManager_Model_Event::FLD_REGISTRATION_POSSIBLE_UNTIL   => new Tinebase_DateTime("2027-09-15"),
             EventManager_Model_Event::FLD_LOCATION                      => '',
             EventManager_Model_Event::FLD_TYPE                          => $event_type,
             EventManager_Model_Event::FLD_STATUS                        => $event_status,
@@ -403,9 +409,8 @@ Die Teilnehmer_innen müssen im Besitz der kirchlichen Rechte sein, getauft und 
             EventManager_Model_Event::FLD_BOOKED_PLACES                 => '',
             EventManager_Model_Event::FLD_AVAILABLE_PLACES              => '',
             EventManager_Model_Event::FLD_OPTIONS                       => [],
-            EventManager_Model_Event::FLD_REGISTRATIONS                 => [[
-                EventManager_Model_Registration::FLD_PARTICIPANT => $heiner,
-            ]],
+            EventManager_Model_Event::FLD_CONTACT_FIELDS                => $defaultContactFields,
+            EventManager_Model_Event::FLD_REGISTRATIONS                 => [],
             EventManager_Model_Event::FLD_APPOINTMENTS                  => [],
             EventManager_Model_Event::FLD_DESCRIPTION                   => 'In der Messfeier gibt es vielfältige Einsatzmöglichkeiten für eine Kantorin / einen Kantor bzw. eine kl. Ansingegruppe / Schola.
 Für die Advents- und Weihnachtszeit werden Wechselgesänge aus dem Gebet- und Gesangbuch GOTTESLOB erarbeitet und Gestaltungsmöglichkeiten aus dem 
@@ -418,9 +423,9 @@ und aus weiteren Materialien vorgestellt.',
         // event 7
         EventManager_Controller_Event::getInstance()->create(new EventManager_Model_Event([
             EventManager_Model_Event::FLD_NAME                          => 'Eingeladen zum Fest des Glaubens',
-            EventManager_Model_Event::FLD_START                         => new Tinebase_DateTime("2025-11-20 19:30:00"),
-            EventManager_Model_Event::FLD_END                           => new Tinebase_DateTime("2025-11-20 21:30:00"),
-            EventManager_Model_Event::FLD_REGISTRATION_POSSIBLE_UNTIL   => new Tinebase_DateTime("2025-11-20"),
+            EventManager_Model_Event::FLD_START                         => new Tinebase_DateTime("2027-11-20 19:30:00"),
+            EventManager_Model_Event::FLD_END                           => new Tinebase_DateTime("2027-11-20 21:30:00"),
+            EventManager_Model_Event::FLD_REGISTRATION_POSSIBLE_UNTIL   => new Tinebase_DateTime("2027-11-20"),
             EventManager_Model_Event::FLD_LOCATION                      => '',
             EventManager_Model_Event::FLD_TYPE                          => $event_type,
             EventManager_Model_Event::FLD_STATUS                        => $event_status,
@@ -429,6 +434,7 @@ und aus weiteren Materialien vorgestellt.',
             EventManager_Model_Event::FLD_BOOKED_PLACES                 => '',
             EventManager_Model_Event::FLD_AVAILABLE_PLACES              => '',
             EventManager_Model_Event::FLD_OPTIONS                       => [],
+            EventManager_Model_Event::FLD_CONTACT_FIELDS                => $defaultContactFields,
             EventManager_Model_Event::FLD_REGISTRATIONS                 => [],
             EventManager_Model_Event::FLD_APPOINTMENTS                  => [],
             EventManager_Model_Event::FLD_DESCRIPTION                   => 'Herzliche Einladung zu einem nächsten Online-Abend zum Thema "Familiengottesdienste".
@@ -440,9 +446,9 @@ www.kindergottesdienst-katholisch.de',
         // event 8
         EventManager_Controller_Event::getInstance()->create(new EventManager_Model_Event([
             EventManager_Model_Event::FLD_NAME                          => 'Religiöse Vielfalt in der Kita religionssensibel begegnen',
-            EventManager_Model_Event::FLD_START                         => new Tinebase_DateTime("2025-11-08 00:00:00"),
-            EventManager_Model_Event::FLD_END                           => new Tinebase_DateTime("2025-11-08 23:45:00"),
-            EventManager_Model_Event::FLD_REGISTRATION_POSSIBLE_UNTIL   => new Tinebase_DateTime("2025-09-15"),
+            EventManager_Model_Event::FLD_START                         => new Tinebase_DateTime("2027-11-08 00:00:00"),
+            EventManager_Model_Event::FLD_END                           => new Tinebase_DateTime("2027-11-08 23:45:00"),
+            EventManager_Model_Event::FLD_REGISTRATION_POSSIBLE_UNTIL   => new Tinebase_DateTime("2027-09-15"),
             EventManager_Model_Event::FLD_LOCATION                      => '',
             EventManager_Model_Event::FLD_TYPE                          => $event_type,
             EventManager_Model_Event::FLD_STATUS                        => $event_status,
@@ -451,9 +457,8 @@ www.kindergottesdienst-katholisch.de',
             EventManager_Model_Event::FLD_BOOKED_PLACES                 => '',
             EventManager_Model_Event::FLD_AVAILABLE_PLACES              => '',
             EventManager_Model_Event::FLD_OPTIONS                       => [],
-            EventManager_Model_Event::FLD_REGISTRATIONS                 => [[
-                EventManager_Model_Registration::FLD_PARTICIPANT => $alexandra,
-            ]],
+            EventManager_Model_Event::FLD_CONTACT_FIELDS                => $defaultContactFields,
+            EventManager_Model_Event::FLD_REGISTRATIONS                 => [],
             EventManager_Model_Event::FLD_APPOINTMENTS                  => [],
             EventManager_Model_Event::FLD_DESCRIPTION                   => 'Unsere katholischen Kitas sind in der heutigen Zeit in vielen Bereichen heterogen.
 Uns begegnen Familien in verschiedenen Beziehungsformen, aus unterschiedlichen Milieus und aus unterschiedlichen Religionen.
@@ -471,9 +476,9 @@ die zum praktischen Umsetzen von Ideen in der eigenen Kita führen soll.',
         // event 9
         EventManager_Controller_Event::getInstance()->create(new EventManager_Model_Event([
             EventManager_Model_Event::FLD_NAME                          => 'Katholisch werden',
-            EventManager_Model_Event::FLD_START                         => new Tinebase_DateTime("2025-10-13 09:30:00"),
-            EventManager_Model_Event::FLD_END                           => new Tinebase_DateTime("2025-10-16 19:30:00"),
-            EventManager_Model_Event::FLD_REGISTRATION_POSSIBLE_UNTIL   => new Tinebase_DateTime("2025-10-12"),
+            EventManager_Model_Event::FLD_START                         => new Tinebase_DateTime("2027-10-13 09:30:00"),
+            EventManager_Model_Event::FLD_END                           => new Tinebase_DateTime("2027-10-16 19:30:00"),
+            EventManager_Model_Event::FLD_REGISTRATION_POSSIBLE_UNTIL   => new Tinebase_DateTime("2027-10-12"),
             EventManager_Model_Event::FLD_LOCATION                      => $location,
             EventManager_Model_Event::FLD_TYPE                          => $event_type,
             EventManager_Model_Event::FLD_STATUS                        => $event_status,
@@ -481,6 +486,7 @@ die zum praktischen Umsetzen von Ideen in der eigenen Kita führen soll.',
             EventManager_Model_Event::FLD_TOTAL_PLACES                  => 20,
             EventManager_Model_Event::FLD_BOOKED_PLACES                 => '',
             EventManager_Model_Event::FLD_AVAILABLE_PLACES              => '',
+            EventManager_Model_Event::FLD_CONTACT_FIELDS                => $defaultContactFields,
             EventManager_Model_Event::FLD_OPTIONS                       => [
                 [
                     EventManager_Model_Option::FLD_NAME_OPTION => 'Erwachsene',
@@ -560,31 +566,21 @@ die zum praktischen Umsetzen von Ideen in der eigenen Kita führen soll.',
                     EventManager_Model_Option::FLD_SORTING => 5,
                 ],
             ],
-            EventManager_Model_Event::FLD_REGISTRATIONS                 => [
-                [
-                    EventManager_Model_Registration::FLD_PARTICIPANT => $alexandra,
-                ],
-                [
-                    EventManager_Model_Registration::FLD_PARTICIPANT => $daniela,
-                ],
-                [
-                    EventManager_Model_Registration::FLD_PARTICIPANT => $christoph,
-                ],
-            ],
+            EventManager_Model_Event::FLD_REGISTRATIONS                 => [],
             EventManager_Model_Event::FLD_APPOINTMENTS                  => [
                 [
                     EventManager_Model_Appointment::FLD_SESSION_NUMBER => 1,
-                    EventManager_Model_Appointment::FLD_SESSION_DATE => new Tinebase_DateTime("2025-10-13 00:00:00"),
-                    EventManager_Model_Appointment::FLD_START_TIME => new Tinebase_DateTime("2025-10-13 11:30:00"),
-                    EventManager_Model_Appointment::FLD_END_TIME => new Tinebase_DateTime("2025-10-13 14:00:00"),
+                    EventManager_Model_Appointment::FLD_SESSION_DATE => new Tinebase_DateTime("2027-10-13 00:00:00"),
+                    EventManager_Model_Appointment::FLD_START_TIME => new Tinebase_DateTime("2027-10-13 11:30:00"),
+                    EventManager_Model_Appointment::FLD_END_TIME => new Tinebase_DateTime("2027-10-13 14:00:00"),
                     EventManager_Model_Appointment::FLD_STATUS => $appointment_status,
                     EventManager_Model_Appointment::FLD_DESCRIPTION => 'Was bedeutet es, katholisch zu sein? Wie läuft der Eintritt in die katholische Kirche ab?',
                 ],
                 [
                     EventManager_Model_Appointment::FLD_SESSION_NUMBER => 2,
-                    EventManager_Model_Appointment::FLD_SESSION_DATE => new Tinebase_DateTime("2025-10-16 00:00:00"),
-                    EventManager_Model_Appointment::FLD_START_TIME => new Tinebase_DateTime("2025-10-16 17:00:00"),
-                    EventManager_Model_Appointment::FLD_END_TIME => new Tinebase_DateTime("2025-10-16 20:00:00"),
+                    EventManager_Model_Appointment::FLD_SESSION_DATE => new Tinebase_DateTime("2027-10-16 00:00:00"),
+                    EventManager_Model_Appointment::FLD_START_TIME => new Tinebase_DateTime("2027-10-16 17:00:00"),
+                    EventManager_Model_Appointment::FLD_END_TIME => new Tinebase_DateTime("2027-10-16 19:30:00"),
                     EventManager_Model_Appointment::FLD_STATUS => $appointment_status,
                     EventManager_Model_Appointment::FLD_DESCRIPTION => 'Welche Werte, Rituale und Feste prägen den katholischen Glauben? Wie kann ich meinen eigenen Glaubensweg gestalten?',
                 ],
@@ -609,24 +605,6 @@ Interessierte, Suchende, Ausgetretene, Wieder-Eintretende und alle, die einfach 
 
         Tinebase_Core::getLogger()->info(__METHOD__ . '::' . __LINE__ . ' Creating 9 test events'
             . EventManager_Model_Event::MODEL_NAME_PART);
-    }
-
-    protected function getContact($n_given, $n_family, $container_id): Addressbook_Model_Contact
-    {
-        $filter = Tinebase_Model_Filter_FilterGroup::getFilterForModel(Addressbook_Model_Contact::class, [
-                ['field' => 'n_given', 'operator' => 'equals', 'value' => $n_given],
-                ['field' => 'n_family', 'operator' => 'equals', 'value' => $n_family],
-            ]);
-        $contact = Addressbook_Controller_Contact::getInstance()->search($filter)->getFirstRecord();
-        if (!$contact) {
-            $adbController = Addressbook_Controller_Contact::getInstance();
-            $contact = $adbController->create(new Addressbook_Model_Contact([
-                'n_given' => $n_given,
-                'n_family' => $n_family,
-                'container_id' => $container_id,
-            ]));
-        }
-        return $contact;
     }
 
     protected function getLocation(

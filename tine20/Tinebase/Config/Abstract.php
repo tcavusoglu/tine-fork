@@ -232,7 +232,7 @@ abstract class Tinebase_Config_Abstract implements Tinebase_Config_Interface
      * @param  string $name
      * @return mixed
      */
-    public function get($name, mixed $default = NULL)
+    public function get($name, mixed $default = null)
     {
         if (isset($this->_mergedConfigCache[$name]) || array_key_exists($name, $this->_mergedConfigCache)) {
             if (!isset($this->_mergedConfigCache[$name]) && null !== $default) {
@@ -969,7 +969,15 @@ abstract class Tinebase_Config_Abstract implements Tinebase_Config_Interface
      */
     public static function rawToConfig(mixed $_rawData, $parent, $parentKey, $definition, $appName)
     {
-        if (null === $_rawData) {
+        if (null === $_rawData
+            // don't return already as we might want to randomize it
+            && (
+                !isset($definition['type'])
+                || $definition['type'] !== self::TYPE_STRING
+                || !isset($definition[self::RANDOMIZEIFEMPTY])
+                || !$definition[self::RANDOMIZEIFEMPTY]
+            )
+        ) {
             return $_rawData;
         }
 

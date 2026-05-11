@@ -1,4 +1,4 @@
-<?php
+<?php declare(strict_types=1);
 /**
  * EFile Controller
  *
@@ -6,7 +6,7 @@
  * @subpackage   Controller
  * @license      http://www.gnu.org/licenses/agpl.html AGPL Version 3
  * @author       Philipp Schüle <p.schuele@metaways.de>
- * @copyright    Copyright (c) 2020 Metaways Infosystems GmbH (http://www.metaways.de)
+ * @copyright    Copyright (c) 2020-2026 Metaways Infosystems GmbH (http://www.metaways.de)
  *
  */
 
@@ -18,6 +18,7 @@
  */
 class EFile_Controller extends Tinebase_Controller_Event
 {
+    /** @use Tinebase_Controller_SingletonTrait<EFile_Controller> */
     use Tinebase_Controller_SingletonTrait;
 
     const TIER_TOKEN_SEPERATOR = ' - ';
@@ -288,6 +289,8 @@ class EFile_Controller extends Tinebase_Controller_Event
             self::setExtendedDefaults($_parent, $_child);
         }
 
+        $renameChild = EFile_Config::getInstance()->{EFile_Config::TIER_TOKEN_RENAME}[$_child->{EFile_Config::TREE_NODE_FLD_TIER_TYPE}] ?? true;
+
         $parentConfig = $_parent->xprops()['efile_config'] ?? [];
         $prefixConf = array_merge(EFile_Config::getInstance()->{EFile_Config::TIER_REFNUMBER_PREFIX}, $parentConfig[EFile_Config::TIER_REFNUMBER_PREFIX] ?? []);
         $tierType = $_child->{EFile_Config::TREE_NODE_FLD_TIER_TYPE};
@@ -339,7 +342,7 @@ class EFile_Controller extends Tinebase_Controller_Event
             }
 
             $namePart = $tierToken . self::TIER_TOKEN_SEPERATOR;
-            if (strpos($_child->name, $namePart) !== 0) {
+            if ($renameChild && strpos($_child->name, $namePart) !== 0) {
                 $_child->name = $namePart . $_child->name;
             }
         }
@@ -496,7 +499,9 @@ class EFile_Controller extends Tinebase_Controller_Event
         // check if node was moved or if tier type did change => rename stuff
         $generateTierToken = false;
         if ($_oldRecord && ($_oldRecord->parent_id !== $_record->parent_id ||
-                $_oldRecord->{EFile_Config::TREE_NODE_FLD_TIER_TYPE} !== $_record->{EFile_Config::TREE_NODE_FLD_TIER_TYPE})) {
+                $_oldRecord->{EFile_Config::TREE_NODE_FLD_TIER_TYPE} !== $_record->{EFile_Config::TREE_NODE_FLD_TIER_TYPE}) &&
+                ($_oldRecord->parent_id === $_record->parent_id || null === ($oldParent = static::getEFilesParentNode($_oldRecord))
+                || $parent->efile_tier_ref_number !== $oldParent->efile_tier_ref_number)) {
             $generateTierToken = true;
         }
 

@@ -18,6 +18,7 @@
  */
 class OnlyOfficeIntegrator_Config extends Tinebase_Config_Abstract
 {
+    /** @use Tinebase_Controller_SingletonTrait<OnlyOfficeIntegrator_Config> */
     use Tinebase_Controller_SingletonTrait;
 
     const APP_NAME = 'OnlyOfficeIntegrator';
@@ -126,5 +127,29 @@ class OnlyOfficeIntegrator_Config extends Tinebase_Config_Abstract
     public static function getProperties()
     {
         return self::$_properties;
+    }
+
+    /**
+     * @throws Tinebase_Exception_InvalidArgument
+     * @see Tinebase_Frontend_Http_SinglePageApplication::getHeaders()
+     */
+    public function registerCspSources(): void
+    {
+        $url = $this->get(OnlyOfficeIntegrator_Config::ONLYOFFICE_PUBLIC_URL);
+
+        if (!empty($url)) {
+            $parsed = parse_url(rtrim($url, '/'));
+            $origin = $parsed['scheme'] . '://' . $parsed['host']
+                . (isset($parsed['port']) ? ':' . $parsed['port'] : '');
+
+            $wsScheme = $parsed['scheme'] === 'https' ? 'wss' : 'ws';
+            $wsOrigin = $wsScheme . '://' . $parsed['host']
+                . (isset($parsed['port']) ? ':' . $parsed['port'] : '');
+
+            Tinebase_Frontend_Http_CspRegistry::getInstance()->addSource('script-src', $origin);
+            Tinebase_Frontend_Http_CspRegistry::getInstance()->addSource('connect-src', $origin);
+            Tinebase_Frontend_Http_CspRegistry::getInstance()->addSource('connect-src', $wsOrigin);
+            Tinebase_Frontend_Http_CspRegistry::getInstance()->addSource('frame-src', $origin);
+        }
     }
 }

@@ -1,5 +1,8 @@
 <?php declare(strict_types=1);
 
+use SAML2\XML\saml\NameID;
+use SimpleSAML\Metadata\MetaDataStorageHandler;
+
 /**
  * facade for simpleSAMLphp Auth\Source class
  *
@@ -13,6 +16,10 @@
 
 class SSO_Facade_SAML_AuthSource extends \SimpleSAML\Auth\Source
 {
+    /*
+     * public function initLogin(string|array $return, ?string $errorURL = null, array $params = []): Response
+    {
+     */
     /**
      * Log out from this authentication source.
      *
@@ -41,12 +48,12 @@ class SSO_Facade_SAML_AuthSource extends \SimpleSAML\Auth\Source
      * @param array &$state Information about the current authentication.
      * @return void
      */
-    public function reauthenticate(array &$state)
+    public function reauthenticate(array &$state): void
     {
         $this->authenticate($state);
     }
 
-    public function authenticate(&$state)
+    public function authenticate(&$state): void
     {
         // we need to make sure the state has not set any exception handlers!
         // we want the exceptions we throw, to be thrown all the way back to tine20 code to catch it!
@@ -94,15 +101,25 @@ class SSO_Facade_SAML_AuthSource extends \SimpleSAML\Auth\Source
             'lastName' => [$user->accountLastName],
             'email' => [$user->accountEmailAddress],
         ];
+        $nameIdFormat = $state['SPMetadata']['NameIDFormat'] ?? 'urn:oasis:names:tc:SAML:2.0:nameid-format:persistent';
+        $state['saml:NameID'][$nameIdFormat] = $user->accountLoginName;
         if (isset($state['SPMetadata'][SSO_Model_Saml2RPConfig::FLD_ATTRIBUTE_MAPPING])) {
             foreach ($state['SPMetadata'][SSO_Model_Saml2RPConfig::FLD_ATTRIBUTE_MAPPING] as $key => $value) {
                 if (!$value) {
                     unset($state['Attributes'][$key]);
                 } else {
                     $state['Attributes'][$key] = [$user->{$value}];
+                    if ('uid' === $key) {
+                        $state['saml:NameID'][$nameIdFormat] = $user->{$value};
+                    }
                 }
             }
         }
+        $nameId = new NameID();
+        $nameId->setFormat($nameIdFormat);
+        $nameId->setValue($state['saml:NameID'][$nameIdFormat]);
+        $nameId->setSPNameQualifier($state['core:SP']);
+        $state['saml:NameID'][$nameIdFormat] = $nameId;
 
         if (!isset($state['PersistentAuthData'])) {
             $state['PersistentAuthData'] = [];

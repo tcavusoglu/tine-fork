@@ -1,0 +1,85 @@
+/**
+ * Tine 2.0
+ * 
+ * @package     Timetracker
+ * @license     http://www.gnu.org/licenses/agpl.html AGPL Version 3
+ * @author      Philipp Schuele <p.schuele@metaways.de>
+ * @copyright   Copyright (c) 2007-2008 Metaways Infosystems GmbH (http://www.metaways.de)
+ * @version     $Id: Tasks.css 3797 2008-08-11 08:33:21Z c.weiss@metaways.de $
+ *
+ */
+ 
+ 
+.TimetrackerIconCls {
+    background-image:url(../../images/icon-set/icon_timetracking.svg) !important;
+}
+
+.TimetrackerTimesheet {
+    background-image:url(../../images/icon-set/icon_timesheet.svg) !important;
+}
+
+.TimetrackerTimeaccount {
+    background-image:url(../../images/icon-set/icon_timeaccount.svg) !important;
+}
+
+.TimetrackerTimeaccount_Invoice {
+    background-image:url(../../images/icon-set/icon_invoice.svg) !important;
+}
+
+.combo-icon {
+    width: 22px;
+    height: 16px;
+    background-repeat: no-repeat;
+    background-position: 4px 0;
+    vertical-align: middle;
+    text-indent: 22px;
+}
+
+.dark-mode .combo-icon.TimetrackerTimeaccount_Invoice {
+    filter: invert(1) !important;
+}
+
+.preview-panel-timesheet-description {
+    width: 98%;
+    height: 97px;
+    padding:3px;
+    position: relative;
+    }
+.preview-panel-timesheet-left {
+    float:left;
+    position: relative;
+    flex: 1 1 auto;
+    height: 102px;
+    padding:5px;
+    margin:5px 2px 5px 5px;
+    font-family:verdana;
+    }
+.preview-panel-timesheet-right {
+    float:left;
+    position: relative;
+    flex: 1 1 auto;
+    padding:5px;
+    margin:5px;
+    border: solid 3px #e5e6fe;
+    font-family:verdana;
+    }
+.preview-panel-timesheet-leftside {
+    width:180px;
+    padding: 5px;
+    }
+.preview-panel-timesheet-rightside {
+    width:auto;
+    padding: 5px;
+    }
+.preview-panel-timesheet-nobreak {
+    display: flex;
+    align-items: stretch;
+    align-content: center;
+    justify-content: space-evenly;
+    flex-wrap: wrap;
+    flex-direction: row;
+    padding-right: 16px;
+}
+.preview-panel-timesheet-right .duration-renderer-small {
+    display: none;
+}

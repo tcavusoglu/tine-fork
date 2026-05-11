@@ -270,10 +270,8 @@ Tine.Timetracker.TimesheetGridPanel = Ext.extend(Tine.widgets.grid.GridPanel, {
                                     value += type;
                             }
                         }
-                        
-                        var encoded = Ext.util.Format.htmlEncode(value);
+                        let encoded = Tine.Tinebase.common.markdownRenderer(value, {}, null);
                         encoded = Ext.util.Format.nl2br(encoded);
-                        
                         return encoded;
                     } else {
                         return '';
@@ -319,7 +317,7 @@ Tine.Timetracker.TimesheetGridPanel = Ext.extend(Tine.widgets.grid.GridPanel, {
         
         Tine.Timetracker.TimesheetGridPanel.superclass.initActions.call(this);
 
-        this.actions_export.initialConfig.actionUpdater = this.updateExportAction.createDelegate(this);
+        Ext.Action.setInitialConfig(this.actions_export, 'actionUpdater', this.updateExportAction.createDelegate(this));
     },
 
     /**

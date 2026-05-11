@@ -5,7 +5,7 @@
  * @package     Sales
  * @subpackage  Model
  * @license     http://www.gnu.org/licenses/agpl.html AGPL Version 3
- * @copyright   Copyright (c) 2021-2023 Metaways Infosystems GmbH (http://www.metaways.de)
+ * @copyright   Copyright (c) 2021-2026 Metaways Infosystems GmbH (http://www.metaways.de)
  * @author      Paul Mehrer <p.mehrer@metaways.de>
  */
 
@@ -30,7 +30,7 @@ class Sales_Model_Document_Address extends Sales_Model_Address
     {
         parent::inheritModelConfigHook($_definition);
 
-        $_definition[self::VERSION] = 3;
+        $_definition[self::VERSION] = 4;
         $_definition[self::MODEL_NAME] = self::MODEL_NAME_PART;
         $_definition[self::TABLE][self::NAME] = self::TABLE_NAME;
         $_definition[self::TABLE][self::INDEXES] = [
@@ -63,7 +63,10 @@ class Sales_Model_Document_Address extends Sales_Model_Address
         $_definition[self::FIELDS][self::FLD_DEBITOR_ID][self::CONFIG][self::MODEL_NAME] = Sales_Model_Document_Debitor::MODEL_NAME_PART;
         $_definition[self::FIELDS][self::FLD_DEBITOR_ID][self::CONFIG][self::DENORMALIZATION_OF] = null;
         unset($_definition[self::FIELDS][self::FLD_DEBITOR_ID][self::CONFIG][self::IS_PARENT]);
-        unset($_definition[self::FIELDS][self::FLD_DEBITOR_ID][self::NULLABLE]);
+
+        $_definition[self::FIELDS][self::FLD_SUPPLIER_ID][self::CONFIG][self::MODEL_NAME] = Sales_Model_Document_Supplier::MODEL_NAME_PART;
+        $_definition[self::FIELDS][self::FLD_SUPPLIER_ID][self::CONFIG][self::DENORMALIZATION_OF] = null;
+        unset($_definition[self::FIELDS][self::FLD_SUPPLIER_ID][self::CONFIG][self::IS_PARENT]);
     }
 
     /**

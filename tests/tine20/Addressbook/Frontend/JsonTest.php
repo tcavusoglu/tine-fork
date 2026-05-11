@@ -259,14 +259,15 @@ class Addressbook_Frontend_JsonTest extends TestCase
     {
         $adminListId = Tinebase_Group::getInstance()->getDefaultAdminGroup()->list_id;
         $list = $this->_uit->getList($adminListId);
-        self::assertTrue(isset($list['account_only']), 'account_only field missing from list ' . print_r($list, true));
+        self::assertTrue(isset($list['account_only']), 'account_only field missing from list '
+            . print_r($list, true));
 
         if (Tinebase_User::getConfiguredBackend() === Tinebase_User::LDAP ||
             Tinebase_User::getConfiguredBackend() === Tinebase_User::ACTIVEDIRECTORY
         ) {
-            self::assertFalse($list['account_only']);
+            self::assertFalse((bool)$list['account_only']);
         } else {
-            self::assertTrue($list['account_only']);
+            self::assertTrue((bool)$list['account_only']);
         }
     }
 
@@ -602,7 +603,7 @@ class Addressbook_Frontend_JsonTest extends TestCase
 
         // check invalid data
         $changes = array(
-            array('name' => 'tz', 'value' => 'looooongtextwithmorethaneightcharacters'),
+            array('name' => 'tz', 'value' => str_repeat("~", 50)),
         );
         $result = $json->updateMultipleRecords('Addressbook', 'Contact', $changes, $filter);
 
@@ -2600,7 +2601,8 @@ Steuernummer 33/111/32212";
             array('field' => 'record_id', 'operator' => 'equals', 'value' => $list['id']),
         ), '');
 
-        static::assertEquals(4, $notes['totalcount']);
+        static::assertEquals(4, $notes['totalcount'],
+            'notes count mismatch: ' . print_r($notes['results'], true));
         foreach (array(
                      array('members ( 0: ali PHPUNIT 1: ali PHPUNIT -> )'),
                      array('members ( 0: ali PHPUNIT ->  0: ali PHPUNIT 1: ali PHPUNIT)'),

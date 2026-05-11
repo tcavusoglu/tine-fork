@@ -19,16 +19,7 @@ class MatrixSynapseIntegrator_Frontend_JsonTest extends TestCase
      */
     protected $_uit = null;
 
-    public function setUp(): void
-    {
-        parent::setUp();
-
-        MatrixSynapseIntegrator_Controller_MatrixAccount::getInstance()->setCorporalBackend(
-            new MatrixSynapseIntegrator_Backend_CorporalMock()
-        );
-    }
-
-    public function testMatrixAccountApi($delete = true): array
+    public function testMatrixAccountApi(bool $delete = true): array
     {
         return $this->_testSimpleRecordApi(
             MatrixSynapseIntegrator_Model_MatrixAccount::MODEL_NAME_PART,
@@ -38,6 +29,45 @@ class MatrixSynapseIntegrator_Frontend_JsonTest extends TestCase
             MatrixSynapseIntegrator_ControllerTests::getMatrixAccountData(),
             false // no update (see above - descriptionField)
         );
+    }
+
+    public function testRoomCreateDelete(): void
+    {
+        $testSynapse = new MatrixSynapseIntegrator_Backend_SynapseMock();
+        MatrixSynapseIntegrator_Controller_Room::getInstance()->setSynapseBackend($testSynapse);
+
+        $list = Addressbook_Controller_List::getInstance()->create(new Addressbook_Model_List([
+            'name' => 'test list',
+            'container_id' => $this->_getTestContainer(
+                Addressbook_Config::APP_NAME, Addressbook_Model_List::class)->getId(),
+        ]));
+        $roomData = [
+            MatrixSynapseIntegrator_Model_Room::FLD_NAME => 'test room',
+            MatrixSynapseIntegrator_Model_Room::FLD_TOPIC => 'topic',
+            MatrixSynapseIntegrator_Model_Room::FLD_SYSTEM_USER_ONLY => true,
+        ];
+
+        $adbJson = new Addressbook_Frontend_Json();
+        $listData = $list->toArray();
+        $listData[MatrixSynapseIntegrator_Config::ADDRESSBOOK_CF_NAME_ROOM] = $roomData;
+        $listArray = $adbJson->saveList($listData);
+
+        self::assertArrayHasKey(MatrixSynapseIntegrator_Config::ADDRESSBOOK_CF_NAME_ROOM, $listArray,
+            print_r($listArray, true));
+        self::assertNotNull($listArray[MatrixSynapseIntegrator_Config::ADDRESSBOOK_CF_NAME_ROOM]);
+        $roomData = $listArray[MatrixSynapseIntegrator_Config::ADDRESSBOOK_CF_NAME_ROOM];
+        self::assertEquals('test room', $roomData[MatrixSynapseIntegrator_Model_Room::FLD_NAME]);
+        self::assertEquals(\MatrixSynapseIntegrator_Backend_SynapseMock::ROOM_ID,
+            $roomData[MatrixSynapseIntegrator_Model_Room::FLD_ROOM_ID]);
+
+        // check delete list -> room should be deleted, too
+        $adbJson->deleteLists([$listArray['id']]);
+        try {
+            MatrixSynapseIntegrator_Controller_Room::getInstance()->get($roomData['id']);
+            self::fail('room should be deleted');
+        } catch (Tinebase_Exception_NotFound $tenf) {
+            self::assertStringContainsString('MatrixSynapseIntegrator_Model_Room record with id', $tenf->getMessage());
+        }
     }
 
     public function testGetBootstrapdata()
@@ -127,6 +157,32 @@ class MatrixSynapseIntegrator_Frontend_JsonTest extends TestCase
         self::assertEquals(
             $account[MatrixSynapseIntegrator_Model_MatrixAccount::FLD_MATRIX_ID],
             $updatedAccount[MatrixSynapseIntegrator_Model_MatrixAccount::FLD_MATRIX_ID]
+        );
+    }
+
+    public function testSaveOwnMatrixAccount()
+    {
+        MatrixSynapseIntegrator_Controller_MatrixAccount::getInstance()->setCorporalBackend(
+            new MatrixSynapseIntegrator_Backend_CorporalMock()
+        );
+
+        $user = $this->_createTestUser();
+        $account = MatrixSynapseIntegrator_Controller_MatrixAccount::getInstance()->create(
+            new MatrixSynapseIntegrator_Model_MatrixAccount(
+                MatrixSynapseIntegrator_ControllerTests::getMatrixAccountData($user)
+            )
+        )->toArray();
+        $this->_setUser($user);
+        $account[MatrixSynapseIntegrator_Model_MatrixAccount::FLD_MATRIX_ID] = '@somethingelse:matrix.domain';
+        $account[MatrixSynapseIntegrator_Model_MatrixAccount::FLD_DESCRIPTION] = 'my account';
+        $updatedAccount = $this->_getUit()->saveOwnMatrixAccount($account);
+        self::assertNotEquals(
+            $account[MatrixSynapseIntegrator_Model_MatrixAccount::FLD_MATRIX_ID],
+            $updatedAccount[MatrixSynapseIntegrator_Model_MatrixAccount::FLD_MATRIX_ID]
+        );
+        self::assertEquals(
+            $account[MatrixSynapseIntegrator_Model_MatrixAccount::FLD_DESCRIPTION],
+            $updatedAccount[MatrixSynapseIntegrator_Model_MatrixAccount::FLD_DESCRIPTION]
         );
     }
 }

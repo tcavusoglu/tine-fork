@@ -6,7 +6,7 @@
  * @package     MatrixSynapseIntegrator
  * @subpackage  Setup
  * @license     https://www.gnu.org/licenses/agpl.html AGPL3
- * @copyright   Copyright (c) 2025 Metaways Infosystems GmbH (https://www.metaways.de)
+ * @copyright   Copyright (c) 2025-2026 Metaways Infosystems GmbH (https://www.metaways.de)
  * @author      Philipp Schüle <p.schuele@metaways.de>
  *
  * this is 2026.11 (ONLY!)
@@ -15,6 +15,9 @@ class MatrixSynapseIntegrator_Setup_Update_19 extends Setup_Update_Abstract
 {
     protected const RELEASE019_UPDATE000 = __CLASS__ . '::update000';
     protected const RELEASE019_UPDATE001 = __CLASS__ . '::update001';
+    protected const RELEASE019_UPDATE002 = __CLASS__ . '::update002';
+    protected const RELEASE019_UPDATE003 = __CLASS__ . '::update003';
+    protected const RELEASE019_UPDATE004 = __CLASS__ . '::update004';
 
     static protected $_allUpdates = [
         self::PRIO_NORMAL_APP_UPDATE        => [
@@ -27,6 +30,18 @@ class MatrixSynapseIntegrator_Setup_Update_19 extends Setup_Update_Abstract
             self::RELEASE019_UPDATE001          => [
                 self::CLASS_CONST                   => self::class,
                 self::FUNCTION_CONST                => 'update001',
+            ],
+            self::RELEASE019_UPDATE002          => [
+                self::CLASS_CONST                   => self::class,
+                self::FUNCTION_CONST                => 'update002',
+            ],
+            self::RELEASE019_UPDATE003          => [
+                self::CLASS_CONST                   => self::class,
+                self::FUNCTION_CONST                => 'update003',
+            ],
+            self::RELEASE019_UPDATE004          => [
+                self::CLASS_CONST                   => self::class,
+                self::FUNCTION_CONST                => 'update004',
             ],
         ],
     ];
@@ -41,12 +56,47 @@ class MatrixSynapseIntegrator_Setup_Update_19 extends Setup_Update_Abstract
 
     public function update001(): void
     {
-        MatrixSynapseIntegrator_Setup_Initialize::initializeCustomFields();
+        MatrixSynapseIntegrator_Setup_Initialize::createCustomFields(MatrixSynapseIntegrator_Setup_Initialize::$customfields);
         MatrixSynapseIntegrator_Controller_MatrixAccount::getInstance()->setMatrixIdInContacts();
 
         $this->addApplicationUpdate(
             MatrixSynapseIntegrator_Config::APP_NAME,
             '19.1',
             self::RELEASE019_UPDATE001);
+    }
+
+    public function update002(): void
+    {
+        Setup_SchemaTool::updateSchema([
+            MatrixSynapseIntegrator_Model_Room::class,
+        ]);
+        $this->addApplicationUpdate(
+            MatrixSynapseIntegrator_Config::APP_NAME,
+            '19.2',
+            self::RELEASE019_UPDATE002);
+    }
+
+    public function update003(): void
+    {
+        Setup_SchemaTool::updateSchema([
+            MatrixSynapseIntegrator_Model_MatrixAccount::class,
+        ]);
+        $this->addApplicationUpdate(
+            MatrixSynapseIntegrator_Config::APP_NAME,
+            '19.3',
+            self::RELEASE019_UPDATE003);
+    }
+
+    public function update004(): void
+    {
+        Setup_SchemaTool::updateSchema([
+            MatrixSynapseIntegrator_Model_Room::class,
+        ]);
+        MatrixSynapseIntegrator_Setup_Initialize::createCustomFields(MatrixSynapseIntegrator_Setup_Initialize::$customfields);
+
+        $this->addApplicationUpdate(
+            MatrixSynapseIntegrator_Config::APP_NAME,
+            '19.4',
+            self::RELEASE019_UPDATE004);
     }
 }

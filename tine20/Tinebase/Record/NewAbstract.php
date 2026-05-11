@@ -14,6 +14,7 @@
  *
  * @package     Tinebase
  * @subpackage  Record
+ * @phpstan-consistent-constructor
  */
 class Tinebase_Record_NewAbstract extends Tinebase_ModelConfiguration_Const implements Tinebase_Record_Interface
 {
@@ -133,7 +134,7 @@ class Tinebase_Record_NewAbstract extends Tinebase_ModelConfiguration_Const impl
 
         $this->bypassFilters = (bool)$_bypassFilters;
 
-        if (is_array($_data)) {
+        if (is_array($_data) && !empty($_data)) {
             if (static::$inJson) {
                 $this->setFromJson($_data);
             } else {
@@ -398,7 +399,7 @@ class Tinebase_Record_NewAbstract extends Tinebase_ModelConfiguration_Const impl
     /**
      * sets the record related properties from user generated input.
      *
-     * Input-filtering and validation by Zend_Filter_Input can enabled and disabled
+     * Input-filtering and validation by Zend_Filter_Input can be enabled and disabled
      *
      * @param array $_data the new data to set
      * @throws Tinebase_Exception_InvalidArgument
@@ -438,7 +439,7 @@ class Tinebase_Record_NewAbstract extends Tinebase_ModelConfiguration_Const impl
         }
 
         // convert data to record(s)
-        foreach(static::$_configurationObject->_fields as $fieldName => $config) {
+        foreach (static::$_configurationObject->_fields as $fieldName => $config) {
             if (isset($_data[$fieldName]) && is_array($_data[$fieldName])) {
                 $config = $config[self::TYPE] === self::TYPE_VIRTUAL && isset($config[self::CONFIG][self::TYPE]) ?
                     $config[self::CONFIG] : $config;
@@ -552,10 +553,10 @@ class Tinebase_Record_NewAbstract extends Tinebase_ModelConfiguration_Const impl
         if (null === $splObjSet) {
             $splObjSet = new SplObjectStorage();
         }
-        if ($splObjSet->contains($this)) {
+        if ($splObjSet->offsetExists($this)) {
             $_recursive = false;
         } elseif ($_recursive) {
-            $splObjSet->attach($this);
+            $splObjSet->offsetSet($this);
         }
 
         try {
@@ -572,7 +573,7 @@ class Tinebase_Record_NewAbstract extends Tinebase_ModelConfiguration_Const impl
             }
         } finally {
             if ($_recursive) {
-                $splObjSet->detach($this);
+                $splObjSet->offsetUnset($this);
             }
         }
         return $recordArray;
@@ -1649,10 +1650,10 @@ class Tinebase_Record_NewAbstract extends Tinebase_ModelConfiguration_Const impl
      * @param  string $_timezone
      * @param  bool $_recursive
      * @return  void
-     * @deprecated
-     * todo we should throw an exception
-     * todo later we should remove the function
      * @throws Tinebase_Exception_Record_Validation
+     * @deprecated
+     * @todo we should throw an exception
+     * @todo later we should remove the function
      */
     public function setTimezone($_timezone, $_recursive = TRUE)
     {
@@ -1666,18 +1667,18 @@ class Tinebase_Record_NewAbstract extends Tinebase_ModelConfiguration_Const impl
             }
 
             foreach ($toConvert as &$value) {
-                if (! method_exists($value, 'setTimezone')) {
-                    if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(
+                if (method_exists($value, 'setTimezone')) {
+                    $value->setTimezone($_timezone);
+                } else if (Tinebase_Core::isLogLevel(Zend_Log::NOTICE)) {
+                    Tinebase_Core::getLogger()->notice(
                         __METHOD__ . '::' . __LINE__ . ' '
-                        . print_r($this->toArray(), true));
-                    throw new Tinebase_Exception_Record_Validation($field . ' must have a method setTimezone');
+                        . $field . ' does not have a method setTimezone: ' . print_r($value, true));
                 }
-                $value->setTimezone($_timezone);
             }
         }
 
         if ($_recursive) {
-            foreach ($this->_data as $property => $propValue) {
+            foreach ($this->_data as $propValue) {
                 if ($propValue && is_object($propValue) &&
                     ($propValue instanceof Tinebase_Record_Interface ||
                         $propValue instanceof Tinebase_Record_RecordSet) ) {
@@ -1734,9 +1735,11 @@ class Tinebase_Record_NewAbstract extends Tinebase_ModelConfiguration_Const impl
             $grantProtectedFields = $grantProtectedFields[$action];
         }
 
-        if (Tinebase_Core::isLogLevel(Zend_Log::TRACE)) Tinebase_Core::getLogger()->trace(
-            __METHOD__ . '::' . __LINE__ . ' Grant protected properties of class '
-            . static::class . ' ' . print_r($grantProtectedFields,true));
+        if (Tinebase_Core::isLogLevel(Zend_Log::TRACE)) {
+            Tinebase_Core::getLogger()->trace(
+                __METHOD__ . '::' . __LINE__ . ' Grant protected properties of class '
+                . static::class . ' ' . print_r($grantProtectedFields,true));
+        }
 
         /** @var Tinebase_Controller_Record_Abstract $ctrl */
         $ctrl = Tinebase_Core::getApplicationInstance(static::class, '', true);
@@ -1754,9 +1757,11 @@ class Tinebase_Record_NewAbstract extends Tinebase_ModelConfiguration_Const impl
             return;
         }
 
-        if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(
-            __METHOD__ . '::' . __LINE__ . ' Deny properties '
-            . print_r($denyProperties,true));
+        if (Tinebase_Core::isLogLevel(Zend_Log::TRACE)) {
+            Tinebase_Core::getLogger()->trace(
+                __METHOD__ . '::' . __LINE__ . ' Deny properties '
+                . print_r($denyProperties,true));
+        }
 
         if (null === $oldRecord) {
             $bypassFilters = $this->bypassFilters;

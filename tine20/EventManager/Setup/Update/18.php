@@ -5,8 +5,8 @@
  *
  * @package     EventManager
  * @subpackage  Setup
- * @license     http://www.gnu.org/licenses/agpl.html AGPL3
- * @copyright   Copyright (c) 2024 Metaways Infosystems GmbH (http://www.metaways.de)
+ * @license     https://www.gnu.org/licenses/agpl.html AGPL3
+ * @copyright   Copyright (c) 2024-2026 Metaways Infosystems GmbH (http://www.metaways.de)
  * @author      Philipp Schüle <p.schuele@metaways.de>
  *
  * this is 2025.11 (ONLY!)
@@ -22,6 +22,11 @@ class EventManager_Setup_Update_18 extends Setup_Update_Abstract
     protected const RELEASE018_UPDATE006 = __CLASS__ . '::update006';
     protected const RELEASE018_UPDATE007 = __CLASS__ . '::update007';
     protected const RELEASE018_UPDATE008 = __CLASS__ . '::update008';
+    protected const RELEASE018_UPDATE009 = __CLASS__ . '::update009';
+    protected const RELEASE018_UPDATE010 = __CLASS__ . '::update010';
+    protected const RELEASE018_UPDATE011 = __CLASS__ . '::update011';
+    protected const RELEASE018_UPDATE012 = __CLASS__ . '::update012';
+    protected const RELEASE018_UPDATE013 = __CLASS__ . '::update013';
 
 
     protected static $_allUpdates = [
@@ -34,8 +39,28 @@ class EventManager_Setup_Update_18 extends Setup_Update_Abstract
                 self::CLASS_CONST                   => self::class,
                 self::FUNCTION_CONST                => 'update002',
             ],
+            self::RELEASE018_UPDATE011          => [
+                self::CLASS_CONST                   => self::class,
+                self::FUNCTION_CONST                => 'update011',
+            ],
         ],
         self::PRIO_NORMAL_APP_STRUCTURE     => [
+            self::RELEASE018_UPDATE013          => [
+                self::CLASS_CONST                   => self::class,
+                self::FUNCTION_CONST                => 'update013',
+            ],
+            self::RELEASE018_UPDATE012          => [
+                self::CLASS_CONST                   => self::class,
+                self::FUNCTION_CONST                => 'update012',
+            ],
+            self::RELEASE018_UPDATE010          => [
+                self::CLASS_CONST                   => self::class,
+                self::FUNCTION_CONST                => 'update010',
+            ],
+            self::RELEASE018_UPDATE009          => [
+                self::CLASS_CONST                   => self::class,
+                self::FUNCTION_CONST                => 'update009',
+            ],
             self::RELEASE018_UPDATE008          => [
                 self::CLASS_CONST                   => self::class,
                 self::FUNCTION_CONST                => 'update008',
@@ -132,7 +157,6 @@ class EventManager_Setup_Update_18 extends Setup_Update_Abstract
             EventManager_Model_Event::class,
             EventManager_Model_Registration::class,
         ]);
-        EventManager_Setup_Initialize::getContactEventContainer();
 
         $this->addApplicationUpdate(EventManager_Config::APP_NAME, '18.7', self::RELEASE018_UPDATE007);
     }
@@ -144,5 +168,56 @@ class EventManager_Setup_Update_18 extends Setup_Update_Abstract
         ]);
 
         $this->addApplicationUpdate(EventManager_Config::APP_NAME, '18.8', self::RELEASE018_UPDATE008);
+    }
+
+    public function update009()
+    {
+        Setup_SchemaTool::updateSchema([
+            EventManager_Model_Registration::class,
+            EventManager_Model_Register_Contact::class,
+            EventManager_Model_Register_ContactPropertiesAddress::class,
+        ]);
+
+        $this->addApplicationUpdate(EventManager_Config::APP_NAME, '18.9', self::RELEASE018_UPDATE009);
+    }
+
+    public function update010()
+    {
+        Setup_SchemaTool::updateSchema([
+            EventManager_Model_Event::class,
+            EventManager_Model_Registration::class,
+        ]);
+
+        $this->addApplicationUpdate(EventManager_Config::APP_NAME, '18.10', self::RELEASE018_UPDATE010);
+    }
+
+    public function update011()
+    {
+        if (!Tinebase_Core::isReplica()) {
+            $container_id = EventManager_Config::getInstance()
+                ->get(EventManager_Config::DEFAULT_CONTACT_EVENT_CONTAINER);
+            if ($container_id) {
+                Tinebase_Container::getInstance()->deleteContainer($container_id);
+            }
+        }
+        $this->addApplicationUpdate(EventManager_Config::APP_NAME, '18.11', self::RELEASE018_UPDATE011);
+    }
+
+    public function update012()
+    {
+        Setup_SchemaTool::updateSchema([
+            EventManager_Model_Register_Contact::class,
+        ]);
+
+        $this->addApplicationUpdate(EventManager_Config::APP_NAME, '18.12', self::RELEASE018_UPDATE012);
+    }
+
+    public function update013()
+    {
+        Setup_SchemaTool::updateSchema([
+            EventManager_Model_Event::class,
+        ]);
+
+        $this->addApplicationUpdate(EventManager_Config::APP_NAME, '18.13', self::RELEASE018_UPDATE013);
     }
 }

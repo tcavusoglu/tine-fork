@@ -1,12 +1,12 @@
 <?php
 /**
- * Tine 2.0
+ * tine Groupware
  * 
  * @package     Calendar
  * @subpackage  Frontend
- * @license     http://www.gnu.org/licenses/agpl.html AGPL Version 3
+ * @license     https://wwws.gnu.org/licenses/agpl.html AGPL Version 3
  * @author      Cornelius Weiss <c.weiss@metaways.de>
- * @copyright   Copyright (c) 2007-2019 Metaways Infosystems GmbH (http://www.metaways.de)
+ * @copyright   Copyright (c) 2007-2026 Metaways Infosystems GmbH (https://www.metaways.de)
  */
 
 /**
@@ -29,9 +29,13 @@ class Calendar_Frontend_Json extends Tinebase_Frontend_Json_Abstract
      * @var array
      */
     protected $_configuredModels = [
+        Calendar_Model_Event::MODEL_NAME_PART,
+        Calendar_Model_Attender::MODEL_NAME_PART,
+        Calendar_Model_FreeBusyUrl::MODEL_NAME_PART,
         'Poll',
         'EventType',
-        'EventTypes'
+        'EventTypes',
+        Calendar_Model_SyncContainerConfig::MODEL_NAME_PART,
     ];
 
     /**
@@ -406,7 +410,7 @@ class Calendar_Frontend_Json extends Tinebase_Frontend_Json_Abstract
         }
         return $result;
     }
-    
+
     /**
      * Search for events matching given arguments
      *
@@ -414,14 +418,19 @@ class Calendar_Frontend_Json extends Tinebase_Frontend_Json_Abstract
      * @param array $paging
      * @param boolean $addFixedCalendars
      * @return array
+     * @throws Tinebase_Exception_InvalidArgument
+     * @throws Tinebase_Exception_NotFound
+     * @throws Tinebase_Exception_Record_DefinitionFailure
+     * @throws Tinebase_Exception_Record_Validation
      */
-    public function searchEvents($filter, $paging, $addFixedCalendars = true)
+    public function searchEvents($filter, $paging, $addFixedCalendars = true): array
     {
         $controller = Calendar_Controller_Event::getInstance();
         
         $decodedPagination = $this->_prepareParameter($paging);
         $pagination = new Tinebase_Model_Pagination($decodedPagination);
-        $filter = $this->_decodeFilter($filter, 'Calendar_Model_EventFilter');
+        /** @var Calendar_Model_EventFilter $filter */
+        $filter = $this->_decodeFilter($filter, Calendar_Model_EventFilter::class);
         $clientFilter = $filter;
 
         if ($addFixedCalendars) {
@@ -429,6 +438,7 @@ class Calendar_Frontend_Json extends Tinebase_Frontend_Json_Abstract
             $fixedCalendarIds = Calendar_Controller_Event::getInstance()->getFixedCalendarIds();
             $useFixedCalendars = is_array($fixedCalendarIds) && !empty($fixedCalendarIds);
         } else {
+            $fixedCalendarIds = [];
             $useFixedCalendars = false;
         }
         
@@ -446,7 +456,11 @@ class Calendar_Frontend_Json extends Tinebase_Frontend_Json_Abstract
         // add fixed calendar on demand
         if ($useFixedCalendars) {
             $fixed = new Calendar_Model_EventFilter(array(), 'AND');
-            $fixed->addFilter( new Tinebase_Model_Filter_Text('container_id', 'in', $fixedCalendarIds));
+            $fixed->addFilter(new Tinebase_Model_Filter_Text(
+                'container_id',
+                'in',
+                $fixedCalendarIds)
+            );
             
             $fixed->addFilter($periodFilter);
             
@@ -458,9 +472,10 @@ class Calendar_Frontend_Json extends Tinebase_Frontend_Json_Abstract
             $filter->addFilterGroup($og);
         }
 
-        if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(
-            __METHOD__ . '::' . __LINE__ . ' events filter: ' . print_r($filter->toArray(), true));
-
+        if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) {
+            Tinebase_Core::getLogger()->debug(
+                __METHOD__ . '::' . __LINE__ . ' events filter: ' . print_r($filter->toArray(), true));
+        }
 
         // get weekday filter here and remove it from filters so it's not evaluated in the sql...
         $weekdayFilters = $filter->getFilter('weekday', true, true);
@@ -473,27 +488,29 @@ class Calendar_Frontend_Json extends Tinebase_Frontend_Json_Abstract
             }
         }
 
-        $records = $controller->search($filter, $pagination, FALSE);
+        $records = $controller->search($filter, $pagination);
 
         $result = $this->_multipleRecordsToJson($records, $clientFilter, $pagination);
 
-        //if we have a weekday filter remove all non-matching events here
+        // if we have a weekday filter remove all non-matching events here
         if (count($weekdayFilters) > 0) {
             $startsOnDays = [];
             $endsOnDays = [];
             $filteredResults = [];
 
-            foreach ($weekdayFilters as $filter) {
-                $wkdayIds = array_values(array_map('strval', array_filter($filter->getValue())));
-
-                if ($filter->getOperator() === 'startson') {
-                    $startsOnDays = array_merge($startsOnDays, $wkdayIds);
-                } elseif ($filter->getOperator() === 'endson') {
-                    $endsOnDays = array_merge($endsOnDays, $wkdayIds);
+            foreach ($weekdayFilters as $weekdayFilter) {
+                $value = $weekdayFilter->getValue();
+                if (is_array($value)) {
+                    $wkdayIds = array_values(array_map('strval', array_filter($value)));
+                    if ($weekdayFilter->getOperator() === 'startson') {
+                        $startsOnDays = array_merge($startsOnDays, $wkdayIds);
+                    } elseif ($weekdayFilter->getOperator() === 'endson') {
+                        $endsOnDays = array_merge($endsOnDays, $wkdayIds);
+                    }
                 }
             }
 
-            foreach ($result as $idx => $recordData) {
+            foreach ($result as $recordData) {
                 $dtstart = new Tinebase_DateTime($recordData['dtstart']);
                 $dtend = new Tinebase_DateTime($recordData['dtend']);
                 $recordStartDay = $dtstart->format('w');
@@ -550,7 +567,34 @@ class Calendar_Frontend_Json extends Tinebase_Frontend_Json_Abstract
         return $this->_search($filter, $paging, Calendar_Controller_Resource::getInstance(),
             Calendar_Model_ResourceFilter::class, true);
     }
-    
+
+    /**
+     * returns Felamimail_Model_Message if options['composeEmail'] = true, otherwise bool
+     *
+     * @param string|array $currentEvent
+     * @param array $counterEvent
+     * @param array $options
+     * @return bool|array
+     */
+    public function counterEvent(string|array $currentEvent, array $counterEvent, array $options = []): bool|array
+    {
+        $backendOptions = [
+            'composeEmail' => ($options['composeEmail'] ?? false),
+        ];
+        $result = Calendar_Controller_Event::getInstance()->counterEvent(
+            Calendar_Controller_Event::getInstance()->get(is_array($currentEvent) ? $currentEvent['id'] ?? '' : $currentEvent),
+            $this->_jsonToRecord($counterEvent, Calendar_Model_Event::class),
+            $backendOptions
+        );
+
+        if (!is_bool($result)) {
+            $result = $this->_recordToJson($result);
+            $result['attachments'][0] = $result['attachments'][0]->getContent();
+        }
+
+        return $result;
+    }
+
     /**
      * creates/updates an event / recur
      *
@@ -719,9 +763,7 @@ class Calendar_Frontend_Json extends Tinebase_Frontend_Json_Abstract
         try {
             $attendee = new Tinebase_Record_RecordSet('Calendar_Model_Attender', $attendee);
         } catch (Tinebase_Exception_Record_Validation $terv) {
-            if (Tinebase_Core::isLogLevel(Zend_Log::NOTICE)) Tinebase_Core::getLogger()->notice(
-                __METHOD__ . '::' . __LINE__ . ' ' . $terv->getMessage() . ' attendee: '
-                . print_r($attendee, true));
+            Tinebase_Exception::log($terv, additionalData: print_r($attendee, true));
             return $fbInfo;
         }
 
@@ -730,7 +772,16 @@ class Calendar_Frontend_Json extends Tinebase_Frontend_Json_Abstract
         $aggregatedPeriods = [];
 
         foreach ($events as $event) {
-            $eventRecord = new Calendar_Model_Event([], TRUE);
+            if (!is_array($event)) {
+                if (Tinebase_Core::isLogLevel(Zend_Log::NOTICE)) {
+                    Tinebase_Core::getLogger()->notice(
+                        __METHOD__ . '::' . __LINE__
+                        . ' Skipping invalid event data: ' . print_r($event, true));
+                }
+                continue;
+            }
+
+            $eventRecord = new Calendar_Model_Event([], true);
             $eventRecord->setFromJsonInUsersTimezone($event);
 
             if ($eventRecord->dtstart === null || (empty($eventRecord->getId()) &&
@@ -775,8 +826,10 @@ class Calendar_Frontend_Json extends Tinebase_Frontend_Json_Abstract
                 if (! isset($period['from']) || ! isset($period['until'])
                     || ! $period['from'] || ! $period['until'])
                 {
-                    if (Tinebase_Core::isLogLevel(Zend_Log::NOTICE)) Tinebase_Core::getLogger()->notice(
-                        __METHOD__ . '::' . __LINE__ . ' Invalid event period: ' . print_r($period, true));
+                    if (Tinebase_Core::isLogLevel(Zend_Log::NOTICE)) {
+                        Tinebase_Core::getLogger()->notice(
+                            __METHOD__ . '::' . __LINE__ . ' Invalid event period: ' . print_r($period, true));
+                    }
                     break;
                 }
                 $period['from']->setTimezone($userTimeZone);

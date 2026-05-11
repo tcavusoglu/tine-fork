@@ -6,7 +6,7 @@
  * @package     Sales
  * @subpackage  Setup
  * @license     http://www.gnu.org/licenses/agpl.html AGPL3
- * @copyright   Copyright (c) 2024-2025 Metaways Infosystems GmbH (http://www.metaways.de)
+ * @copyright   Copyright (c) 2024-2026 Metaways Infosystems GmbH (http://www.metaways.de)
  * @author      Philipp Schüle <p.schuele@metaways.de>
  *
  * this is 2025.11 (ONLY!)
@@ -21,6 +21,13 @@ class Sales_Setup_Update_18 extends Setup_Update_Abstract
     protected const RELEASE018_UPDATE002 = __CLASS__ . '::update002';
     protected const RELEASE018_UPDATE003 = __CLASS__ . '::update003';
     protected const RELEASE018_UPDATE004 = __CLASS__ . '::update004';
+    protected const RELEASE018_UPDATE005 = __CLASS__ . '::update005';
+    protected const RELEASE018_UPDATE006 = __CLASS__ . '::update006';
+    protected const RELEASE018_UPDATE007 = __CLASS__ . '::update007';
+    protected const RELEASE018_UPDATE008 = __CLASS__ . '::update008';
+    protected const RELEASE018_UPDATE009 = __CLASS__ . '::update009';
+    protected const RELEASE018_UPDATE010 = __CLASS__ . '::update010';
+    protected const RELEASE018_UPDATE011 = __CLASS__ . '::update011';
 
 
     static protected $_allUpdates = [
@@ -43,11 +50,39 @@ class Sales_Setup_Update_18 extends Setup_Update_Abstract
                 self::CLASS_CONST                   => self::class,
                 self::FUNCTION_CONST                => 'update004',
             ],
+            self::RELEASE018_UPDATE005          => [
+                self::CLASS_CONST                   => self::class,
+                self::FUNCTION_CONST                => 'update005',
+            ],
+            self::RELEASE018_UPDATE006          => [
+                self::CLASS_CONST                   => self::class,
+                self::FUNCTION_CONST                => 'update006',
+            ],
+            self::RELEASE018_UPDATE008          => [
+                self::CLASS_CONST                   => self::class,
+                self::FUNCTION_CONST                => 'update008',
+            ],
+            self::RELEASE018_UPDATE009          => [
+                self::CLASS_CONST                   => self::class,
+                self::FUNCTION_CONST                => 'update009',
+            ],
+            self::RELEASE018_UPDATE010          => [
+                self::CLASS_CONST                   => self::class,
+                self::FUNCTION_CONST                => 'update010',
+            ],
+            self::RELEASE018_UPDATE011          => [
+                self::CLASS_CONST                   => self::class,
+                self::FUNCTION_CONST                => 'update011',
+            ],
         ],
         self::PRIO_NORMAL_APP_UPDATE        => [
             self::RELEASE018_UPDATE000          => [
                 self::CLASS_CONST                   => self::class,
                 self::FUNCTION_CONST                => 'update000',
+            ],
+            self::RELEASE018_UPDATE007          => [
+                self::CLASS_CONST                   => self::class,
+                self::FUNCTION_CONST                => 'update007',
             ],
         ],
     ];
@@ -134,7 +169,6 @@ class Sales_Setup_Update_18 extends Setup_Update_Abstract
         }
 
         Setup_SchemaTool::updateSchema($models);
-
         $this->addApplicationUpdate(Sales_Config::APP_NAME, '18.3', self::RELEASE018_UPDATE003);
     }
 
@@ -149,5 +183,181 @@ class Sales_Setup_Update_18 extends Setup_Update_Abstract
         ]);
 
         $this->addApplicationUpdate(Sales_Config::APP_NAME, '18.4', self::RELEASE018_UPDATE004);
+    }
+
+    public function update005(): void
+    {
+        Setup_SchemaTool::updateSchema([
+            Sales_Model_Product::class,
+        ]);
+        $this->addApplicationUpdate(Sales_Config::APP_NAME, '18.5', self::RELEASE018_UPDATE005);
+    }
+
+    public function update006(): void
+    {
+        Tinebase_TransactionManager::getInstance()->rollBack();
+
+        Setup_SchemaTool::updateSchema([
+            Sales_Model_Document_PaymentReminder::class,
+            Sales_Model_Document_PurchaseInvoice::class,
+            Sales_Model_Document_Supplier::class,
+            Sales_Model_DocumentPosition_PurchaseInvoice::class,
+            Sales_Model_Supplier::class,
+        ]);
+
+        Tinebase_Controller_EvaluationDimension::addModelsToDimension(Tinebase_Model_EvaluationDimension::COST_CENTER, [
+            Sales_Model_Document_PurchaseInvoice::class,
+            Sales_Model_DocumentPosition_PurchaseInvoice::class,
+        ]);
+        Tinebase_Controller_EvaluationDimension::addModelsToDimension(Tinebase_Model_EvaluationDimension::COST_BEARER, [
+            Sales_Model_Document_PurchaseInvoice::class,
+            Sales_Model_DocumentPosition_PurchaseInvoice::class,
+        ]);
+
+        $this->addApplicationUpdate(Sales_Config::APP_NAME, '18.6', self::RELEASE018_UPDATE006);
+    }
+
+    public function update007(): void
+    {
+        $piCtrl = Sales_Controller_Document_PurchaseInvoice::getInstance();
+        $refProp = new ReflectionProperty(Sales_Controller_Document_PurchaseInvoice::class, '_skipSetModlog');
+        $refProp->setValue($piCtrl, true);
+        $raii = new Tinebase_RAII(fn() => $refProp->setValue($piCtrl, false));
+        $recAttachmentCtrl = Tinebase_FileSystem_RecordAttachments::getInstance();
+
+        foreach (Sales_Controller_PurchaseInvoice::getInstance()->getAll()->sort(fn($a, $b) => $a->date && $b->date ? $a->date->compare($b->date) : -1) as $oldPI) {
+            $oldPI->relations = Tinebase_Relations::getInstance()->getRelations(Sales_Model_PurchaseInvoice::class, 'Sql', $oldPI->getId());
+
+            $newPI = $piCtrl->create(new Sales_Model_Document_PurchaseInvoice([
+                Sales_Model_Document_PurchaseInvoice::FLD_EXTERNAL_INVOICE_NUMBER => $oldPI->number,
+                Sales_Model_Document_PurchaseInvoice::FLD_PURCHASE_INVOICE_STATUS => $oldPI->payed_at ? Sales_Model_Document_PurchaseInvoice::STATUS_PAID :
+                    Sales_Model_Document_PurchaseInvoice::STATUS_APPROVAL_REQUESTED,
+                Sales_Model_Document_PurchaseInvoice::FLD_DESCRIPTION => $oldPI->description,
+                Sales_Model_Document_PurchaseInvoice::FLD_DOCUMENT_DATE => $oldPI->date,
+                Sales_Model_Document_PurchaseInvoice::FLD_DUE_AT => $oldPI->due_at,
+                Sales_Model_Document_PurchaseInvoice::FLD_PAYMENT_TERMS => $oldPI->due_in,
+                Sales_Model_Document_PurchaseInvoice::FLD_PAY_AT => $oldPI->pay_at,
+                Sales_Model_Document_PurchaseInvoice::FLD_PAID_AT => $oldPI->payed_at,
+                Sales_Model_Document_PurchaseInvoice::FLD_OVER_DUE_AT => $oldPI->overdue_at,
+                Sales_Model_Document_PurchaseInvoice::FLD_DOCUMENT_CURRENCY => 'EUR',
+                Sales_Model_Document_PurchaseInvoice::FLD_INVOICE_DISCOUNT_PERCENTAGE => 0,
+                Sales_Model_Document_PurchaseInvoice::FLD_INVOICE_DISCOUNT_SUM => 0,
+                Sales_Model_Document_PurchaseInvoice::FLD_NET_SUM => $oldPI->price_net + $oldPI->price_gross2,
+                Sales_Model_Document_PurchaseInvoice::FLD_POSITIONS_NET_SUM => $oldPI->price_net + $oldPI->price_gross2,
+                Sales_Model_Document_PurchaseInvoice::FLD_POSITIONS_GROSS_SUM => $oldPI->price_gross + $oldPI->price_gross2,
+                Sales_Model_Document_PurchaseInvoice::FLD_POSITIONS_DISCOUNT_SUM => 0,
+                Sales_Model_Document_PurchaseInvoice::FLD_SALES_TAX => $oldPI->price_tax,
+                Sales_Model_Document_PurchaseInvoice::FLD_SALES_TAX_BY_RATE => array_merge([[
+                    Sales_Model_Document_SalesTax::FLD_TAX_RATE => ($salesTax = ($oldPI->sales_tax ?? 0)),
+                    Sales_Model_Document_SalesTax::FLD_TAX_AMOUNT => $oldPI->price_tax,
+                    Sales_Model_Document_SalesTax::FLD_NET_AMOUNT => $oldPI->price_net + ($salesTax > 0 ? 0 : $oldPI->price_gross2),
+                    Sales_Model_Document_SalesTax::FLD_GROSS_AMOUNT => $oldPI->price_gross + ($salesTax > 0 ? 0 : $oldPI->price_gross2),
+                ]], $oldPI->price_gross2 && $salesTax > 0 ? [[
+                    Sales_Model_Document_SalesTax::FLD_TAX_RATE => 0,
+                    Sales_Model_Document_SalesTax::FLD_TAX_AMOUNT => 0,
+                    Sales_Model_Document_SalesTax::FLD_NET_AMOUNT => $oldPI->price_gross2,
+                    Sales_Model_Document_SalesTax::FLD_GROSS_AMOUNT => $oldPI->price_gross2,
+                ]] : []),
+                Sales_Model_Document_PurchaseInvoice::FLD_GROSS_SUM => $oldPI->price_total,
+                Sales_Model_Document_PurchaseInvoice::FLD_PAID_AMOUNT => $oldPI->price_total,
+                Sales_Model_Document_PurchaseInvoice::FLD_APPROVER => $oldPI->relations->find('type', 'APPROVER')?->related_record->account_id ?: null,
+                Sales_Model_Document_PurchaseInvoice::FLD_SUPPLIER_ID => $oldPI->relations->find('type', 'SUPPLIER')?->related_record,
+                Sales_Model_Document_PurchaseInvoice::FLD_XPROPS => ['migration_src_id' => $oldPI->getId()],
+                Sales_Model_Document_PurchaseInvoice::FLD_PAYMENT_MEANS_USED  => $oldPI->payment_method,
+                Sales_Model_Document_PurchaseInvoice::FLD_PAYMENT_REMINDERS => new Tinebase_Record_RecordSet(Sales_Model_Document_PaymentReminder::class, $oldPI->dunned_at ? [
+                    new Sales_Model_Document_PaymentReminder([
+                        Sales_Model_Document_PaymentReminder::FLD_DATE => $oldPI->dunned_at,
+                        Sales_Model_Document_PaymentReminder::FLD_FEE => 0.0,
+                        Sales_Model_Document_PaymentReminder::FLD_OUTSTANDING_AMOUNT => $oldPI->price_total,
+                    ], true),
+                ] : []),
+                Sales_Model_Document_Abstract::FLD_EVAL_DIM_COST_CENTER => $oldPI->{Sales_Model_Document_Abstract::FLD_EVAL_DIM_COST_CENTER},
+                Sales_Model_Document_PurchaseInvoice::FLD_LAST_DATEV_SEND_DATE => $oldPI->last_datev_send_date,
+
+                'created_by' => $oldPI->getIdFromProperty('created_by'),
+                'creation_time' => $oldPI->creation_time,
+                'last_modified_by' => $oldPI->getIdFromProperty('last_modified_by'),
+                'last_modified_time' => $oldPI->last_modified_time,
+                'seq' => 1,
+            ]));
+
+            $oldPath = $recAttachmentCtrl->getRecordAttachmentPath($oldPI) . '/';
+            $newPath = $recAttachmentCtrl->getRecordAttachmentPath($newPI, true) . '/';
+            foreach ($recAttachmentCtrl->getRecordAttachments($oldPI) as $recAttachment) {
+                Tinebase_FileSystem::getInstance()->copy($oldPath . $recAttachment->name, $newPath . $recAttachment->name);
+            }
+
+        }
+
+        Sales_Setup_Initialize::createDefaultFavoritesDocPurchaseInvoice();
+
+        $this->addApplicationUpdate(Sales_Config::APP_NAME, '18.7', self::RELEASE018_UPDATE007);
+
+        unset($raii);
+    }
+
+    public function update008(): void
+    {
+        Setup_SchemaTool::updateSchema([
+            Sales_Model_Document_Supplier::class
+        ]);
+        $this->addApplicationUpdate(Sales_Config::APP_NAME, '18.8', self::RELEASE018_UPDATE008);
+    }
+
+    public function update009(): void
+    {
+        Tinebase_TransactionManager::getInstance()->rollBack();
+
+        Setup_SchemaTool::updateSchema([
+            Sales_Model_Address::class,
+            Sales_Model_Document_Address::class,
+            Sales_Model_Document_SupplierAddress::class,
+        ]);
+
+        $supplierIds = Sales_Controller_Supplier::getInstance()->search(Tinebase_Model_Filter_FilterGroup::getFilterForModel(Sales_Model_Supplier::class, [
+                [TMFA::FIELD => 'is_deleted', TMFA::OPERATOR => TMFA::OP_EQUALS, TMFA::VALUE => Tinebase_Model_Filter_Bool::VALUE_NOTSET],
+            ]), _onlyIds: true);
+        if (!empty($supplierIds)) {
+            $db = $this->getDb();
+            $db->query('UPDATE ' . $db->quoteIdentifier(SQL_TABLE_PREFIX . Sales_Model_Address::TABLE_NAME) . 'SET '
+                . Sales_Model_Address::FLD_SUPPLIER_ID . ' = ' . Sales_Model_Address::FLD_CUSTOMER_ID . ' WHERE ' . Sales_Model_Address::FLD_CUSTOMER_ID . ($quotedIds = $db->quoteInto(' IN (?)', $supplierIds)));
+            $db->query('UPDATE ' . $db->quoteIdentifier(SQL_TABLE_PREFIX . Sales_Model_Address::TABLE_NAME) . 'SET '
+                . Sales_Model_Address::FLD_CUSTOMER_ID . ' = NULL WHERE ' . Sales_Model_Address::FLD_SUPPLIER_ID . $quotedIds);
+        }
+
+        $documentSuppliers = Sales_Controller_Document_Supplier::getInstance()->getAll();
+        Tinebase_Record_Expander::expandRecords($documentSuppliers);
+        foreach ($documentSuppliers as $documentSupplier) {
+            if (null === $documentSupplier->{Sales_Model_Document_Supplier::FLD_ORIGINAL_ID} || null !== $documentSupplier->postal_id) {
+                continue;
+            }
+            if (null !== ($adr = Sales_Controller_Supplier::getInstance()->get($documentSupplier->{Sales_Model_Document_Supplier::FLD_ORIGINAL_ID})->postal_id)) {
+                $documentSupplier->postal_id = $adr;
+                Sales_Controller_Document_Supplier::getInstance()->update($documentSupplier);
+            }
+        }
+
+        $this->addApplicationUpdate(Sales_Config::APP_NAME, '18.9', self::RELEASE018_UPDATE009);
+    }
+
+    public function update010(): void
+    {
+        Setup_SchemaTool::updateSchema([
+            Sales_Model_Supplier::class,
+            Sales_Model_Contract::class,
+        ]);
+        $this->addApplicationUpdate(Sales_Config::APP_NAME, '18.10', self::RELEASE018_UPDATE010);
+    }
+
+    public function update011(): void
+    {
+        Setup_SchemaTool::updateSchema([
+            Sales_Model_Document_Delivery::class,
+            Sales_Model_Document_Invoice::class,
+            Sales_Model_Document_Offer::class,
+            Sales_Model_Document_Order::class,
+            Sales_Model_Document_PurchaseInvoice::class,
+        ]);
+        $this->addApplicationUpdate(Sales_Config::APP_NAME, '18.11', self::RELEASE018_UPDATE011);
     }
 }

@@ -116,7 +116,7 @@ abstract class Tinebase_Export_Abstract implements Tinebase_Record_IteratableInt
     protected $_prefKey = null;
 
     /**
-     * format strings
+     * format strings - supported formats are: * (all), doc, docx, rtf, odt, ods, xls, xlsx, csv, pdf, html, txt, rtf
      *
      * @var string
      */
@@ -177,6 +177,13 @@ abstract class Tinebase_Export_Abstract implements Tinebase_Record_IteratableInt
      * @var boolean
      */
     protected $_hasTemplate = false;
+
+    /**
+     * only some extensions are allowed for templates
+     *
+     * @var bool
+     */
+    protected bool $_verifyTemplateFileExtension = true;
 
     /** @var Tinebase_Twig */
     protected $_twig = null;
@@ -322,9 +329,12 @@ abstract class Tinebase_Export_Abstract implements Tinebase_Record_IteratableInt
             } catch (Exception) {
             }
         }
-        if ($this->_templateFileName && !in_array($templateFileExtension = pathinfo($this->_templateFileName, PATHINFO_EXTENSION), [
+        if ($this->_templateFileName
+            && $this->_verifyTemplateFileExtension
+            && !in_array($templateFileExtension = strtolower(pathinfo($this->_templateFileName, PATHINFO_EXTENSION)), [
                     'doc', 'docx', 'xls', 'xlsx', 'ods', 'odt'
-                ])) {
+                ])
+        ) {
             throw new Tinebase_Exception_UnexpectedValue('File extension: "' . $templateFileExtension . '" in ' . $this->_templateFileName . ' is not supported');
         }
         if (!$this->_modelName && !empty($this->_config->model)) {
@@ -506,6 +516,11 @@ abstract class Tinebase_Export_Abstract implements Tinebase_Record_IteratableInt
             foreach ($matchingData as $needle) {
                 if (str_contains($file, (string) $needle)) {
                     ++$matches;
+                } else {
+                    [$needleKey] = explode('-', $needle, 2);
+                    if (preg_match('/' . preg_quote($needleKey, '/') . '-[^\-]+--/', $file)) {
+                        continue 2;
+                    }
                 }
             }
             if ($matches > $maxMatches) {
@@ -682,7 +697,8 @@ abstract class Tinebase_Export_Abstract implements Tinebase_Record_IteratableInt
         if (isset($this->_config->exportFilename) && $this->_hasTwig()) {
             $this->_twig->addLoader(new Twig_Loader_Array(['fileNameTmpl' => $this->_config->exportFilename]));
             $twigTmpl = $this->_twig->load('fileNameTmpl');
-            return $twigTmpl->render($this->_getTwigContext(['record' => $this->_currentRecord]));
+            $context = $this->_getTwigContext(['record' => $this->_currentRecord]);
+            return $twigTmpl->render($context);
         }
 
         $model = '';
@@ -838,7 +854,9 @@ abstract class Tinebase_Export_Abstract implements Tinebase_Record_IteratableInt
 
     protected function _loadTwig()
     {
-        if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . ' loading twig template...');
+        if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) {
+            Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . ' loading twig template...');
+        }
 
         $options = [
             // in order to cache the templates, we need to cache $this->_twigMapping too!
@@ -1571,8 +1589,13 @@ abstract class Tinebase_Export_Abstract implements Tinebase_Record_IteratableInt
      */
     protected function _renderTwigTemplate($_record = null)
     {
+        $context = $this->_getTwigContext(['record' => $_record]);
+        if (Tinebase_Core::isLogLevel(Zend_Log::TRACE)) {
+            Tinebase_Core::getLogger()->trace(__METHOD__ . '::' . __LINE__
+                . ' Additional Context: ' . print_r(array_diff_key($context, ['record' => '']), true));
+        }
         $twigResult = $this->_twigTemplate->render(
-            $this->_getTwigContext(array('record' => $_record)));
+            $this->_getTwigContext($context));
         $twigResult = json_decode($twigResult);
         if (!is_array($twigResult)) {
             if (Tinebase_Core::isLogLevel(Zend_Log::WARN)) Tinebase_Core::getLogger()->warn(__METHOD__ . '::' . __LINE__ .

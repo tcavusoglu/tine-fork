@@ -3,9 +3,9 @@
  * Tine 2.0
  *
  * @package     Tinebase
- * @license     http://www.gnu.org/licenses/agpl.html AGPL Version 3
+ * @license     https://www.gnu.org/licenses/agpl.html AGPL Version 3
  * @author      Cornelius Weiss <c.weiss@metaways.de>
- * @copyright   Copyright (c) 2018-2025 Metaways Infosystems GmbH (http://www.metaways.de)
+ * @copyright   Copyright (c) 2018-2026 Metaways Infosystems GmbH (https://www.metaways.de)
  */
 class Tinebase_Frontend_Http_SinglePageApplication {
 
@@ -117,47 +117,101 @@ class Tinebase_Frontend_Http_SinglePageApplication {
     }
 
     /**
-     * gets headers for initial client html pages
+     * gets headers for initial client HTML pages
      *
      * @return array
+     *
+     * @throws Tinebase_Exception_InvalidArgument
+     *
      */
     public static function getHeaders()
     {
         $header = [];
 
-        $frameAncestors = implode(' ' ,array_merge(
+        $frameAncestors = implode(' ', array_merge(
             (array) Tinebase_Core::getConfig()->get(Tinebase_Config::ALLOWEDJSONORIGINS, array()),
             array("'self'")
         ));
 
-        // set Content-Security-Policy header against clickjacking and XSS
+        // set the Content-Security-Policy header against clickjacking and XSS
         // @see https://developer.mozilla.org/en/Security/CSP/CSP_policy_directives
-        $scriptSrcs = array("'self'", "'unsafe-eval'", 'https://versioncheck.tine20.net');
-        if (TINE20_BUILDTYPE == 'DEVELOPMENT') {
-            $scriptSrcs[] = Tinebase_Core::getUrl(Tinebase_Core::GET_URL_PROTOCOL) . '://' .
-                Tinebase_Core::getUrl(Tinebase_Core::GET_URL_HOST) . ":10443";
-        }
-        $scriptSrc = implode(' ', $scriptSrcs);
-        $header += [
-            "Content-Security-Policy" => "default-src 'self'",
-            "Content-Security-Policy" => "script-src $scriptSrc",
-            "Content-Security-Policy" => "frame-ancestors $frameAncestors",
 
-            // headers for IE 10+11
-            "X-Content-Security-Policy" => "default-src 'self'",
-            "X-Content-Security-Policy" => "script-src $scriptSrc",
-            "X-Content-Security-Policy" => "frame-ancestors $frameAncestors",
-        ];
+        Tinebase_Frontend_Http_CspRegistry::getInstance()->registerAppSources();
+
+        $scriptSrcs = array_merge(
+            ["'self'", 'blob:', "'unsafe-eval'", "'unsafe-inline'", 'https://versioncheck.tine20.net'],
+            Tinebase_Frontend_Http_CspRegistry::getInstance()->getSources('script-src')
+        );
+        $connectSrcs = array_merge(
+            ["'self'"],
+            Tinebase_Frontend_Http_CspRegistry::getInstance()->getSources('connect-src')
+        );
+        $imgSrcs = array_merge(
+        //@todo: deal with extern images in emails, delete 'https:' when done
+            ["'self'", 'data:', 'blob:', 'https:'],
+            Tinebase_Frontend_Http_CspRegistry::getInstance()->getSources('img-src')
+        );
+        $frameSrcs = array_merge(
+            ["'self'", 'blob:'],
+            Tinebase_Frontend_Http_CspRegistry::getInstance()->getSources('frame-src')
+        );
+        $styleSrcs = array_merge(
+            ["'self'", "'unsafe-inline'"],
+            Tinebase_Frontend_Http_CspRegistry::getInstance()->getSources('style-src')
+        );
+        $objectSrcs = array_merge(
+            ["'self'", 'blob:'],
+            Tinebase_Frontend_Http_CspRegistry::getInstance()->getSources('object-src')
+        );
+        $fontSrcs = array_merge(
+            ["'self'", 'data:'],
+            Tinebase_Frontend_Http_CspRegistry::getInstance()->getSources('font-src')
+        );
+
+        if (defined('TINE20_BUILDTYPE') && TINE20_BUILDTYPE === 'DEVELOPMENT') {
+            $protocol  = Tinebase_Core::getUrl(Tinebase_Core::GET_URL_PROTOCOL);
+            $host      = Tinebase_Core::getUrl(Tinebase_Core::GET_URL_HOST);
+            $wsScheme  = $protocol === 'https' ? 'wss' : 'ws';
+
+            $scriptSrcs[]  = "$protocol://$host:10443";
+            $connectSrcs[] = "$protocol://$host:10443";
+            $connectSrcs[] = "$wsScheme://$host:10443";
+            $connectSrcs[] = 'webpack:';
+        }
+
+        //@todo create csp-endpoint for Content-Security-Policy-Report-Only ?
+        //@see https://developer.mozilla.org/en-US/docs/Web/API/Reporting_API
+        $csp = implode('; ', [
+            "default-src 'self'",
+            "script-src " . implode(' ', $scriptSrcs),
+            "connect-src " . implode(' ', $connectSrcs),
+            "img-src " . implode(' ', $imgSrcs),
+            "frame-src " . implode(' ', $frameSrcs),
+            "style-src " . implode(' ', $styleSrcs),
+            "object-src " . implode(' ', $objectSrcs),
+            "font-src " . implode(' ', $fontSrcs),
+            "frame-ancestors $frameAncestors",
+        ]);
+
+        $header['Content-Security-Policy'] = $csp;
 
         // set Strict-Transport-Security; used only when served over HTTPS
-        $headers['Strict-Transport-Security'] = 'max-age=16070400';
+        $header['Strict-Transport-Security'] = 'max-age=16070400';
 
         // cache mainscreen for one day in production
-        $maxAge = ! defined('TINE20_BUILDTYPE') || TINE20_BUILDTYPE != 'DEVELOPMENT' ? 86400 : -10000;
+        $maxAge = !defined('TINE20_BUILDTYPE') || TINE20_BUILDTYPE !== 'DEVELOPMENT' ? 86400 : -10000;
         $header += [
             'Cache-Control' => 'private, max-age=' . $maxAge,
-            'Expires' => gmdate('D, d M Y H:i:s', Tinebase_DateTime::now()->addSecond($maxAge)->getTimestamp()) . " GMT",
+            'Expires'       => gmdate(
+                'D, d M Y H:i:s',
+                Tinebase_DateTime::now()->addSecond($maxAge)->getTimestamp()
+            ) . ' GMT',
         ];
+
+        if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) {
+            Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__
+                . ' Headers: ' . print_r($header, true));
+        }
 
         return $header;
     }
@@ -178,8 +232,8 @@ class Tinebase_Frontend_Http_SinglePageApplication {
             $jsonFileUri = $devServerURL . '/' . $jsonFile;
             $json = Tinebase_Helper::getFileOrUriContents($jsonFileUri);
             if (! $json) {
-                Tinebase_Core::getLogger()->err(self::class . '::' . __METHOD__
-                    . ' (' . __LINE__ .') Could not get json file: ' . $jsonFile);
+                Tinebase_Core::getLogger()->err(__METHOD__ . '::' . __LINE__
+                    . ' Could not get json file: ' . $jsonFile);
                 throw new Exception('You need to run webpack-dev-server in dev mode! See https://wiki.tine20.org/Developers/Getting_Started/Working_with_GIT#Install_webpack');
             }
         } else if ($absoluteJsonFilePath = self::getAbsoluteAssetsJsonFilename()) {
@@ -235,8 +289,10 @@ class Tinebase_Frontend_Http_SinglePageApplication {
                 }
             }
         } catch (Exception $e) {
-            Tinebase_Core::getLogger()->notice(self::class . '::' . __METHOD__ . ' (' . __LINE__ .') cannot filter assetMap by installed apps');
-            Tinebase_Core::getLogger()->notice(self::class . '::' . __METHOD__ . ' (' . __LINE__ .') ' . $e);
+            Tinebase_Core::getLogger()->notice(__METHOD__ . '::' . __LINE__
+                . ' cannot filter assetMap by installed apps');
+            Tinebase_Core::getLogger()->notice(__METHOD__ . '::' . __LINE__
+                . ' ' . $e);
         }
 
         return sha1(json_encode($map) . TINE20_BUILDTYPE);

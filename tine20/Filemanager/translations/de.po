@@ -66,7 +66,7 @@ msgid "Shared folders"
 msgstr "Gemeinsame Ordner"
 
 msgid "Folders of other users"
-msgstr "Ordner anderer Benutzer"
+msgstr "Ordner anderer Benutzer*innen"
 
 msgid "Received"
 msgstr "Erhalten"
@@ -249,8 +249,8 @@ msgstr "Kein {0} hinzugefügt"
 msgid "You must enter a {0} name!"
 msgstr "Sie müssen einen {0}-namen angeben!"
 
-msgid "Illegal characters: "
-msgstr "Ungültige Zeichen:"
+msgid "Illegal character found:"
+msgstr "Ungültiger Zeichen gefunden:"
 
 #, python-brace-format
 msgid "A folder named {0} already exists!"
@@ -293,7 +293,7 @@ msgid "Download"
 msgstr "Herunterladen"
 
 msgid "Use this link to share the entry with other system users"
-msgstr "Verwende diesen Link um den Eintrag mit einem anderen Systembenutzer zu teilen"
+msgstr "Verwende diesen Link um den Eintrag mit einem anderen Systembenutzer oder einer anderen Systembenutzerin zu teilen"
 
 msgid "Grants"
 msgstr "Berechtigungen"
@@ -360,10 +360,6 @@ msgstr "Aktualisieren"
 msgid "Create Folder"
 msgstr "Ordner anlegen"
 
-#, python-brace-format
-msgid "Not renamed {0}"
-msgstr "Unbenannter {0}"
-
 msgid "Edit Properties"
 msgstr "Eigenschaften bearbeiten"
 
@@ -377,6 +373,10 @@ msgstr "{0} umbenennen"
 #, python-brace-format
 msgid "Please enter the new name of the {0}:"
 msgstr "Bitte den neuen Namen von {0} eingeben:"
+
+#, python-brace-format
+msgid "Not renamed {0}"
+msgstr "Unbenannter {0}"
 
 msgid "System Link"
 msgstr "System Link"
@@ -443,6 +443,9 @@ msgstr "Beschreibung"
 
 msgid "Enter description"
 msgstr "Beschreibung eingeben"
+
+msgid "Try again?"
+msgstr ""
 
 msgid "You have unfinished uploads. Please check the upload monitor and restart any failed uploads."
 msgstr "Es gab fehlgeschlagene Uploads. Bitte überprüfen Sie den Upload-Fortschritt und starten Sie die fehlgeschlagenen Uploads erneut."
@@ -523,7 +526,7 @@ msgid "Once a year"
 msgstr "Einmal pro Jahr"
 
 msgid "Search for users..."
-msgstr "Suche nach Benutzern..."
+msgstr "Suche nach Benutzer*innen..."
 
 msgid "No permission"
 msgstr "Keine Berechtigung"
@@ -592,10 +595,10 @@ msgid "Usage by File Type"
 msgstr "Verbrauch nach Dateityp"
 
 msgid "User"
-msgstr "Benutzer"
+msgstr "Benutzer*in"
 
 msgid "Usage by User"
-msgstr "Verbrauch nach Benutzer"
+msgstr "Verbrauch nach Benutzer*innen"
 
 msgid "unknown"
 msgstr "unbekannt"
@@ -625,6 +628,3 @@ msgstr "Zum Herunterladen Passwort eingeben"
 
 msgid "Submit"
 msgstr "Abschicken"
-
-#~ msgid "Manage anonymous download links"
-#~ msgstr "Anonyme Download Links verwalten"

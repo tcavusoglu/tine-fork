@@ -180,6 +180,9 @@ msgstr "Configured Area Locks"
 msgid "Database Configuration"
 msgstr "Database Configuration"
 
+msgid "Session Configuration"
+msgstr "Session Configuration"
+
 msgid "External Database Configuration"
 msgstr "External Database Configuration"
 
@@ -293,6 +296,9 @@ msgstr "Replication master configuration"
 
 msgid "Replication master configuration."
 msgstr "Replication master configuration."
+
+msgid "Disable Owncloud permissions support"
+msgstr "Disable Owncloud permissions support"
 
 msgid "Report WebDAV issues"
 msgstr "Report WebDAV issues"
@@ -721,6 +727,12 @@ msgstr "Maintenance mode enabled"
 
 msgid "Set Tine 2.0 maintenance mode. Possible values: \"off\", \"on\" (only users having the maintenance right can login) and \"all\""
 msgstr "Set Tine 2.0 maintenance mode. Possible values: \"off\", \"on\" (only users having the maintenance right can login) and \"all\""
+
+msgid "Maintenance mode for health check"
+msgstr "Maintenance mode for health check"
+
+msgid "If this is true, the tine health check is also in maintenance and returns http code 503"
+msgstr "If this is true, the tine health check is also in maintenance and returns http code 503"
 
 msgid "Version check enabled"
 msgstr "Version check enabled"
@@ -1153,6 +1165,10 @@ msgid_plural "Bank Holiday Calendars"
 msgstr[0] "Bank Holiday Calendar"
 msgstr[1] "Bank Holiday Calendars"
 
+#, python-format, php-format
+msgid "You do not have permission to %s record of type %s"
+msgstr "You do not have permission to %s record of type %s"
+
 #, python-brace-format
 msgid "A Message has been filed to this record. Subject: {0}"
 msgstr "A Message has been filed to this record. Subject: {0}"
@@ -1160,6 +1176,15 @@ msgstr "A Message has been filed to this record. Subject: {0}"
 #, python-format, php-format
 msgid "Status %s is not valid."
 msgstr "Status %s is not valid."
+
+msgid "get"
+msgstr "get"
+
+msgid "update"
+msgstr "update"
+
+msgid "delete"
+msgstr "delete"
 
 #, python-brace-format
 msgid "Email address {0} not in allowed domains [{1}] or invalid"
@@ -1303,6 +1328,9 @@ msgstr "MFA send out triggered"
 msgid "Anyone"
 msgstr "Anyone"
 
+msgid "CloudAccount is not a CalDAV account"
+msgstr "CloudAccount is not a CalDAV account"
+
 #, python-format, php-format
 msgid "The following fields weren't imported: %s"
 msgstr "The following fields weren't imported: %s"
@@ -1444,6 +1472,27 @@ msgstr "Whole day"
 msgid "Add new Element..."
 msgstr "Add new Element..."
 
+msgid "Test Connection"
+msgstr "Test Connection"
+
+msgid "Cloud Account Access Possible"
+msgstr "Cloud Account Access Possible"
+
+msgid "Cloud connect to cloud account with given data."
+msgstr "Cloud connect to cloud account with given data."
+
+msgid "Cloud Account Access Failure"
+msgstr "Cloud Account Access Failure"
+
+msgid "Cloud not connect to cloud account with given data."
+msgstr "Cloud not connect to cloud account with given data."
+
+msgid "Save cloud account anyway?"
+msgstr "Save cloud account anyway?"
+
+msgid "Select a { collectionName }..."
+msgstr "Select a { collectionName }..."
+
 msgid "Usage:&#160;"
 msgstr "Usage:&#160;"
 
@@ -1452,6 +1501,9 @@ msgstr "personal"
 
 msgid "No Information"
 msgstr "No Information"
+
+msgid "This field supports Markdown formatting. For more information check the user manual"
+msgstr "This field supports Markdown formatting. For more information check the user manual"
 
 msgid "No Access"
 msgstr "No Access"
@@ -1643,6 +1695,9 @@ msgstr "Close"
 
 msgid "Do you want to copy the HTML content with styles?"
 msgstr "Do you want to copy the HTML content with styles?"
+
+msgid "Hint: You can paste content without formatting by pressing Ctrl + Shift + V"
+msgstr "Hint: You can paste content without formatting by pressing Ctrl + Shift + V"
 
 msgid "Outdated Browser"
 msgstr "Outdated Browser"
@@ -2128,6 +2183,12 @@ msgstr "Session Timed Out"
 msgid "You can close this window."
 msgstr "You can close this window."
 
+msgid "Please wait or contact your administrator"
+msgstr "Please wait or contact your administrator"
+
+msgid "Installation is in maintenance mode. Please try again later"
+msgstr "Installation is in maintenance mode. Please try again later"
+
 msgid "Your Client is Outdated"
 msgstr "Your Client is Outdated"
 
@@ -2137,8 +2198,11 @@ msgstr "A new client is available, press OK to get this version"
 msgid "tine needs to be updated or is not installed yet."
 msgstr "tine needs to be updated or is not installed yet."
 
-msgid "Please wait or contact your administrator"
-msgstr "Please wait or contact your administrator"
+msgid "Could not load service map"
+msgstr "Could not load service map"
+
+msgid "You might have to clear the session/cookies and do the login again"
+msgstr "You might have to clear the session/cookies and do the login again"
 
 msgid "Translation Problem"
 msgstr "Translation Problem"
@@ -2253,9 +2317,6 @@ msgstr "Convert to pure text"
 msgid "Loading"
 msgstr "Loading"
 
-msgid "Click to edit"
-msgstr "Click to edit"
-
 msgid "Image Failed"
 msgstr "Image Failed"
 
@@ -2342,6 +2403,10 @@ msgstr "Select all pages ({0} records)"
 msgid "Toggle selection"
 msgstr "Toggle selection"
 
+#, python-brace-format
+msgid "Enter {label}..."
+msgstr "Enter {label}..."
+
 msgid "Infinity %"
 msgstr "Infinity %"
 
@@ -2382,6 +2447,9 @@ msgstr "Related to"
 
 msgid "enter search filter"
 msgstr "enter search filter"
+
+msgid "Do not show this message again"
+msgstr "Do not show this message again"
 
 msgid "Leave site?"
 msgstr "Leave site?"
@@ -2730,11 +2798,11 @@ msgstr "Keep existing record and discard mine"
 msgid "Action:"
 msgstr "Action:"
 
+msgid "Notice: Changes to {recordGender, select, male {this} female {this} other {this}} {recordName} apply only to {contextRecordGender, select, male {the associated} female {the associated} other {the associated}} {contextRecordName}. {recordGender, select, male {The} female {The} other {The}} [original {recordName}]() remains unchanged."
+msgstr "Notice: Changes to {recordGender, select, male {this} female {this} other {this}} {recordName} apply only to {contextRecordGender, select, male {the associated} female {the associated} other {the associated}} {contextRecordName}. {recordGender, select, male {The} female {The} other {The}} [original {recordName}]() remains unchanged."
+
 msgid "Enter description"
 msgstr "Enter description"
-
-msgid "delete"
-msgstr "delete"
 
 #, python-brace-format
 msgid "Print {0}"
@@ -3211,6 +3279,18 @@ msgstr "Save config"
 msgid "Reload config"
 msgstr "Reload config"
 
+msgid "Optional"
+msgstr "Optional"
+
+msgid "Required"
+msgstr "Required"
+
+msgid "Field"
+msgstr "Field"
+
+msgid "Contact Fields"
+msgstr "Contact Fields"
+
 msgid "Compose Email"
 msgstr "Compose Email"
 
@@ -3530,6 +3610,9 @@ msgstr "Displaying records {0} - {1} of {2}"
 msgid "No {0} to display"
 msgstr "No {0} to display"
 
+msgid "show full text"
+msgstr "show full text"
+
 msgid "{recordGender, select, male {{recordCount, plural, one {# {recordName} selected} other {# {recordsName} selected}}} female {{recordCount, plural, one {# {recordName} selected} other {# {recordsName} selected}}} other {{recordCount, plural, one {# {recordName} selected} other {# {recordsName} selected}}}}"
 msgstr "{recordGender, select, male {{recordCount, plural, one {# {recordName} selected} other {# {recordsName} selected}}} female {{recordCount, plural, one {# {recordName} selected} other {# {recordsName} selected}}} other {{recordCount, plural, one {# {recordName} selected} other {# {recordsName} selected}}}}"
 
@@ -3725,6 +3808,12 @@ msgstr "Saving Favorite \"{0}\""
 msgid "(shared)"
 msgstr "(shared)"
 
+msgid "Follow Preference"
+msgstr "Follow Preference"
+
+msgid "this config can not be set because its overwritten from a locked preference in admin mode."
+msgstr "this config can not be set because its overwritten from a locked preference in admin mode."
+
 msgid "Defined by..."
 msgstr "Defined by..."
 
@@ -3916,11 +4005,8 @@ msgstr "Please Wait..."
 msgid "Detaching Tags"
 msgstr "Detaching Tags"
 
-msgid "Timezone"
-msgstr "Timezone"
-
-msgid "Setting new timezone..."
-msgstr "Setting new timezone..."
+msgid "Select a timezone..."
+msgstr "Select a timezone..."
 
 #, python-brace-format
 msgid "Rename {0}"
@@ -4236,6 +4322,25 @@ msgstr "Filter"
 
 msgid "Skip Upstream Updates"
 msgstr "Skip Upstream Updates"
+
+msgid "Instance Domain"
+msgid_plural "Instance Domains"
+msgstr[0] "Instance Domain"
+msgstr[1] "Instance Domains"
+
+msgid "Instance ID"
+msgstr "Instance ID"
+
+msgid "Domain Name"
+msgstr "Domain Name"
+
+msgid "Instance"
+msgid_plural "Instances"
+msgstr[0] "Instance"
+msgstr[1] "Instances"
+
+msgid "Flag Icon File"
+msgstr "Flag Icon File"
 
 msgid "LogEntry"
 msgid_plural "LogEntries"
@@ -4574,6 +4679,9 @@ msgstr "Auto search on filter change"
 msgid "Perform auto search when filter is changed"
 msgstr "Perform auto search when filter is changed"
 
+msgid "Timezone"
+msgstr "Timezone"
+
 msgid "The timezone in which dates are shown in Tine 2.0."
 msgstr "The timezone in which dates are shown in Tine 2.0."
 
@@ -4591,12 +4699,6 @@ msgstr "Window Type"
 
 msgid "You can choose between modal windows or normal browser popup windows."
 msgstr "You can choose between modal windows or normal browser popup windows."
-
-msgid "Confirm Logout"
-msgstr "Confirm Logout"
-
-msgid "Show confirmation dialog on logout."
-msgstr "Show confirmation dialog on logout."
 
 msgid "Enable advanced search"
 msgstr "Enable advanced search"
@@ -4648,6 +4750,9 @@ msgstr "Your Tine 2.0 account has been deactivated"
 
 msgid "BASE"
 msgstr "BASE"
+
+msgid "Redirecting..."
+msgstr "Redirecting..."
 
 msgid "Your user account has been deactivated"
 msgstr "Your user account has been deactivated"

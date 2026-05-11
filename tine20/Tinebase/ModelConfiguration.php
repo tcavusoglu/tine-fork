@@ -880,6 +880,8 @@ class Tinebase_ModelConfiguration extends Tinebase_ModelConfiguration_Const
      */
     protected $_attributeConfig = NULL;
 
+    protected $_inheritParentSystemCustomFields = true;
+
     /*
      * mappings
      */
@@ -1039,6 +1041,9 @@ class Tinebase_ModelConfiguration extends Tinebase_ModelConfiguration_Const
         if (empty($this->_modelName)) {
             [,,$this->_modelName] = explode('_', $recordClass, 3);
         }
+        if (empty($this->_appName)) {
+            [$this->_appName] = explode('_', $recordClass, 2);
+        }
 
         $this->_application = $this->_applicationName = $this->_appName;
 
@@ -1072,13 +1077,52 @@ class Tinebase_ModelConfiguration extends Tinebase_ModelConfiguration_Const
         if ($this->_hasSystemCustomFields) {
             try {
                 $modelsSystemCFs = Tinebase_CustomField::getInstance()->getCustomFieldsForApplication($this->_appName,
-                    $this->_appName . '_Model_' . $this->_modelName, Tinebase_Model_CustomField_Grant::GRANT_READ,
+                    $currentModel = $this->_appName . '_Model_' . $this->_modelName, Tinebase_Model_CustomField_Grant::GRANT_READ,
                     true);
+                if ($this->_inheritParentSystemCustomFields) {
+                    $parents = [];
+                    while ($currentModel = get_parent_class($currentModel)) {
+                        if (Tinebase_Record_NewAbstract::class === $currentModel || Tinebase_Record_Abstract::class === $currentModel) {
+                            break;
+                        }
+                        $parents[] = $currentModel;
+                    }
+                    foreach ($parents as $parent) {
+                        $parentSCFs = Tinebase_CustomField::getInstance()->getCustomFieldsForApplication(explode('_', $parent, 2)[0],
+                            $parent, Tinebase_Model_CustomField_Grant::GRANT_READ,
+                            true)->getClone();
+
+                        if (null !== $this->_denormalizationOf) {
+                            foreach ($parentSCFs as $cfc) {
+                                $definition = $cfc->definition->toArray();
+                                $fieldDef = $definition[Tinebase_Model_CustomField_Config::DEF_FIELD] ?? null;
+                                if (($fieldDef[self::CONFIG][self::DEPENDENT_RECORDS] ?? false) && ($fieldDef[self::CONFIG][self::MODEL_NAME] ?? false)) {
+                                    $scfModel = explode('_', $fieldDef[self::CONFIG][self::MODEL_NAME]);
+                                    $ourModelPath = '';
+                                    if (false !== strpos($this->_modelName, '_')) {
+                                        $ourModelPath = explode('_', $this->_modelName)[0] . '_';
+                                    }
+                                    $modelNameLastPart = join('' === $ourModelPath ? '_' : '', $scfModel);
+                                    $adbCPDenormClass = $this->_appName . '_Model_' . $ourModelPath . $modelNameLastPart;
+                                    if (!class_exists($adbCPDenormClass)) {
+                                        $parentSCFs->removeById($cfc->getId());
+                                    } else {
+                                        $fieldDef[self::CONFIG][self::APP_NAME] = $this->_appName;
+                                        $fieldDef[self::CONFIG][self::MODEL_NAME] = $ourModelPath . $modelNameLastPart;
+                                        $definition[Tinebase_Model_CustomField_Config::DEF_FIELD] = $fieldDef;
+                                        $cfc->definition = new Tinebase_Config_Struct($definition);
+                                    }
+                                }
+                            }
+                        }
+                        $modelsSystemCFs = $modelsSystemCFs->getClone(true);
+                        $modelsSystemCFs->mergeById($parentSCFs);
+                    }
+                }
             } catch (Tinebase_Exception_NotFound|Zend_Db_Exception) {
-                // during install app may not be there yet
+                // during installation, the app may not be there yet
                 $modelsSystemCFs = [];
             }
-            /** @var Tinebase_Model_CustomField_Config $cfc */
             foreach ($modelsSystemCFs as $cfc) {
                 $definition = $cfc->definition->toArray();
                 if (isset($definition[Tinebase_Model_CustomField_Config::DEF_FIELD])) {
@@ -1415,7 +1459,7 @@ class Tinebase_ModelConfiguration extends Tinebase_ModelConfiguration_Const
             // the property name
             $fieldDef['key'] = $fieldKey;
 
-            switch($fieldDef[self::TYPE]) {
+            switch ($fieldDef[self::TYPE]) {
                 case self::TYPE_KEY_FIELD:
                     $fieldDef['length'] = 40;
                     $keyFieldAppName = $fieldDef['config']['application'] ?? $this->_applicationName;
@@ -1576,29 +1620,10 @@ class Tinebase_ModelConfiguration extends Tinebase_ModelConfiguration_Const
                 $this->_copyOmitFields[] = $fieldKey;
             }
 
-            // set default value
-            if (isset($fieldDef['defaultValConfig'])) {
-                $config = Tinebase_Config::getAppConfig($fieldDef['defaultValConfig']['appName']);
-                $fieldDef['default'] = $config->get($fieldDef['defaultValConfig']['config']);
-            }
             // TODO: implement complex default values (maybe use defaultConfig for this?)
             if (isset($fieldDef['default'])) {
-//                 // allows dynamic default values
-//                 if (is_array($fieldDef['default'])) {
-//                     switch ($fieldDef[self::TYPE]) {
-//                         case 'time':
-//                         case 'date':
-//                         case 'datetime':
-//                         default:
-//                             throw new Tinebase_Exception_NotImplemented($_message);
-//                     }
-//                 } else {
                     $this->_defaultData[$fieldKey] = $fieldDef['default'];
             }
-
-            // TODO: Split this up in multiple functions
-            // TODO: Refactor: key 'tag' should be 'tags' in filter definition / quick hack
-            // also see ticket 8944 (https://forge.tine20.org/mantisbt/view.php?id=8944)
             
             $this->_setFieldFilterModel($fieldDef, $fieldKey);
 
@@ -1659,6 +1684,7 @@ class Tinebase_ModelConfiguration extends Tinebase_ModelConfiguration_Const
                     }
                 }
                 $this->_filters[$fieldKey][] = new Tinebase_Record_Filter_CallableEmpty($defaultValue);
+                $this->_defaultData[$fieldKey] = $defaultValue;
             }
 
             $this->_addToModlogOmit($fieldDef, $fieldKey);
@@ -1730,7 +1756,8 @@ class Tinebase_ModelConfiguration extends Tinebase_ModelConfiguration_Const
      */
     protected function _addToPasswordFields(array $fieldDef, string $fieldKey): void
     {
-        if (isset($fieldDef[self::SPECIAL_TYPE]) && $fieldDef[self::SPECIAL_TYPE] === self::SPECIAL_TYPE_PASSWORD) {
+        if (($fieldDef[self::TYPE] ?? null) === self::TYPE_PASSWORD ||
+                ($fieldDef[self::SPECIAL_TYPE] ?? null) === self::SPECIAL_TYPE_PASSWORD) {
             $this->_pwFields[] = $fieldKey;
         }
     }

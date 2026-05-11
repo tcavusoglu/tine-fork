@@ -58,6 +58,8 @@ class Tinebase_Frontend_Json extends Tinebase_Frontend_Json_Abstract
         Tinebase_Model_CloudAccount_CalDAV::MODEL_NAME_PART,
         Tinebase_Model_EvaluationDimension::MODEL_NAME_PART,
         Tinebase_Model_EvaluationDimensionItem::MODEL_NAME_PART,
+        Tinebase_Model_Instance::MODEL_NAME_PART,
+        Tinebase_Model_InstanceMailDomain::MODEL_NAME_PART,
         Tinebase_Model_Tree_FlySystem::MODEL_NAME_PART,
         Tinebase_Model_Tree_FlySystem_AdapterConfig_Local::MODEL_NAME_PART,
         Tinebase_Model_Tree_FlySystem_AdapterConfig_WebDAV::MODEL_NAME_PART,
@@ -88,13 +90,43 @@ class Tinebase_Frontend_Json extends Tinebase_Frontend_Json_Abstract
     /**
      * get list of translated country names
      * 
-     * Wrapper for {@see Tinebase_Core::getCountrylist}
-     * 
      * @return array list of countrys
      */
     public function getCountryList($locale = null)
     {
-        return Tinebase_Translation::getCountryList($locale ? new Zend_Locale($locale) : null);
+        try {
+            $result = Tinebase_Translation::getCountryList($locale ? new Zend_Locale($locale) : null);
+        } catch (Symfony\Component\Intl\Exception\MissingResourceException $mre) {
+            if (Tinebase_Core::isLogLevel(Zend_Log::WARN)) {
+                Tinebase_Core::getLogger()->debug(
+                    __METHOD__ . '::' . __LINE__
+                    . ' Error: "' . $mre->getMessage()
+                    . '" -> Switching to default locale');
+            }
+            $result = Tinebase_Translation::getCountryList();
+        }
+        return $result;
+    }
+
+    /**
+     * get list of translated timezone names
+     *
+     * @return array list of timezones
+     */
+    public function getTimezoneList($locale = null)
+    {
+        try {
+            $result = Tinebase_Translation::getTimezoneList($locale ? new Zend_Locale($locale) : null);
+        } catch (Symfony\Component\Intl\Exception\MissingResourceException $mre) {
+            if (Tinebase_Core::isLogLevel(Zend_Log::WARN)) {
+                Tinebase_Core::getLogger()->debug(
+                    __METHOD__ . '::' . __LINE__
+                    . ' Error: "' . $mre->getMessage()
+                    . '" -> Switching to default locale');
+            }
+            $result = Tinebase_Translation::getTimezoneList();
+        }
+        return $result;
     }
 
     /**
@@ -412,7 +444,7 @@ class Tinebase_Frontend_Json extends Tinebase_Frontend_Json_Abstract
         } else {
             $apps = Tinebase_Application::getInstance()->getApplicationsByState(Tinebase_Application::ENABLED);
         }
-        $apps = $apps->filter(fn($app) => Tinebase_Core::getUser()->hasRight($app, Tinebase_Acl_Rights_Abstract::TWIG));
+        $apps = $apps->filter(fn($app) => Tinebase_Core::getUser()->hasRight($app, Tinebase_Acl_Rights_Abstract::MANAGE_TEMPLATES));
 
         $pathFilterValue = $pathFilter?->getValue();
         $pathFilter = match($pathFilter?->getOperator()) {
@@ -976,7 +1008,6 @@ class Tinebase_Frontend_Json extends Tinebase_Frontend_Json_Abstract
 
         $manageSmtpEmailUser = Tinebase_EmailUser::manages(Tinebase_Config::SMTP);
         $manageImapEmailUser = Tinebase_EmailUser::manages(Tinebase_Config::IMAP);
-        $allowExternalEmail = ! $manageImapEmailUser || Tinebase_Config::getInstance()->get(Tinebase_Config::IMAP)->allowExternalEmail;
 
         $smtpConfig = $manageSmtpEmailUser
             ? Tinebase_EmailUser::getConfig(Tinebase_Config::SMTP, true)
@@ -999,7 +1030,6 @@ class Tinebase_Frontend_Json extends Tinebase_Frontend_Json_Abstract
             'manageImapEmailUser' => $manageImapEmailUser,
             'manageSmtpEmailUser' => $manageSmtpEmailUser,
             'mustchangepw' => $user->mustChangePassword(),
-            'confirmLogout' => Tinebase_Core::getPreference()->getValue(Tinebase_Preference::CONFIRM_LOGOUT, 1),
             'advancedSearch' => Tinebase_Core::getPreference()->getValue(Tinebase_Preference::ADVANCED_SEARCH, 0),
             'persistentFilters' => $persistentFilters,
             'userAccountChanged' => Tinebase_Controller::getInstance()->userAccountChanged(),
@@ -1009,10 +1039,10 @@ class Tinebase_Frontend_Json extends Tinebase_Frontend_Json_Abstract
             'primarydomain' => $smtpConfig['primarydomain'] ?? '',
             'secondarydomains' => $smtpConfig['secondarydomains'] ?? '',
             'additionalexternaldomains' => $smtpConfig['additionalexternaldomains'] ?? '',
-            // imap.allowExternalEmail is deprecated, please use smtp.allowAnyExternalDomains instead
-            'allowAnyExternalDomains'   => $smtpConfig['allowAnyExternalDomains'] ?? $allowExternalEmail,
+            'allowAnyExternalDomains'   => $smtpConfig['allowAnyExternalDomains'] ?? false,
             'smtpAliasesDispatchFlag' => Tinebase_EmailUser::smtpAliasesDispatchFlag(),
             'hasSmsAdapters'   => count($smsAdapterConfig) > 0,
+            'writePwToSql'  =>  Tinebase_User::getBackendConfiguration('writePwToSql'),
         );
 
         if (Tinebase_Core::get(Tinebase_Core::SESSION)->encourage_mfa) {
@@ -1069,8 +1099,10 @@ class Tinebase_Frontend_Json extends Tinebase_Frontend_Json_Abstract
             $registryData['Tinebase'] = $this->getRegistryData();
         }
 
-        if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__
-            . ' Total registry size: ' . strlen(json_encode($registryData)));
+        if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) {
+            Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__
+                . ' Total registry size: ' . strlen(json_encode($registryData)));
+        }
 
         return $registryData;
     }
@@ -1556,7 +1588,23 @@ class Tinebase_Frontend_Json extends Tinebase_Frontend_Json_Abstract
     {
         /** @var Tinebase_Model_CloudAccount $record */
         $record = $this->_jsonToRecord($data, Tinebase_Model_CloudAccount::class);
+        $record->isValid(true);
         return $record->testAccess();
+    }
+
+    public function getCloudAccountWebDAVCollections(string $cloudAccountId): array
+    {
+        $cloudAccount = Tinebase_Controller_CloudAccount::getInstance()->get($cloudAccountId);
+        if (!$cloudAccount->{Tinebase_Model_CloudAccount::FLD_CONFIG} instanceof Tinebase_Model_CloudAccount_CalDAV) {
+            throw new Tinebase_Exception_SystemGeneric(Tinebase_Translation::getTranslation()->_('CloudAccount is not a CalDAV account'));
+        }
+
+        /** @var Calendar_Backend_CalDav_Client $calDavClient */
+        $calDavClient = $cloudAccount->{Tinebase_Model_CloudAccount::FLD_CONFIG}->getClient();
+        if ($result = $calDavClient->findAllCollections()) {
+            return $this->_multipleRecordsToJson($result);
+        }
+        return [];
     }
     
     /************************ protected functions ***************************/
@@ -1664,10 +1712,11 @@ class Tinebase_Frontend_Json extends Tinebase_Frontend_Json_Abstract
         if (!Tinebase_Session::isStarted()) {
             Tinebase_Core::startCoreSession();
         }
-        return Tinebase_Auth_Webauthn::getWebAuthnRequestOptions(
-            Tinebase_Auth_MFA::getInstance($mfaId)->getAdapter()->getConfig(),
-            true
-        )->jsonSerialize();
+        return json_decode(Tinebase_Auth_Webauthn::serializePublicKeyCredentialRequestOptions(
+            Tinebase_Auth_Webauthn::getWebAuthnRequestOptions(
+                Tinebase_Auth_MFA::getInstance($mfaId)->getAdapter()->getConfig(),
+                true
+        )), true);
     }
 
 
@@ -1694,10 +1743,12 @@ class Tinebase_Frontend_Json extends Tinebase_Frontend_Json_Abstract
         /** @var Tinebase_Model_MFA_WebAuthnConfig $config */
         $config = Tinebase_Auth_MFA::getInstance($configId)->getAdapter()->getConfig();
 
-        return Tinebase_Auth_Webauthn::getWebAuthnRequestOptions($config, true, $account, $mfaId)->jsonSerialize();
+        return json_decode(Tinebase_Auth_Webauthn::serializePublicKeyCredentialRequestOptions(
+            Tinebase_Auth_Webauthn::getWebAuthnRequestOptions($config, true, $account, $mfaId)
+        ), true);
     }
 
-    public function getWebAuthnRegisterPublicKeyOptionsForMFA(string $mfaId, ?string $accountId = null)
+    public function getWebAuthnRegisterPublicKeyOptionsForMFA(string $mfaId, ?string $accountId = null): array
     {
         if (null !== $accountId && Tinebase_Core::getUser()->accountId !== $accountId) {
             if (!Tinebase_Core::getUser()->hasRight(Tinebase_Config::APP_NAME, Tinebase_Acl_Rights::ADMIN)) {
@@ -1711,7 +1762,9 @@ class Tinebase_Frontend_Json extends Tinebase_Frontend_Json_Abstract
         /** @var Tinebase_Model_MFA_WebAuthnConfig $config */
         $config = Tinebase_Auth_MFA::getInstance($mfaId)->getAdapter()->getConfig();
 
-        return Tinebase_Auth_Webauthn::getWebAuthnCreationOptions(true, $user, $config)->jsonSerialize();
+        return json_decode(Tinebase_Auth_Webauthn::serializePublicKeyCredentialCreationOptions(
+            Tinebase_Auth_Webauthn::getWebAuthnCreationOptions(true, $user, $config)
+        ), true);
     }
 
     /**
@@ -1990,5 +2043,30 @@ class Tinebase_Frontend_Json extends Tinebase_Frontend_Json_Abstract
         $result = Tinebase_FileSystem_Previews::getInstance()->createPreviewsFromNode($_node);
 
         return $_node->preview_count ?? 0;
+    }
+
+    /**
+     * get Message twig template by template path
+     * @param string $templatePath
+     * @param string $app
+     * @return array
+     */
+    public function getEmailTwigTemplate(string $templatePath, string $app = 'Tinebase', $context = [])
+    {
+        $result = [
+            'subject' => '',
+            'content' => ''
+        ];
+
+        try {
+            $twig = new Tinebase_Twig(Tinebase_Core::getLocale(), Tinebase_Translation::getTranslation($app));
+            $htmlTemplate = $twig->load($app . '/views/emails/'. $templatePath .'.html.twig');
+            $result['content'] = $htmlTemplate->render($context);
+            $result['subject'] = $htmlTemplate->renderBlock('subject', $context);
+        } catch (Exception $e) {
+            Tinebase_Core::getLogger()->err(__METHOD__ . '::' . __LINE__ . ' Failed to get E-Mail twig template : ' .  $e->getMessage());
+        }
+
+        return $result;
     }
 }

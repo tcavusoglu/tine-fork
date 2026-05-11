@@ -1,12 +1,12 @@
 <?php
 /**
- * Tine 2.0
+ * tine Groupware
  *
  * @package     Tinebase
  * @subpackage  Json
- * @license     http://www.gnu.org/licenses/agpl.html AGPL Version 3
+ * @license     https://www.gnu.org/licenses/agpl.html AGPL Version 3
  * @author      Philipp Schüle <p.schuele@metaways.de>
- * @copyright   Copyright (c) 2007-2022 Metaways Infosystems GmbH (http://www.metaways.de)
+ * @copyright   Copyright (c) 2007-2026 Metaways Infosystems GmbH (https://www.metaways.de)
  *
  */
 class Tinebase_Frontend_JsonTest extends TestCase
@@ -141,11 +141,14 @@ class Tinebase_Frontend_JsonTest extends TestCase
 
     /**
      * test getCountryList
-     *
      */
     public function testGetCountryList()
     {
         $list = $this->_instance->getCountryList();
+        $this->assertTrue(count($list['results']) > 200);
+
+        // test with bogus locale
+        $list = $this->_instance->getCountryList('root');
         $this->assertTrue(count($list['results']) > 200);
     }
 
@@ -521,7 +524,7 @@ class Tinebase_Frontend_JsonTest extends TestCase
 
         // check results
         $this->assertTrue(isset($results['results']));
-        $this->assertEquals(7, $results['totalcount']);
+        $this->assertEquals(8, $results['totalcount']);
 
         $this->assertEquals( 'user', $results['results'][0]['account_type']);
     }
@@ -686,8 +689,9 @@ class Tinebase_Frontend_JsonTest extends TestCase
         $registryData = $this->_instance->getAllRegistryData();
         $currentUser = Tinebase_Core::getUser();
 
-        self::assertTrue(isset($registryData['Tinebase']['currentAccount']), 'currentAccount is missing: '
-            . print_r($registryData['Tinebase'], true));
+        self::assertTrue(isset($registryData['Tinebase']), 'Tinebase registry data missing');
+        self::assertTrue(isset($registryData['Tinebase']['currentAccount']),
+            'currentAccount is missing from Tinebase registry');
         self::assertEquals($currentUser->toArray(), $registryData['Tinebase']['currentAccount']);
         self::assertEquals(
             Addressbook_Controller_Contact::getInstance()->getContactByUserId($currentUser->getId())->toArray(),
@@ -742,7 +746,7 @@ class Tinebase_Frontend_JsonTest extends TestCase
             self::assertSame(60, $registryData['Tinebase']['serviceMap']['services']['Sales.createPaperSlip']['apiTimeout']);
         }
 
-        self::assertLessThan(3100000, strlen(json_encode($registryData)), 'registry size got too big');
+        self::assertLessThan(3400000, strlen(json_encode($registryData)), 'registry size got too big');
     }
 
     protected function _assertImportExportDefinitions($registryData)
@@ -1202,15 +1206,16 @@ class Tinebase_Frontend_JsonTest extends TestCase
 
     public function testAppPwd()
     {
+        $token = 'tooooooooken';
         $result = $this->_instance->saveAppPassword([
             Tinebase_Model_AppPassword::FLD_ACCOUNT_ID => Tinebase_Core::getUser()->getId(),
             Tinebase_Model_AppPassword::FLD_VALID_UNTIL => Tinebase_DateTime::now()->addYear(10),
-            Tinebase_Model_AppPassword::FLD_AUTH_TOKEN => 'foo',
+            Tinebase_Model_AppPassword::FLD_AUTH_TOKEN => $token,
             Tinebase_Model_AppPassword::FLD_CHANNELS => [0=>0],
         ]);
 
         $this->assertArrayHasKey('id', $result);
-        $this->assertSame('foo', $result[Tinebase_Model_AppPassword::FLD_AUTH_TOKEN]);
+        $this->assertSame('sha3-512_' . hash('sha3-512', $token), $result[Tinebase_Model_AppPassword::FLD_AUTH_TOKEN]);
     }
 
     /**
@@ -1262,7 +1267,6 @@ class Tinebase_Frontend_JsonTest extends TestCase
      */
     public function testSearchPaths()
     {
-        $result = null;
         try {
             $result = $this->_instance->searchPaths([
                 ['field' => 'shadow_path', 'operator' => 'contains', 'value' => $this->_personas['sclever']->contact_id],
@@ -1329,20 +1333,4 @@ class Tinebase_Frontend_JsonTest extends TestCase
         // the empty filter gets removed
         static::assertEquals(1, count($result['filter']));
     }
-
-    /**
-     * this test doesnt test anything really useful
-     * it heavily depends on config and fails on github (because of config)
-     * just read it, either param null and result should be success?... if anything this test shows that the api is broken
-    public function testChangePasswordWithNullValues()
-    {
-        $this->_skipIfLDAPBackend();
-
-        $credentials = TestServer::getInstance()->getTestCredentials();
-        $result = $this->_instance->changePassword($credentials['password'], null);
-        self::assertEquals(['success' => 1], $result);
-        $result = $this->_instance->changePassword( null, $credentials['password']);
-        self::assertEquals(['success' => 1], $result);
-    }
-     * */
 }

@@ -154,6 +154,8 @@ class Crm_Controller_Lead extends Tinebase_Controller_Record_Abstract
     /**
      * creates notification text and sends out notifications
      *
+     * @docs https://docs.tine-groupware.de/be/users/CrmNotifications
+     *
      * @todo:
      *  - add changes to mail body
      *  - find updater in addressbook to notify him
@@ -306,11 +308,15 @@ class Crm_Controller_Lead extends Tinebase_Controller_Record_Abstract
                 Tinebase_Core::getLogger()->info(__METHOD__ . '::' . __LINE__ . ' Sending of Lead notifications all people having read access to container disabled by config.');
                 return $recipients;
             }
-            if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__CLASS__ . '::' . __METHOD__ . '::' . __LINE__ . ' no responsibles found for lead: ' . 
-                $_lead->getId() . ' sending notification to all people having read access to container ' . $_lead->container_id);
+            if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) {
+                Tinebase_Core::getLogger()->debug(__CLASS__ . '::' . __METHOD__ . '::' . __LINE__
+                    . ' No responsible person found for lead: '
+                    . $_lead->getId() . ' sending notification to all people having read access to container '
+                    . $_lead->container_id);
+            }
                 
             $containerGrants = Tinebase_Container::getInstance()->getGrantsOfContainer($_lead->container_id, TRUE);
-            // NOTE: we just send notifications to users, not to groups or anyones!
+            // NOTE: we just send notifications to users, not to groups or anyone's!
             foreach ($containerGrants as $grant) {
                 if ($grant['account_type'] == Tinebase_Acl_Rights::ACCOUNT_TYPE_USER && $grant[Tinebase_Model_Grants::GRANT_READ] == 1) {
                     try {
@@ -430,7 +436,7 @@ class Crm_Controller_Lead extends Tinebase_Controller_Record_Abstract
                 // check if relation is product and has price
                 if ($relation['type'] == 'PRODUCT' && isset($relation['remark']['price'])) {
                     $quantity = (isset($relation['remark']['quantity'])) ? $relation['remark']['quantity'] : 1;
-                    $sum += $relation['remark']['price'] * (integer) $quantity;
+                    $sum += $relation['remark']['price'] * (int) $quantity;
                 }
             }
             

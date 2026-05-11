@@ -21,6 +21,13 @@ theme:
         name: Switch to light mode
   features:
     - content.code.copy
+    - navigation.indexes
+
+extra_css:
+  - assets/extra.css
+
+extra_javascript:
+  - assets/theme-param.js
 
 #nav:
 #  - 'User Guide': 'user-guide.md'
@@ -45,13 +52,24 @@ markdown_extensions:
         - name: math
           class: arithmatex
           format: "!!python/object/apply:pymdownx.arithmatex.arithmatex_inline_format {kwds: {mode: generic}}"
-  - pymdownx.inlinehilite
   - pymdownx.snippets
   - pymdownx.superfences
   - admonition
   - pymdownx.details
+  - attr_list
+  - md_in_html
+  - abbr
+  - footnotes
+
+hooks:
+  - docs/hooks/build_context_map.py
+  - docs/hooks/generate_manual_index.py
 
 extra:
+  branding:
+    title: tine ®
+    weburl: https://www.tine-groupware.de
+    repo_url: https://github.com/tine-groupware/tine
   social:
     - icon: fontawesome/brands/github
       link: https://github.com/tine-groupware/tine
@@ -59,10 +77,18 @@ extra:
     - icon: fontawesome/solid/globe
       link: https://transifex.com/tine
       name: translations on transifex
+  version:
+    provider: mike
+    alias: true
+  img_url_desktop: https://tine-screenshots.s3.rz1.metaways.net/main/desktop/
+  img_url_tablet: https://tine-screenshots.s3.rz1.metaways.net/main/tablet/
+  img_url_mobile: https://tine-screenshots.s3.rz1.metaways.net/main/mobile/
+  icon_url: https://raw.githubusercontent.com/tine-groupware/icon-set/master/
 
 plugins:
   - search
   - awesome-pages
+  - macros
   - i18n:
       docs_structure: suffix
       fallback_to_default: true
@@ -77,3 +103,9 @@ plugins:
           name: Deutsch
       reconfigure_material: true
       reconfigure_search: true
+#  - enumerate-headings:
+#      toc_depth: 6
+#      strict: true
+#      increment_across_pages: true
+#      include:
+#        - users/manual/*

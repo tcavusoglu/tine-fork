@@ -13,6 +13,7 @@
  */
 
 use Addressbook_Model_ContactProperties_Definition as AMCPD;
+use Tinebase_ModelConfiguration_Const as TMCC;
 
 /**
  * @property    string $account_id                 id of associated user
@@ -781,6 +782,7 @@ class Addressbook_Model_Contact extends Tinebase_Record_NewAbstract
             ],
             'pubkey'                        => [
                 self::TYPE                      => self::TYPE_TEXT,
+                self::LABEL                     => 'Public Key', // _('Public Key')
                 self::LENGTH                    => 2147483647, // mysql longtext, really?!?
                 self::NULLABLE                  => true,
                 self::VALIDATORS                => [Zend_Filter_Input::ALLOW_EMPTY => true],
@@ -815,6 +817,9 @@ class Addressbook_Model_Contact extends Tinebase_Record_NewAbstract
                 self::LABEL                     => 'Salutation', // _('Salutation')
                 self::VALIDATORS                => [Zend_Filter_Input::ALLOW_EMPTY => true],
                 self::NAME                      => Addressbook_Config::CONTACT_SALUTATION,
+                self::CONFIG                    => [
+                    self::APPLICATION               => Addressbook_Config::APP_NAME,
+                ],
                 self::UI_CONFIG                 => [
                     'group'                         => 'Name',
                 ],
@@ -940,6 +945,9 @@ class Addressbook_Model_Contact extends Tinebase_Record_NewAbstract
                 self::LENGTH                    => 128,
                 self::LABEL                     => 'Type', // _('Type')
                 self::SYSTEM                    => true,
+                self::CONFIG                    => [
+                    self::APPLICATION               => Addressbook_Config::APP_NAME,
+                ],
                 self::VALIDATORS                => [
                     Zend_Filter_Input::ALLOW_EMPTY      => true,
                     Zend_Filter_Input::DEFAULT_VALUE    => self::CONTACTTYPE_CONTACT,
@@ -951,12 +959,13 @@ class Addressbook_Model_Contact extends Tinebase_Record_NewAbstract
             ],
             'tz'                            => [
                 self::TYPE                      => self::TYPE_STRING,
-                self::LENGTH                    => 8,
+                self::LENGTH                    => 40,
                 self::NULLABLE                  => true,
                 self::LABEL                     => 'Timezone', // _('Timezone')
+                self::SPECIAL_TYPE              => self::SPECIAL_TYPE_TIMEZONE,
                 self::VALIDATORS                => [
                     Zend_Filter_Input::ALLOW_EMPTY => true,
-                    ['StringLength', ['max' => 8]],
+                    ['StringLength', ['max' => 40]],
                 ],
                 self::UI_CONFIG                 => [
                     'omitDuplicateResolving'        => true,
@@ -1092,8 +1101,12 @@ class Addressbook_Model_Contact extends Tinebase_Record_NewAbstract
                 self::NULLABLE              => true,
                 self::CONFIG                => [
                     self::APP_NAME              => Addressbook_Config::APP_NAME,
+                    self::DEPENDENT_RECORDS     => true,
                     self::MODEL_NAME            => Addressbook_Model_ExternalFreeBusyUrl::MODEL_NAME_PART,
                     self::STORAGE               => self::TYPE_JSON,
+                ],
+                self::UI_CONFIG             => [
+                    'xtype'                     => 'wdgt.pickergrid-layercombo',
                 ],
             ],
         ],

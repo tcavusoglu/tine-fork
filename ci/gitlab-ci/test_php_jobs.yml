@@ -29,11 +29,11 @@ php-unit-all-tests-source-sequential:
     NODE_TOTAL: 1
     NODE_INDEX: 1
     ARG_EXCLUDE_GROUP: longrunning,needsbuild,nogitlabci,ServerTests,nodockerci,nosequential
-  after_script:
-    - |
-      if [ "${CI_COMMIT_REF_NAME}" == "${MAJOR_COMMIT_REF_NAME}" ]; then
-        s3cmd --access_key=${SCREENSHOTS_S3_ACCESS_KEY} --secret_key=${SCREENSHOTS_S3_SECRET_KEY} --host ${SCREENSHOTS_S3_HOST} --host-bucket "%(bucket)s.${SCREENSHOTS_S3_HOST}" --acl-public --delete-removed --no-mime-magic sync ${CI_PROJECT_DIR}/coverage/ s3://tine-phpunit-coverage/${CI_COMMIT_REF_NAME}/
-      fi
+  # after_script:
+  #   - |
+  #     if [ "${CI_COMMIT_REF_NAME}" == "${MAJOR_COMMIT_REF_NAME}" ]; then
+  #       s3cmd --access_key=${SCREENSHOTS_S3_ACCESS_KEY} --secret_key=${SCREENSHOTS_S3_SECRET_KEY} --host ${SCREENSHOTS_S3_HOST} --host-bucket "%(bucket)s.${SCREENSHOTS_S3_HOST}" --acl-public --delete-removed --no-mime-magic sync ${CI_PROJECT_DIR}/coverage/ s3://tine-phpunit-coverage/${CI_COMMIT_REF_NAME}/
+  #     fi
   needs: []
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_LABELS =~ /php-unit-all-tests-source-sequential/
@@ -65,7 +65,7 @@ php-unit-all-tests-source-matrix:
 #          - "mariadb:10.6" # tine cloud version
           - "mariadb:10.2"
         PHP_VERSION:
-          - "8.1"
+          - "8.2"
           - "8.3"
   rules:
     - if: $PIPELINE_TYPE =~ /matrix-tests/
@@ -430,6 +430,7 @@ php-unit-nogitlabci-tests-built-parallel:
     - |
       log "updating to ${TINE_VERSION_BE}"
       git checkout ${TINE_VERSION_BE}
+      git describe
       test_composer_install
       test_update_tine
       su tine20 -c "php setup.php --config=/etc/tine20 --install EventManager"
@@ -438,6 +439,7 @@ php-unit-nogitlabci-tests-built-parallel:
       if [ "${TINE_VERSION_BETA}" != "" ] && [ "${TINE_VERSION_BETA}" != "main" ] ;then
         log "updating to ${TINE_VERSION_BETA}"
         git checkout ${TINE_VERSION_BETA}
+        git describe
         test_composer_install
         test_update_tine
 
@@ -447,6 +449,7 @@ php-unit-nogitlabci-tests-built-parallel:
     - |
       log "updating to ${TINE_VERSION_NEXT}"
       git checkout ${TINE_VERSION_NEXT}
+      git describe
       test_composer_install
       test_update_tine
     - |
@@ -456,7 +459,7 @@ php-unit-nogitlabci-tests-built-parallel:
 
 php-unit-update-tests:
   variables:
-    PHP_VERSION: "8.1"
+    PHP_VERSION: "8.3"
     DATABASE_IMAGE: "${UTIL_REGISTRY}/mariadb:10.9.8"
   extends: .php-unit-update-tests
   rules:

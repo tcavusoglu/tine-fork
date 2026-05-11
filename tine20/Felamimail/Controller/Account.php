@@ -1,12 +1,12 @@
 <?php
 /**
- * Tine 2.0
+ * tine Groupware
  *
  * @package     Felamimail
  * @subpackage  Controller
- * @license     http://www.gnu.org/licenses/agpl.html AGPL Version 3
+ * @license     https://www.gnu.org/licenses/agpl.html AGPL Version 3
  * @author      Philipp Schüle <p.schuele@metaways.de>
- * @copyright   Copyright (c) 2009-2023 Metaways Infosystems GmbH (http://www.metaways.de)
+ * @copyright   Copyright (c) 2009-2026 Metaways Infosystems GmbH (https://www.metaways.de)
  */
 
 /**
@@ -309,7 +309,8 @@ class Felamimail_Controller_Account extends Tinebase_Controller_Record_Grants
     protected function _createSharedEmailUserAndCredentials(Felamimail_Model_Account $_record)
     {
         if (empty($_record->email)) {
-            throw new Tinebase_Exception_Record_Validation('Shared account needs email address');
+            $translation = Tinebase_Translation::getTranslation($this->_applicationName);
+            throw new Tinebase_Exception_SystemGeneric($translation->_('Shared account needs email address'));
         }
 
         $translation = Tinebase_Translation::getTranslation($this->_applicationName);
@@ -1361,8 +1362,6 @@ class Felamimail_Controller_Account extends Tinebase_Controller_Record_Grants
                     throw new Tinebase_Exception_AccessDenied("You don't have the right to manage personal accounts!");
                 }
                 break;
-            default;
-               break;
         }
 
         parent::_checkRight($_action);
@@ -1798,7 +1797,7 @@ class Felamimail_Controller_Account extends Tinebase_Controller_Record_Grants
         $account = $this->get($_account->getId());
         if ($account->sieve_vacation_active != $_vacationEnabled) {
             if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(
-                __METHOD__ . '::' . __LINE__ . ' Updating sieve_vacation_active = ' . (integer) $_vacationEnabled
+                __METHOD__ . '::' . __LINE__ . ' Updating sieve_vacation_active = ' . (int) $_vacationEnabled
                 . ' for account: ' . $account->name);
 
             $account->sieve_vacation_active = (bool) $_vacationEnabled;
@@ -1840,7 +1839,7 @@ class Felamimail_Controller_Account extends Tinebase_Controller_Record_Grants
         if (empty($_account->accountEmailAddress)
             || !Tinebase_EmailUser::manages(Tinebase_Config::IMAP)
             || !Tinebase_Config::getInstance()->{Tinebase_Config::IMAP}->{Tinebase_Config::IMAP_USE_SYSTEM_ACCOUNT}
-            || !Tinebase_EmailUser::checkAllowedDomain($_account->accountEmailAddress)
+            || !Tinebase_EmailUser::checkAllowedDomain($_account->accountEmailAddress, _internalDomainOnly: true)
         ) {
             return null;
         }

@@ -9,6 +9,8 @@
  * @copyright   Copyright (c) 2011 Metaways Infosystems GmbH (http://www.metaways.de)
  */
 
+use PHPMailer\DKIMValidator\Validator;
+
 /**
  * message flags controller for Felamimail
  *
@@ -47,9 +49,8 @@ class Felamimail_Controller_Message_Flags extends Felamimail_Controller_Message
         $this->_modelName = 'Felamimail_Model_Message';
         $this->_backend = new Felamimail_Backend_Cache_Sql_Message();
 
-        if (Felamimail_Config::getInstance()->featureEnabled(Felamimail_Config::FEATURE_TINE20_FLAG)) {
-            self::$_allowedFlags['Tine20'] = 'Tine20';
-        }
+        self::$_allowedFlags['Tine20'] = 'Tine20';
+        self::$_allowedFlags['SPAM'] = 'SPAM';
     }
     
     /**
@@ -114,17 +115,26 @@ class Felamimail_Controller_Message_Flags extends Felamimail_Controller_Message
         $flags = (array) $_flags;
         $isClearMode = in_array($_mode, ['clear_cache_only', 'clear']);
         
-        if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . ' ' . $_mode. ' flags: ' . print_r($_flags, TRUE));
+        if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) {
+            Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . ' ' . $_mode. ' flags: '
+                . print_r($_flags, TRUE));
+        }
 
         $ids = null;
         if ($_messages instanceof Tinebase_Model_Filter_FilterGroup) {
-            if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . ' searching for msgs');
+            if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) {
+                Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . ' searching for msgs');
+            }
             $ids = $this->search($_messages, null, false, true);
-            if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . ' sorting found msgs');
+            if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) {
+                Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . ' sorting found msgs');
+            }
             $ids = $this->search(new Felamimail_Model_MessageFilter([
                 ['field' => 'id', 'operator' => 'in', 'value' => $ids],
             ]), new Tinebase_Model_Pagination(['sort' => 'folder_id']), false, true);
-            if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . ' done');
+            if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) {
+                Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . ' done');
+            }
             $_messages = new Felamimail_Model_MessageFilter([
                 ['field' => 'id', 'operator' => 'in', 'value' => array_slice($ids, 0, 100)],
             ]);
@@ -373,59 +383,83 @@ class Felamimail_Controller_Message_Flags extends Felamimail_Controller_Message
         
         return $folderCounts;
     }
-    
-    /**
-     * set seen flag of message
-     * 
-     * @param Felamimail_Model_Message $_message
-     */
-    public function setSeenFlag(Felamimail_Model_Message $_message)
-    {
-        if (! in_array(Zend_Mail_Storage::FLAG_SEEN, $_message->flags)) {
-            if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ .
-                ' Add \Seen flag to msg uid ' . $_message->messageuid);
-            
-            $this->addFlags($_message, Zend_Mail_Storage::FLAG_SEEN);
-            $_message->flags[] = Zend_Mail_Storage::FLAG_SEEN;
-        }        
-    }
 
     /**
-     * tine20FlagEnabled
+     * set custom flag by parsing message DKIM
      *
-     * @param array|Felamimail_Model_Message $message
-     * @return bool
+     * @param Felamimail_Model_Message|array $_message
      */
-    public function tine20FlagEnabled($message = null)
+    public function setSenderFlag(Felamimail_Model_Message|array &$_message, $headers)
     {
-        if (Felamimail_Config::getInstance()->featureEnabled(Felamimail_Config::FEATURE_TINE20_FLAG)) {
-            if ($message && isset($message['headers']['user-agent'])) {
-                $userAgentHeader = $message['headers']['user-agent'];
-                $title = Tinebase_Config::getInstance()->{Tinebase_Config::BRANDING_TITLE};
-                foreach((array) $userAgentHeader as $userAgent) {
-                    if (strpos($userAgent, $title) !== false && strpos($userAgent, "tine") !== false) {
-                        return true;
-                    }
+        $flag = null;
+
+        if (isset($headers['user-agent'])) {
+            $title = Tinebase_Config::getInstance()->{Tinebase_Config::BRANDING_TITLE};
+            foreach((array) $headers['user-agent'] as $userAgent) {
+                if (strpos($userAgent, $title) !== false && strpos($userAgent, "tine") !== false) {
+                    $flag = 'Tine20';
                 }
             }
         }
 
-        return false;
+        try {
+            $mailAsString = $this->getMessageRawContent($_message);
+            $dkimValidator = new Validator($mailAsString);
+
+            if ($dkimValidator->validateBoolean()) {
+                [, $domain] = explode('@', $_message->from_email, 2);
+                $trustedMailDomains = Tinebase_Controller_Instance::getInstance()->getTrustedMailDomains();
+                foreach ($trustedMailDomains as $server => $data) {
+                    if (preg_match("/^$server$/", $domain)) {
+                        $flag = $data['id'];
+                    }
+                }
+            }
+        } catch (Throwable $t) {
+            if (Tinebase_Core::isLogLevel(Zend_Log::ERR)) {
+                Tinebase_Core::getLogger()->err(__METHOD__ . '::' . __LINE__
+                    . ' exception: ' . $t->getMessage());
+            }
+        }
+
+        if (isset($headers['dkim-signature'])) {
+            $flag = $this->_getDkimFlag((array) $headers['dkim-signature']);
+        }
+
+        $flags = isset($_message['flags']) ? $_message['flags']: array();
+
+        if ($flag && is_array($flags) && ! in_array($flag, $flags)) {
+            if (isset($_message['id'])) {
+                $this->addFlags($_message['id'], $flag);
+            }
+            $flags[] = $flag;
+            $_message['flags'] = $flags;
+        }
     }
 
-    /**
-     * set tine20 flag of message
-     *
-     * @param Felamimail_Model_Message $_message
-     */
-    public function setTine20Flag(Felamimail_Model_Message $_message)
+    protected function _getDkimFlag(array $dkimHeaders): ?string
     {
-        $flags = isset($_message->flags) ? $_message->flags : array();
+        $result = null;
+        foreach ($dkimHeaders as $dkimHeader) {
+            if (is_array($dkimHeader)) {
+                if (Tinebase_Core::isLogLevel(Zend_Log::NOTICE)) {
+                    Tinebase_Core::getLogger()->notice(__METHOD__ . '::' . __LINE__
+                        . ' Could not parse DKIM header: ' . print_r($dkimHeader, true));
+                }
+                continue;
+            }
+            if (preg_match('/d=([^;]+)/', $dkimHeader, $matches)) {
+                $domain = trim($matches[1]);
+                $trustedMailDomains = Tinebase_Controller_Instance::getInstance()->getTrustedMailDomains();
 
-        if (is_array($flags) && ! in_array("Tine20", $flags)) {
-            $this->addFlags($_message->id, "Tine20");
-            array_push($flags, "Tine20");
-            $_message->flags = $flags;
+                foreach ($trustedMailDomains as $server => $data) {
+                    if (preg_match("/^$server$/", $domain)) {
+                        $result = $data['id'];
+                        break 2;
+                    }
+                }
+            }
         }
+        return $result;
     }
 }

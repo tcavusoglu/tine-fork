@@ -20,8 +20,10 @@ const PaymentMeansField = Ext.extend(Tine.Tinebase.widgets.form.VMultiPicker, {
         initList: function() {
             Tine.Tinebase.widgets.form.RecordPickerComboBox.prototype.initList.apply(this, arguments);
 
-            const recipient = this.editDialog.getForm().findField(this.recipientField).selectedRecord;
+            const recipient = this.editDialog.getForm().findField(this.recipientField)?.selectedRecord;
             const means = _.get(recipient, 'data.debitor_id.payment_means');
+
+            if (!means) return;
 
             this.onBeforeLoad(this.store, {});
             this.store.loadData(means);
@@ -49,7 +51,7 @@ const PaymentMeansField = Ext.extend(Tine.Tinebase.widgets.form.VMultiPicker, {
 
     afterRender () {
         this.supr().afterRender.call(this)
-        this.editDialog.getForm().findField(this.recipientField).on('select', (combo, record, index) => {
+        this.editDialog.getForm().findField(this.recipientField)?.on('select', (combo, record, index) => {
             let means = _.get(record, 'data.debitor_id.payment_means', [])
             if (this.editDialog.recordClass.getMeta('modelName').match(/Invoice/)) {
                 // NOTE: xRechnung limits payment means see "PAYMENT INSTRUCTIONS" BG-16 in EN 16931

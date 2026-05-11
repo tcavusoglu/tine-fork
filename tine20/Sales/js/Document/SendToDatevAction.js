@@ -147,14 +147,14 @@ Promise.all([Tine.Tinebase.appMgr.isInitialised('Sales'),
         });
     };
     
-    ['PurchaseInvoice', 'Document_Invoice', 'Invoice'].forEach((modelName) => {
-        const configName = modelName === 'PurchaseInvoice' ? 'datevRecipientEmailsPurchaseInvoice' : 'datevRecipientEmailsInvoice';
+    ['Document_PurchaseInvoice','PurchaseInvoice', 'Document_Invoice', 'Invoice'].forEach((modelName) => {
+        const configName = modelName.match(/PurchaseInvoice$/) ? 'datevRecipientEmailsPurchaseInvoice' : 'datevRecipientEmailsInvoice';
         const datevRecipients = Tine.Tinebase.configManager.get(configName, 'Sales');
         if (!datevRecipients || datevRecipients.length === 0) return;
         const action = getAction(modelName, {});
         const medBtnStyle = { scale: 'medium', rowspan: 2, iconAlign: 'top'};
         Ext.ux.ItemRegistry.registerItem(`Sales-${modelName}-GridPanel-ContextMenu`, action, 2);
-        Ext.ux.ItemRegistry.registerItem(`Sales-${modelName}-GridPanel-ActionToolbar-leftbtngrp`, Ext.apply(new Ext.Button(action), medBtnStyle), 30);
-        Ext.ux.ItemRegistry.registerItem(`Sales-${modelName}-editDialog-Toolbar`, Ext.apply(new Ext.Button(action), medBtnStyle), 10);
+        Ext.ux.ItemRegistry.registerItem(`Sales-${modelName}-GridPanel-ActionToolbar-leftbtngrp`, Ext.apply({ xtype: 'button', overrides: medBtnStyle }, action), 30)
+        Ext.ux.ItemRegistry.registerItem(`Sales-${modelName}-editDialog-Toolbar`, Ext.apply({ xtype: 'button', overrides: medBtnStyle }, action), 10)
     })
 })

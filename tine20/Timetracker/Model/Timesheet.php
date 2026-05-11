@@ -3,9 +3,9 @@
  * class to hold Timesheet data
  * 
  * @package     Timetracker
- * @license     http://www.gnu.org/licenses/agpl.html AGPL Version 3
+ * @license     https://www.gnu.org/licenses/agpl.html AGPL Version 3
  * @author      Philipp Schuele <p.schuele@metaways.de>
- * @copyright   Copyright (c) 2007-2022 Metaways Infosystems GmbH (http://www.metaways.de)
+ * @copyright   Copyright (c) 2007-2026 Metaways Infosystems GmbH (https://www.metaways.de)
  * 
  */
 
@@ -27,12 +27,21 @@
  */
 class Timetracker_Model_Timesheet extends Tinebase_Record_Abstract implements Sales_Model_Billable_Interface
 {
+    public const TABLE_NAME = 'timetracker_timesheet';
     public const MODEL_NAME_PART = 'Timesheet';
 
     public const FLD_CLEARED_AMOUNT = 'cleared_amount';
     public const FLD_RECORDED_AMOUNT = 'recorded_amount';
     public const FLD_END_DATE = 'end_date';
+    public const FLD_START_DATE = 'start_date';
     public const FLD_CORRELATION_ID = 'correlation_id';
+    public const FLD_DURATION = 'duration';
+    public const FLD_ACCOUNTING_TIME = 'accounting_time';
+    public const FLD_ACCOUNTING_TIME_FACTOR = 'accounting_time_factor';
+    public const FLD_WORKINGTIME_IS_CLEARED = 'workingtime_is_cleared';
+    public const FLD_WORKINGTIME_CLEARED_IN = 'workingtime_cleared_in';
+    public const FLD_SOURCE = 'source';
+    public const FLD_SOURCE_MODEL = 'source_model';
 
     /**
      * holds the configuration object (must be declared in the concrete class)
@@ -50,6 +59,7 @@ class Timetracker_Model_Timesheet extends Tinebase_Record_Abstract implements Sa
         'version'           => 12,
         'recordName'        => 'Timesheet',
         'recordsName'       => 'Timesheets', // ngettext('Timesheet', 'Timesheets', n)
+        self::EXPOSE_JSON_API => true,
         'hasRelations'      => true,
         'hasCustomFields'   => true,
         'hasNotes'          => true,
@@ -83,10 +93,10 @@ class Timetracker_Model_Timesheet extends Tinebase_Record_Abstract implements Sa
         ],
 
         'table'             => array(
-            'name'    => 'timetracker_timesheet',
+            'name'    => self::TABLE_NAME,
             'indexes' => array(
-                'start_date' => array(
-                    'columns' => array('start_date')
+                self::FLD_START_DATE => array(
+                    'columns' => array(self::FLD_START_DATE)
                 ),
                 'timeaccount_id' => array(
                     'columns' => array('timeaccount_id'),
@@ -112,7 +122,7 @@ class Timetracker_Model_Timesheet extends Tinebase_Record_Abstract implements Sa
         // frontend
         'multipleEdit'      => true,
         'splitButton'       => true,
-        'defaultFilter'     => 'start_date',
+        'defaultFilter'     => self::FLD_START_DATE,
 
         'fields'            => array(
             'account_id'            => array(
@@ -212,10 +222,9 @@ class Timetracker_Model_Timesheet extends Tinebase_Record_Abstract implements Sa
 //                // strip time information from datetime string
 //                'inputFilters'          => array('Zend_Filter_PregReplace' => array('/(\d{4}-\d{2}-\d{2}).*/', '$1'))
 //            ),
-            'start_date'            => array(
+            self::FLD_START_DATE    => array(
                 'label'                 => 'Date', // _('Date')
                 'validators'            => array(Zend_Filter_Input::ALLOW_EMPTY => false, 'presence'=>'required'),
-                //'type'                  => 'date',
                 'type'                  => 'datetime_separated_date',
             ),
             'start_time'            => array(
@@ -250,10 +259,11 @@ class Timetracker_Model_Timesheet extends Tinebase_Record_Abstract implements Sa
                 'type'                  => 'time',
                 'shy'                   => TRUE
             ),
-            'duration'              => array(
+            self::FLD_DURATION    => array(
                 'label'                 => 'Duration', // _('Duration')
                 'validators'            => array(Zend_Filter_Input::ALLOW_EMPTY => false, 'presence'=>'required'),
                 'type'                  => 'integer',
+                self::UNSIGNED          => true,
                 'specialType'           => 'minutes',
                 'default'               => '30',
             ),
@@ -293,11 +303,12 @@ class Timetracker_Model_Timesheet extends Tinebase_Record_Abstract implements Sa
                     ],
                 ],
             ),
-            'accounting_time'  => array(
+            self::FLD_ACCOUNTING_TIME   => array(
                 'label'                 => 'Invoiceable time', // _('Invoiceable time')
                 'inputFilters' => array('Zend_Filter_Empty' => 0),
                 'type'                  => 'integer',
                 'specialType'           => 'minutes',
+                self::UNSIGNED          => true,
                 'default'               => '30',
                 self::UI_CONFIG         => [
                     self::FIELDS_CONFIG     => [

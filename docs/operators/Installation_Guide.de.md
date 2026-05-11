@@ -5,7 +5,7 @@ Installation Guide
 
 ## Schnellstart
 
-Dies ist eine schnelle und leichte Möglichkeit, tine auszuprobieren. Hierfür benötigen Sie Docker und Docker Compose (https://docs.docker.com/compose/).
+Dies ist eine schnelle und leichte Möglichkeit, {{ branding.title }} auszuprobieren. Hierfür benötigen Sie Docker und Docker Compose (https://docs.docker.com/compose/).
 
 Erstellen Sie im ersten Schritt einen Ordner. Docker Compose verwendet die Ordnernamen zur Identifizierung.
 
@@ -35,7 +35,7 @@ docker compose up
 Warten Sie einen Moment, bis die Datenbank erreichbar ist. Im Webcontainer Log steht dann `web_1    | DB available`. Dann können Sie Tine installieren. Öffnen Sie dafür ein neues Terminal und führen Sie den Installer aus. Im Installer müssen Sie die Tine-Lizenz und Datenschutzerklärung bestätigen und können das Password für den initialen Admin festlegen.
 
 ```
-docker compose exec web tine20_install
+docker compose exec web su tine20 bash -c "php /usr/share/tine20/setup.php --config /etc/tine20/config.inc.php --install"
 ```
 
 tine ist jetzt unter http://127.0.0.1:4000 erreichbar.

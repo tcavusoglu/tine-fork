@@ -20,6 +20,8 @@ use Tinebase_ModelConfiguration_Const as TMCC;
  * @subpackage  Controller
  *
  * @property Addressbook_Backend_Sql $_backend protected member, you don't have access to that
+ *
+ * @extends Tinebase_Controller_Record_Abstract<Addressbook_Model_Contact>
  */
 class Addressbook_Controller_Contact extends Tinebase_Controller_Record_Abstract implements Tinebase_User_Plugin_SqlInterface
 {
@@ -351,10 +353,10 @@ class Addressbook_Controller_Contact extends Tinebase_Controller_Record_Abstract
         }
 
         foreach ($toAdd as $groupId) {
-            Addressbook_Controller_List::getInstance()->addListMember($groupId, $updatedRecord->getId());
+            Addressbook_Controller_List::getInstance()->addListMember($groupId, $updatedRecord);
         }
         foreach ($toDelete as $groupId) {
-            Addressbook_Controller_List::getInstance()->removeListMember($groupId, $updatedRecord->getId());
+            Addressbook_Controller_List::getInstance()->removeListMember($groupId, $updatedRecord);
         }
         $updatedRecord->groups = Addressbook_Controller_List::getInstance()->getMemberships($updatedRecord);
 
@@ -1564,7 +1566,6 @@ class Addressbook_Controller_Contact extends Tinebase_Controller_Record_Abstract
         foreach ($phoneDefs as $phoneDef) {
             $telFields[$phoneDef->{AMCPD::FLD_NAME}] = $phoneDef->{AMCPD::FLD_NAME};
         }
-        Addressbook_Model_Contact::setTelefoneFields($telFields);
 
         $filterModel = $mc->filterModel;
         $filterModel['telephone'][TMCC::OPTIONS][TMCC::FIELDS] = array_values($telFields);
@@ -1584,7 +1585,6 @@ class Addressbook_Controller_Contact extends Tinebase_Controller_Record_Abstract
                 $filterModel['name_email_query'][TMCC::OPTIONS][TMCC::FIELDS][] = $emailField;
             }
         }
-        Addressbook_Model_Contact::setEmailFields($emailFields);
         $mc->setFilterModel($filterModel);
 
         $additionalAdrFields = Addressbook_Model_Contact::getAdditionalAddressFields();
@@ -1593,10 +1593,15 @@ class Addressbook_Controller_Contact extends Tinebase_Controller_Record_Abstract
         foreach ($adrDefs as $adrDef) {
             $additionalAdrFields[$adrDef->{AMCPD::FLD_NAME}] = $adrDef->{AMCPD::FLD_NAME};
         }
-        Addressbook_Model_Contact::setAdditionalAddressFields($additionalAdrFields);
+
+        if (Addressbook_Config::APP_NAME === $mc->getAppName()) {
+            Addressbook_Model_Contact::setTelefoneFields($telFields);
+            Addressbook_Model_Contact::setEmailFields($emailFields);
+            Addressbook_Model_Contact::setAdditionalAddressFields($additionalAdrFields);
+        }
 
         $expanderDef = $mc->jsonExpander;
-        foreach (Addressbook_Model_Contact::getAdditionalAddressFields() as $val) {
+        foreach ($additionalAdrFields as $val) {
             $expanderDef[Tinebase_Record_Expander::EXPANDER_PROPERTIES][$val] = [];
         }
         $mc->setJsonExpander($expanderDef);
@@ -1605,7 +1610,7 @@ class Addressbook_Controller_Contact extends Tinebase_Controller_Record_Abstract
     protected function _checkDelegatedGrant(Tinebase_Record_Interface $_record,
                                             string $_action,
                                             bool $_throw,
-                                            string $_errorMessage,
+                                            ?string $_errorMessage,
                                             ?Tinebase_Record_Interface $_oldRecord): bool
     {
         $tead = null;

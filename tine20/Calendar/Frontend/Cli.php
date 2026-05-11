@@ -369,7 +369,7 @@ class Calendar_Frontend_Cli extends Tinebase_Frontend_Cli_Abstract
         echo $count . "\n";
 
         $fp = fopen($args['filename'], 'a');
-        fputcsv($fp, $headData);
+        fputcsv($fp, $headData, escape: '\\');
         fclose($fp);
 
         $i = 0;
@@ -462,7 +462,7 @@ class Calendar_Frontend_Cli extends Tinebase_Frontend_Cli_Abstract
                     $usage = Tinebase_Helper::formatBytes($usage, 'MB');
                     $data = [$user['accountLoginName'], $counContainers, $clUsage, $usage];
                     $fp = fopen($args['filename'], 'a');
-                    fputcsv($fp, $data);
+                    fputcsv($fp, $data, escape: '\\');
                     fclose($fp);
                     Tinebase_Core::getLogger()->info(__METHOD__ . '::' . __LINE__ . ' Save the result in ' .
                         $args['filename']);
@@ -862,7 +862,7 @@ class Calendar_Frontend_Cli extends Tinebase_Frontend_Cli_Abstract
         ];
 
         // headline
-        fputcsv($csvhandle, $data);
+        fputcsv($csvhandle, $data, escape: '\\');
 
         foreach ($result as $file) {
             // check size
@@ -899,7 +899,7 @@ class Calendar_Frontend_Cli extends Tinebase_Frontend_Cli_Abstract
                 $event->dtstart->setTimezone('Europe/Berlin');
                 $data = [
                     'filename' => $file['name'],
-                    'size' => Tinebase_Helper::formatBytes((integer) $fileRes[0]['size']),
+                    'size' => Tinebase_Helper::formatBytes((int) $fileRes[0]['size']),
                     'calendar' => $container->name,
                     'container_id' => $container->getId(),
                     'account' => $owner ? $owner->accountLoginName : 'unknown',
@@ -907,7 +907,7 @@ class Calendar_Frontend_Cli extends Tinebase_Frontend_Cli_Abstract
                     'event_dtstart' => $event->dtstart->toString(),
                 ];
 
-                fputcsv($csvhandle, $data);
+                fputcsv($csvhandle, $data, escape: '\\');
 
                 // print_r($data);
             }
@@ -1000,6 +1000,58 @@ class Calendar_Frontend_Cli extends Tinebase_Frontend_Cli_Abstract
             }
         }
         echo "Changed ressources: " . $count . "\n";
+
+        return 0;
+    }
+
+    public function syncCloudAccountContainers(): int
+    {
+        Calendar_Controller_Event::getInstance()->syncCloudAccountContainers();
+        return 0;
+    }
+
+    /**
+     * add scheduled imports for public (school) holidays
+     *
+     * php tine20.php --method=Calendar.addScheduledHolidayImport name=Bayern iso=DE-BY
+     *
+     * @param Zend_Console_Getopt $_opts
+     * @return int
+     * @throws Tinebase_Exception_AccessDenied
+     * @throws Tinebase_Exception_InvalidArgument
+     * @throws Tinebase_Exception_NotFound
+     * @throws Tinebase_Exception_Record_DefinitionFailure
+     * @throws Tinebase_Exception_Record_Validation
+     */
+    public function addScheduledHolidayImport(Zend_Console_Getopt $_opts)
+    {
+        $this->_checkAdminRight();
+
+        $data = $this->_parseArgs($_opts, ['name', 'iso']);
+
+        $translate = Tinebase_Translation::getTranslation(Calendar_Config::APP_NAME);
+        foreach (['SchoolHolidays', 'PublicHolidays'] as $type) {
+            Admin_Controller_SchedulerTask::getInstance()->create(
+                new Admin_Model_SchedulerTask([
+                    Admin_Model_SchedulerTask::FLD_NAME => $type . ' Import ' . $data['name'],
+                    Admin_Model_SchedulerTask::FLD_CRON => '23 4 28 * *',
+                    Admin_Model_SchedulerTask::FLD_CONFIG_CLASS => Admin_Model_SchedulerTask_Import::class,
+                    Admin_Model_SchedulerTask::FLD_CONFIG => [
+                        Admin_Model_SchedulerTask_Import::FLD_PLUGIN_CLASS => Calendar_Import_OpenHolidaysApi::class,
+                        Admin_Model_SchedulerTask_Import::FLD_OPTIONS => [
+                            Calendar_Import_OpenHolidaysApi::OPT_SOURCE => $type,
+                            Calendar_Import_OpenHolidaysApi::OPT_SUBDIVISION => $data['iso'],
+                            Calendar_Import_OpenHolidaysApi::OPT_CALENDAR_NAME =>
+                                $translate->_('Holidays') . ' ' . $data['name'],
+                        ],
+                    ],
+                    Admin_Model_SchedulerTask::FLD_APPLICATION_ID => Tinebase_Application::getInstance()
+                        ->getApplicationByName(Calendar_Config::APP_NAME)->getId()
+                ])
+            );
+        }
+
+        echo "Added scheduled imports for: " . $data['name'] . " (" . $data['iso'] . ")\n";
 
         return 0;
     }

@@ -74,10 +74,11 @@ Tine.Calendar.AttendeeCombo = Ext.extend(Ext.form.ComboBox, {
                 }
             } else {
                 if (!isCurrent) return null;
+                attendee.id = 'current';
             }
 
             // Determine suffix based on attendee role
-            if (this.organizer.email === attendeeRecord.get('user_id').email) {
+            if (this.organizer?.email === attendeeRecord.get('user_id').email) {
                 suffix = this.app.i18n._('Organizer');
             }
             if (attendee.user_id.id === this.currentAccount.contact_id) {

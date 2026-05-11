@@ -146,14 +146,28 @@ Tine.Tinebase.widgets.form.RecordPickerComboBox = Ext.extend(Ext.ux.form.Clearab
             // denormalizationOf means we get denormalization data, but select/pick fresh records
             this.denormalizationRecordClass = this.recordClass;
             this.recordClass = Tine.Tinebase.data.RecordMgr.get(modelConfig.denormalizationOf);
+            this.contextRecordClass = Tine.Tinebase.data.RecordMgr.get(_.get(this.denormalizationRecordClass.getModelConfiguration(), `fields[${this.config.refIdField}].config.recordClassName`));
+
             this.recordProxy =  Tine[this.recordClass.getMeta('appName')][this.recordClass.getMeta('modelName').toLowerCase() + 'Backend'];
+            const me = this
             this.plugins = (this.plugins || []).concat(new RecordEditFieldTriggerPlugin(Ext.applyIf(this.recordEditPluginConfig || {}, {
-                allowCreateNew: false,
+                allowCreateNew: true,
                 preserveJsonProps: 'original_id',
-                qtip: window.i18n._('Edit copy'),
-                editDialogConfig: {
-                    mode: 'local',
-                    denormalizationRecordClass: this.denormalizationRecordClass
+                assertState: function(){
+                    this.setQtip(!!this.field.selectedRecord ? window.i18n._('Edit copy') : 'Add new original')
+                    this.editDialogConfig = !!this.field.selectedRecord ? {
+                        mode: 'local',
+                        denormalizationRecordClass: me.denormalizationRecordClass,
+                        contextRecordClass: me.contextRecordClass,
+                        // NOTE: e.g. Sales_Model_Document_Abstract does not know it's origin yet
+                        contentPanelConstructorInterceptor: function(config) {
+                            const editDialog = me.findParentBy((c) => {return c instanceof Tine.widgets.dialog.EditDialog})
+                            config.contextRecordClass = editDialog ? editDialog.recordClass : config.contextRecordClass
+                        }
+                    } : {
+                        mode: 'remote',
+                    }
+                    RecordEditFieldTriggerPlugin.prototype.assertState.call(this)
                 }
             })));
             this.useEditPlugin = false;
@@ -230,33 +244,37 @@ Tine.Tinebase.widgets.form.RecordPickerComboBox = Ext.extend(Ext.ux.form.Clearab
     initTemplate: function() {
         if (! this.tpl) {
             this.tpl = new Ext.XTemplate('<tpl for="."><div class="x-combo-list-item" {[this.getQtip(values.' + this.recordClass.getMeta('idProperty') + ')]}>{[this.getTitle(values.' + this.recordClass.getMeta('idProperty') + ')]}</div></tpl>', {
-                getTitle: (function(id) {
-                    const record = this.getStore().getById(id)
-
-                    const options = {}
-                    if (this.ownLangPicker) {
-                        options.language = this.ownLangPicker.getValue()
-                    }
-
-                    if (typeof this.getLineTitle === 'function') {
-                        let customTitle = this.getLineTitle(record)
-                        if (customTitle !== false) {
-                            return (Ext.util.Format.htmlEncode(customTitle))
-                        }
-                    }
-
-                    let title = record ? record.getTitle(options) : ' ';
-                    title = title && this.app ? this.app.i18n._hidden(title) : title;
-
-                    return Ext.util.Format.htmlEncode(title)
-                }).createDelegate(this),
-                getQtip: (function(id) {
-                    const record = this.getStore().getById(id)
-                    const qtipText = this.getListItemQtip(record);
-                    return qtipText ? `ext:qtip="${Tine.Tinebase.common.doubleEncode(qtipText)}"` : '';
-                }).createDelegate(this)
+                getTitle: this.getTitle.createDelegate(this),
+                getQtip: this.getQtip.createDelegate(this)
             })
         }
+    },
+
+    getTitle(id) {
+        const record = this.getStore().getById(id)
+
+        const options = {}
+        if (this.ownLangPicker) {
+            options.language = this.ownLangPicker.getValue()
+        }
+
+        if (typeof this.getLineTitle === 'function') {
+            let customTitle = this.getLineTitle(record)
+            if (customTitle !== false) {
+                return (Ext.util.Format.htmlEncode(customTitle))
+            }
+        }
+
+        let title = record ? record.getTitle(options) : ' ';
+        title = title && this.app ? this.app.i18n._hidden(title) : title;
+
+        return Ext.util.Format.htmlEncode(title);
+    },
+
+    getQtip(id) {
+        const record = this.getStore().getById(id)
+        const qtipText = this.getListItemQtip(record);
+        return qtipText ? `ext:qtip="${Tine.Tinebase.common.doubleEncode(qtipText)}"` : '';
     },
 
     initValue: function() {
@@ -280,6 +298,17 @@ Tine.Tinebase.widgets.form.RecordPickerComboBox = Ext.extend(Ext.ux.form.Clearab
         }
 
         return value;
+    },
+
+    // generic overflow tip from Field.js
+    showOverflowTipForText: function(text) {
+        const moreText = this.getListItemQtip(this.selectedRecord)
+        if (moreText) {
+            text = text + '\n\n' + moreText;
+            this.el.set({qtip: ''});
+        }
+
+        Tine.Tinebase.widgets.form.RecordPickerComboBox.superclass.showOverflowTipForText.call(this, text);
     },
 
     // TODO re-init this.list if it goes away?
@@ -368,8 +397,22 @@ Tine.Tinebase.widgets.form.RecordPickerComboBox = Ext.extend(Ext.ux.form.Clearab
      * @param {Number} index
      */
     onSelect: function (record, index) {
-        this.selectedRecord = record;
+        this.setSelectedRecord(record);
         return Tine.Tinebase.widgets.form.RecordPickerComboBox.superclass.onSelect.apply(this, arguments);
+    },
+
+    setSelectedRecord: function (record) {
+        this.selectedRecord = record;
+        if (this.denormalizationRecordClass && !record.data.original_id) {
+            if (!record.json.original_id) {
+                this.selectedRecord.json.original_id = this.selectedRecord.data.original_id = record.id;
+                this.selectedRecord.setId(this.recordClass.generateUID());
+                this.selectedRecord.phantom = true;
+            } else {
+                // NOTE: we use the original models in client which don't have the original_id property
+                this.selectedRecord.data.original_id = record.json.original_id;
+            }
+        }
     },
 
     /**
@@ -429,7 +472,7 @@ Tine.Tinebase.widgets.form.RecordPickerComboBox = Ext.extend(Ext.ux.form.Clearab
                 this.store.addSorted(value);
 
                 value = value.get(this.valueField);
-            } else if (Ext.isPrimitive(value) && value == this.getValue()) {
+            } else if (Ext.isPrimitive(value) && (value === this.getValue() || value === this.selectedRecord?.id)) {
                 if (!this.selectedRecord && !this.forceSelection) {
                     // value is a raw string, no record exists
                     return;
@@ -458,7 +501,7 @@ Tine.Tinebase.widgets.form.RecordPickerComboBox = Ext.extend(Ext.ux.form.Clearab
                 language: this.localizedLangPicker?.getValue()
             });
             description = r.get('description') || description;
-            this.selectedRecord = r;
+            this.setSelectedRecord(r);
             if (this.allowLinkingItself === false) {
                 // check if editDialog exists
                 if (this.editDialog && this.editDialog.record && r.getId() == this.editDialog.record.getId()) {
@@ -517,14 +560,9 @@ Tine.Tinebase.widgets.form.RecordPickerComboBox = Ext.extend(Ext.ux.form.Clearab
     getValue: function() {
         let value = Tine.Tinebase.widgets.form.RecordPickerComboBox.superclass.getValue.apply(this, arguments);
 
-        if (this.denormalizationRecordClass && this.selectedRecord) {
-            // NOTE: denormalized records are depended records, so we need to send all data (or empty string to delete)
-            value = { ...this.selectedRecord.data };
-            value.original_id = this.selectedRecord.json.original_id || value[this.valueField];
-        }
-
-        if (this.inEditor && this.selectedRecord) {
+        if (this.selectedRecord && (this.inEditor || this.denormalizationRecordClass)) {
             // NOTE: in editorGrids we need the data to show render the title
+            // NOTE: denormalized records are depended records, so we need to send all data (or empty string to delete)
             value = { ...this.selectedRecord.data };
         }
 

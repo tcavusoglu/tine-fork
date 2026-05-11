@@ -6,7 +6,7 @@
  * @copyright   Copyright (c) 2010 Metaways Infosystems GmbH (http://www.metaways.de)
  */
 
-require('../../../css/widgets/PickerGridPanel.css');
+require('../../../styles/widgets/PickerGridPanel.scss');
 const { getLocalizedLangPicker } = require("../form/LocalizedLangPicker");
 
 Ext.ns('Tine.widgets.grid');
@@ -190,6 +190,7 @@ Tine.widgets.grid.PickerGridPanel = Ext.extend(Ext.grid.EditorGridPanel, {
         this.searchComboConfig.additionalFilterSpec = this.additionalFilterSpec;
 
         this.recordClass = _.isString(this.recordClass) ? Tine.Tinebase.data.RecordMgr.get(this.recordClass) : this.recordClass;
+        this.app = this.app || (_.isFunction(this.recordClass.getMeta) ? Tine.Tinebase.appMgr.get(this.recordClass.getMeta('appName')) : null);
         this.labelField = this.labelField ? this.labelField : (this.recordClass && this.recordClass.getMeta ? this.recordClass.getMeta('titleProperty') : null);
         this.recordName = this.recordName ? this.recordName : (this.recordClass && this.recordClass.getRecordName ? this.recordClass.getRecordName() || i18n._('Record') : i18n._('Record'));
 
@@ -228,6 +229,7 @@ Tine.widgets.grid.PickerGridPanel = Ext.extend(Ext.grid.EditorGridPanel, {
             const modelConfig = _.isFunction(this.recordClass?.getModelConfiguration) ? this.recordClass.getModelConfiguration() : null;
             const refConfig = _.get(modelConfig, `fields.${this.refIdField}.config`, {});
             const foreignFieldDefinition = _.get(Tine.Tinebase.data.RecordMgr.get(refConfig.appName, refConfig.modelName)?.getModelConfiguration(), `fields.${refConfig.foreignField}`, {});
+            // 2026-01-13 - cweiss: foreignFieldDefinition (from refConfig) is the "owning record"??? don't we need the other side aka this.isMetadataFor???
             const dependentRecords = _.get(foreignFieldDefinition, `config.dependentRecords`, false);
             const isJSONStorage = _.toUpper(_.get(foreignFieldDefinition, `config.storage`, '')) === 'JSON' || _.get(this.config, `storage`) === 'jsonRefId';
             const hasNoAPI = _.isFunction(this.recordClass.getMeta) && !_.get(Tine, `${this.recordClass.getMeta('appName')}.search${_.upperFirst(this.recordClass.getMeta('modelName'))}s`)
@@ -443,11 +445,14 @@ Tine.widgets.grid.PickerGridPanel = Ext.extend(Ext.grid.EditorGridPanel, {
         }
 
         const modelConfig = _.isFunction(this.recordClass?.getModelConfiguration) ? this.recordClass.getModelConfiguration() : null;
-        const refConfig = _.get(modelConfig, `fields.${this.refIdField}.config`, {});
-        const foreignFieldDefinition = _.get(Tine.Tinebase.data.RecordMgr.get(refConfig.appName, refConfig.modelName)?.getModelConfiguration(), `fields.${refConfig.foreignField}`, {});
-        const isJSONStorage = _.toUpper(_.get(foreignFieldDefinition, `config.storage`, '')) === 'JSON' || _.get(this.config, `storage`) === 'jsonRefId';
+        const isJsonRefIdStorage = _.get(this.config, `storage`) === 'jsonRefId';
 
-        this.enableTbar = _.isBoolean(this.enableTbar) ? this.enableTbar : (!this.refIdField || isJSONStorage || this.isMetadataModelFor);
+        // storage:
+        // (a) jsonRefId -> pickable foreign records
+        // (b) JSON / other -> whole record is stored
+        //  i) cross/metadata -> pickable foreign records
+        //  ii) otherwise whole record is stored -> non pickable
+        this.enableTbar = _.isBoolean(this.enableTbar) ? this.enableTbar : (isJsonRefIdStorage || this.isMetadataModelFor || /* backward compability */!modelConfig || !this.config);
 
         if (this.enableTbar) {
             this.initTbar();
@@ -514,6 +519,9 @@ Tine.widgets.grid.PickerGridPanel = Ext.extend(Ext.grid.EditorGridPanel, {
 
         // on rowcontextmenu handler
         this.on('rowcontextmenu', this.onRowContextMenu.createDelegate(this), this);
+        if (_.get(this, 'viewConfig.emptyText')) {
+            _.set(this, 'viewConfig.emptyText', this.app.i18n._hidden(_.get(this, 'viewConfig.emptyText')));
+        }
     },
 
     /**

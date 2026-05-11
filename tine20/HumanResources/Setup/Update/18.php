@@ -21,6 +21,7 @@ class HumanResources_Setup_Update_18 extends Setup_Update_Abstract
     protected const RELEASE018_UPDATE005 = __CLASS__ . '::update005';
     protected const RELEASE018_UPDATE006 = __CLASS__ . '::update006';
     protected const RELEASE018_UPDATE007 = __CLASS__ . '::update007';
+    protected const RELEASE018_UPDATE008 = __CLASS__ . '::update008';
 
     static protected $_allUpdates = [
         self::PRIO_NORMAL_APP_STRUCTURE     => [
@@ -35,6 +36,10 @@ class HumanResources_Setup_Update_18 extends Setup_Update_Abstract
             self::RELEASE018_UPDATE007          => [
                 self::CLASS_CONST                   => self::class,
                 self::FUNCTION_CONST                => 'update007',
+            ],
+            self::RELEASE018_UPDATE008          => [
+                self::CLASS_CONST                   => self::class,
+                self::FUNCTION_CONST                => 'update008',
             ],
         ],
         self::PRIO_NORMAL_APP_UPDATE        => [
@@ -148,5 +153,29 @@ class HumanResources_Setup_Update_18 extends Setup_Update_Abstract
             HumanResources_Model_Employee::class,
         ]);
         $this->addApplicationUpdate(HumanResources_Config::APP_NAME, '18.7', self::RELEASE018_UPDATE007);
+    }
+
+    public function update008(): void
+    {
+        Tinebase_TransactionManager::getInstance()->rollBack();
+
+        $db = $this->getDb();
+        // sanitize unsigned int fields
+        foreach ([
+                     'break_time_deduction',
+                     'break_time_net',
+                     'working_time_target',
+                 ] as $unsignedIntField) {
+            $db->update(SQL_TABLE_PREFIX . HumanResources_Model_DailyWTReport::TABLE_NAME,
+                [$unsignedIntField => 0],
+                [$db->quoteIdentifier($unsignedIntField) . ' < 0']
+            );
+        }
+
+        Setup_SchemaTool::updateSchema([
+            HumanResources_Model_DailyWTReport::class,
+            HumanResources_Model_MonthlyWTReport::class,
+        ]);
+        $this->addApplicationUpdate(HumanResources_Config::APP_NAME, '18.8', self::RELEASE018_UPDATE008);
     }
 }

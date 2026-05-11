@@ -105,6 +105,22 @@ class Tinebase_Frontend_CliTest extends TestCase
         return $opts;
     }
 
+    public function testImportInstances()
+    {
+        $result = $this->_appCliHelper('Tinebase', 'importInstances', [
+            'path=' . dirname(__FILE__) . '/../files/import_instances.yaml',
+        ]);
+        $this->assertStringContainsString('[totalcount] => 2', $result);
+        $instances = Tinebase_Controller_Instance::getInstance()->search(_getRelations: true);
+        $this->assertEquals(2, count($instances));
+
+        // test update instances
+        $result = $this->_appCliHelper('Tinebase', 'importInstances', [
+            'path=' . dirname(__FILE__) . '/../files/import_instances.yaml',
+        ]);
+        $this->assertStringContainsString('[updatecount] => 2', $result);
+    }
+
     /**
      * test purge deleted records
      */
@@ -268,6 +284,7 @@ class Tinebase_Frontend_CliTest extends TestCase
 
         foreach ($scheduler->getAll() as $task) {
             if (in_array($task->name, [
+                // FIXME skip those checks as they fail at random (?)
                 'Tinebase_FileRevisionCleanup',
                 'Tinebase_DeletedFileCleanup',
                 'Tinebase_FileSystemCheckIndex',
@@ -280,8 +297,7 @@ class Tinebase_Frontend_CliTest extends TestCase
                 // Sales
                 'createAutoInvoicesDailyTask', // skip because invoicing might not be active
                 'createAutoInvoicesMonthlyTask', // skip because invoicing might not be active
-            ])) {
-                // FIXME skip those checks as they fail at random (?)
+            ]) || !$task->active) {
                 continue;
             }
             static::assertNotEmpty($task->last_run, 'task ' . $task->name . ' did not run successfully: ' .

@@ -52,7 +52,9 @@ const BoilerplatePanel = Ext.extend(Ext.Panel, {
         this.store.each((boilerplate) => {
             const fieldName = `boilerplate_${boilerplate.get('name')}`;
             let field = editDialog.getForm().findField(fieldName);
-            boilerplate.set('boilerplate', field.getValue());
+            if (field) {
+                boilerplate.set('boilerplate', field.getValue());
+            }
         });
         record.set('boilerplates', Tine.Tinebase.common.assertComparable(_.map(this.store.data.items, 'data'), true));
 
@@ -121,7 +123,7 @@ const BoilerplatePanel = Ext.extend(Ext.Panel, {
         const gabpArgs = Tine.Tinebase.common.assertComparable([
             record.constructor.getPhpClassName(),
             record.get('date')?.format ? record.get('date').format(Date.patterns.ISO8601Long) : null,
-            record.get('customer_id')?.original_id || record.get('customer_id')?.id,
+            record.json.customer_id?.original_id || record.get('customer_id')?.id,
             record.get('document_category')?.id || record.get('document_category'),
             record.get('document_language')
         ]);

@@ -5,6 +5,8 @@
  * @author      Cornelius Weiss <c.weiss@metaways.de>
  * @copyright   Copyright (c) 2016 Metaways Infosystems GmbH (http://www.metaways.de)
  */
+import TimezoneCombo from "../TimezoneCombo";
+
 Ext.ns('Tine.widgets.form');
 
 import 'widgets/form/AceField';
@@ -14,6 +16,7 @@ import 'widgets/form/RecordEditField';
 import 'widgets/form/LocalizedField';
 import 'widgets/form/UrlField';
 import 'widgets/form/EmailField';
+import 'widgets/TimezoneCombo';
 import {supportedTypes as supportedACETypes} from "./AceField";
 
 /**
@@ -44,18 +47,21 @@ Tine.widgets.form.FieldManager = function() {
             password: 'tw-passwordTriggerField',
             country: 'widget-countrycombo',
             currency: 'widget-currencycombo',
+            timezone: 'widget-timezonecombo',
             url: 'urlfield',
             email: 'tw-emailField',
-            application: 'tw-app-picker'
+            application: 'tw-app-picker',
+            preferenceOverride: 'widget-preferencecombo'
         },
 
         /**
          * get form field of well known field names
          *
          * @param {String} fieldName
+         * @param {Object} config
          * @return {Object}
          */
-        getByFieldname: function(fieldName) {
+        getByFieldname: function(fieldName, config) {
             var field = null;
 
             return field;
@@ -123,7 +129,11 @@ Tine.widgets.form.FieldManager = function() {
             }
             field.name = fieldDefinition.fieldName || fieldDefinition.name;
             field.readOnly = field.hasOwnProperty('readOnly') ? field.readOnly : (!! fieldDefinition.readOnly || !! _.get(fieldDefinition, 'uiconfig.readOnly'));
+            // @TODO blank means ''/null. A int/float/bool/date which is not nullable can't be blank
+            field.nullable = !!fieldDefinition.nullable;
             field.allowBlank = !! (fieldDefinition.validators && fieldDefinition.validators.allowEmpty);
+            field.emptyValue = field.hasOwnProperty('emptyValue') ? field.emptyValue : (fieldDefinition.nullable ? null : '');
+
             // make field available via recordForm.formfield_NAME
             field.ref = '../../formfield_' + field.name;
 
@@ -170,6 +180,7 @@ Tine.widgets.form.FieldManager = function() {
                         field.blurOnSelect = true;
                     }
                     break;
+                case 'bigint':
                 case 'integer':
                     field.xtype = 'numberfield';
                     field.allowDecimals = false;
@@ -183,22 +194,38 @@ Tine.widgets.form.FieldManager = function() {
                     if (fieldDefinition.specialType && fieldDefinition.specialType === 'durationSec') {
                         field.xtype = 'durationspinner';
                         field.baseUnit = 'seconds';
-                        field.allowNegative = false;
                     }
 
                     if (fieldDefinition.specialType && fieldDefinition.specialType === 'minutes') {
                         field.xtype = 'durationspinner';
                         field.baseUnit = 'minutes';
-                        field.allowNegative = false;
                     }
-
+                    
+                    if (fieldDefinition.specialType && fieldDefinition.specialType === 'bytes1000') {
+                        field.xtype = 'extuxbytesfield';
+                        field.forceUnit = _.get(fieldDefinition, 'uiconfig.forceUnit', null);
+                    }
+                    
                     if (fieldDefinition.max) {
                         field.maxValue = fieldDefinition.max;
                     }
 
-                    if (fieldDefinition.min) {
-                        field.minValue = fieldDefinition.min;
+                    if (fieldDefinition.min || fieldDefinition.unsigned) {
+                        field.minValue = fieldDefinition.min || 0;
+                        field.allowNegative = false;
                     }
+
+                    const spinnerConfig = _.get(fieldDefinition, 'uiconfig.fieldConfig.spinner', null);
+                    if (spinnerConfig) {
+                        field.xtype = 'uxspinner';
+                        field.strategy = Object.assign({
+                            xtype: 'number',
+                            incrementValue : 1,
+                            minValue: field.minValue,
+                            maxValue: field.maxValue,
+                        }, spinnerConfig);
+                    }
+
                     break;
                 case 'float':
                     field.xtype = 'numberfield';
@@ -403,7 +430,6 @@ Tine.widgets.form.FieldManager = function() {
                     break;
                 default:
                     field.xtype = field.xtype || this.specialTypeMap[fieldDefinition.specialType] || 'textfield';
-                    field.emptyValue = field.emptyValue || (fieldDefinition.nullable ? null : '');
 
                     if (fieldDefinition.length) {
                         field.maxLength = fieldDefinition.length;
@@ -433,12 +459,13 @@ Tine.widgets.form.FieldManager = function() {
                 genericKey = this.getKey([appName, modelName, fieldName]),
                 config = config || {};
 
-            // check for registered renderer
+            // check for registered field
             var field = fields[categoryKey] ? fields[categoryKey] : fields[genericKey];
+            field = field ? Object.assign({}, field, config) : null;
 
             // check for common names
             if (! field) {
-                field = this.getByFieldname(fieldName);
+                field = this.getByFieldname(fieldName, config);
             }
 
             // check for known datatypes

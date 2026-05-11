@@ -24,6 +24,7 @@ use Tinebase_Model_Filter_Abstract as TMFA;
 class CrewScheduling_Controller_Poll extends Tinebase_Controller_Record_Abstract implements
     Felamimail_Controller_MassMailingPluginInterface
 {
+    /** @use Tinebase_Controller_SingletonTrait<CrewScheduling_Controller_Poll> */
     use Tinebase_Controller_SingletonTrait;
 
     /**
@@ -210,7 +211,7 @@ class CrewScheduling_Controller_Poll extends Tinebase_Controller_Record_Abstract
      * @throws Tinebase_Exception_AccessDenied
      * @throws Tinebase_Exception_NotFound
      */
-    public function prepareMassMailingMessage(Felamimail_Model_Message $_message, Tinebase_Twig $_twig): void
+    public function prepareMassMailingMessage(Felamimail_Model_Message $_message, Tinebase_Twig $_twig, &$context): void
     {
         if (!preg_match('#/CrewScheduling/view/Poll/([a-z0-9]+)#', $_message->body, $matches)) {
             // nothing to do here

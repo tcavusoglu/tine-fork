@@ -3,7 +3,7 @@
 # to be longer than 80 charts. The email user name contains a 40 char hash and an @ leaving 39 for DEPLOYMENT_NAME and
 # DEPLOYMENT_BASE_DOMAIN (and a dot).
 test_cloud_generate_deployment_name() {
-    DEPLOYMENT_NAME=$(echo -n $CI_ENVIRONMENT_NAME | sed 's/\./-/g' | sed 's/\//-/g')
+    DEPLOYMENT_NAME=$(echo -n $CI_ENVIRONMENT_NAME | sed 's/\./-/g' | sed 's/\//-/g' | awk '{print tolower($0)}')
 
     if [[ $(echo -n $DEPLOYMENT_NAME.$DEPLOYMENT_BASE_DOMAIN | wc -c) -le 39 ]]; then
         echo $DEPLOYMENT_NAME
@@ -60,7 +60,9 @@ test_cloud_teardown() {
     # other functions need thees values
     helmfile -f ${CI_BUILDS_DIR}/${CI_PROJECT_NAMESPACE}/tine20/ci/test-cloud/helmfile.yaml write-values --output-file-template=/tmp/values.yaml
 
-    helmfile -f ${CI_BUILDS_DIR}/${CI_PROJECT_NAMESPACE}/tine20/ci/test-cloud/helmfile.yaml destroy
+    if helmfile -f ${CI_BUILDS_DIR}/${CI_PROJECT_NAMESPACE}/tine20/ci/test-cloud/helmfile.yaml status; then
+        helmfile -f ${CI_BUILDS_DIR}/${CI_PROJECT_NAMESPACE}/tine20/ci/test-cloud/helmfile.yaml destroy
+    fi
 
     test_cloud_teardown_database
 
@@ -77,6 +79,27 @@ test_cloud_mariadb() {
     mysql -h ${db_host} -u ${db_username} -p${db_password} --skip-ssl
 }
 
+test_cloud_imap_mariadb() {
+    # helmfile write-values needs to run before!
+    db_host=$(cat /tmp/values.yaml | yq .tine.features.mail.imap.dovecot.host)
+    db_name=$(cat /tmp/values.yaml | yq .tine.features.mail.imap.dovecot.dbname)
+    db_username=$(cat /tmp/values.yaml | yq .tine.features.mail.imap.dovecot.username)
+    db_password=$(cat /tmp/values.yaml | yq .tine.features.mail.imap.dovecot.password)
+
+    mysql -h ${db_host} -u ${db_username} -p${db_password} --skip-ssl ${db_name}
+}
+
+test_cloud_smtp_mariadb() {
+    # helmfile write-values needs to run before!
+
+    db_host=$(cat /tmp/values.yaml | yq .tine.features.mail.smtp.postfix.host)
+    db_name=$(cat /tmp/values.yaml | yq .tine.features.mail.smtp.postfix.dbname)
+    db_username=$(cat /tmp/values.yaml | yq .tine.features.mail.smtp.postfix.username)
+    db_password=$(cat /tmp/values.yaml | yq .tine.features.mail.smtp.postfix.password)
+
+    mysql -h ${db_host} -u ${db_username} -p${db_password} --skip-ssl ${db_name}
+}
+
 test_cloud_setup_database() {
     db_name=$(cat /tmp/values.yaml | yq .database.name)
 
@@ -87,4 +110,10 @@ test_cloud_teardown_database() {
     db_name=$(cat /tmp/values.yaml | yq .database.name)
 
     echo 'DROP DATABASE IF EXISTS `'${db_name}'`;' | test_cloud_mariadb
+
+    # delete artifacts in mail db if they exists
+    echo "DELETE FROM dovecot_users WHERE domain='${DEPLOYMENT_NAME}.${DEPLOYMENT_BASE_DOMAIN}';" | test_cloud_imap_mariadb
+    echo "DELETE FROM smtp_destinations WHERE destination LIKE '%${DEPLOYMENT_NAME}.${DEPLOYMENT_BASE_DOMAIN}';" | test_cloud_smtp_mariadb
+    echo "DELETE FROM smtp_users WHERE email LIKE '%${DEPLOYMENT_NAME}.${DEPLOYMENT_BASE_DOMAIN}';" | test_cloud_smtp_mariadb
+    echo "DELETE FROM smtp_virtual_domains WHERE domain='${DEPLOYMENT_NAME}.${DEPLOYMENT_BASE_DOMAIN}';" | test_cloud_smtp_mariadb
 }

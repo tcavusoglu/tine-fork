@@ -581,7 +581,7 @@ class Tinebase_FileSystem implements
         $this->acquireWriteLock();
 
         try {
-            $destinationNode = $this->stat($sourcePath);
+            $sourceNode = $this->stat($sourcePath);
             $sourcePathParts = $this->_splitPath($sourcePath);
 
             try {
@@ -594,8 +594,8 @@ class Tinebase_FileSystem implements
                         ("Destination path exists and is a file. Please remove before.");
                 }
 
-                $destinationNodeName = basename(trim($sourcePath, '/'));
-                $destinationPathParts = array_merge($this->_splitPath($destinationPath), (array)$destinationNodeName);
+                $sourceNodeName = basename(trim($sourcePath, '/'));
+                $destinationPathParts = array_merge($this->_splitPath($destinationPath), (array)$sourceNodeName);
             } catch (Tinebase_Exception_NotFound) {
                 // does parent directory of destinationPath exist?
                 try {
@@ -605,17 +605,17 @@ class Tinebase_FileSystem implements
                         ("Parent directory does not exist. Please create before.");
                 }
 
-                $destinationNodeName = basename(trim($destinationPath, '/'));
+                $sourceNodeName = basename(trim($destinationPath, '/'));
                 $destinationPathParts = array_merge($this->_splitPath(dirname($destinationPath)),
-                    (array)$destinationNodeName);
+                    (array)$sourceNodeName);
             }
 
-            if ($sourcePathParts == $destinationPathParts) {
+            if ($sourcePathParts === $destinationPathParts) {
                 throw new Tinebase_Exception_UnexpectedValue("Source path and destination path must be different.");
             }
 
             if (null !== ($existingNode = $this->_getTreeNodeBackend()
-                    ->getChild($parentNode, $destinationNodeName, true, false))) {
+                    ->getChild($parentNode, $sourceNodeName, true, false))) {
                 if ($existingNode->is_deleted) {
                     $this->_updateDeletedNodeName($existingNode);
                 } else {
@@ -623,8 +623,8 @@ class Tinebase_FileSystem implements
                 }
             }
 
-            if ($destinationNode->type !== Tinebase_Model_Tree_FileObject::TYPE_FOLDER) {
-                $createdNode = $this->createFileTreeNode($parentNode->getId(), $destinationNodeName, $destinationNode->type);
+            if ($sourceNode->type !== Tinebase_Model_Tree_FileObject::TYPE_FOLDER) {
+                $createdNode = $this->createFileTreeNode($parentNode->getId(), $sourceNodeName, $sourceNode->type);
                 if ($createdNode->flysystem) {
                     $flySystem = Tinebase_Controller_Tree_FlySystem::getFlySystem($createdNode->flysystem);
                     $fh = $this->fopen($sourcePath, 'r');
@@ -634,10 +634,25 @@ class Tinebase_FileSystem implements
                         $this->fclose($fh);
                     }
                 }
-                $this->updateFileObject($parentNode, $createdNode, null, $destinationNode->hash);
+                $fileObject = $this->_fileObjectBackend->get($createdNode->object_id);
+                $fileObject->lastavscan_time = $sourceNode->lastavscan_time;
+                $fileObject->is_quarantined = $sourceNode->is_quarantined;
+                $fileObject->indexed_hash = $sourceNode->indexed_hash;
+                $fileObject->preview_count = $sourceNode->preview_count;
+                $fileObject->preview_status = $sourceNode->preview_status;
+                $fileObject->preview_error_count = $sourceNode->preview_error_count;
+                $indexRaii = null;
+                if ($this->_indexingActive) {
+                    $this->_indexingActive = false;
+                    $indexRaii = new Tinebase_RAII(fn() => $this->_indexingActive = true);
+                    Tinebase_Fulltext_Indexer::getInstance()->copyFileContents($sourceNode->object_id, $fileObject->getId());
+                }
+
+                $this->updateFileObject($parentNode, $createdNode, $fileObject, $sourceNode->hash);
+                unset($indexRaii);
                 $createdNode = $this->get($createdNode->getId());
             } else {
-                $createdNode = $this->_createDirectoryTreeNode($parentNode->getId(), $destinationNodeName);
+                $createdNode = $this->_createDirectoryTreeNode($parentNode->getId(), $sourceNodeName);
             }
 
             // update hash of all parent folders
@@ -873,7 +888,7 @@ class Tinebase_FileSystem implements
             $this->_checkQuotaAndRegisterRefLog($_node, $sizeDiff, $revisionSizeDiff);
         }
 
-        if (true === $this->_isFileIndexingActive()) {
+        if ($this->_indexingActive) {
             Tinebase_ActionQueue::getInstance(Tinebase_ActionQueue::QUEUE_LONG_RUN)
                 ->queueAction('Tinebase_FOO_FileSystem.indexFileObject', $newFileObject->getId());
         }
@@ -889,14 +904,13 @@ class Tinebase_FileSystem implements
                 $finfo = finfo_open(FILEINFO_MIME_TYPE);
                 $mimeType = finfo_file($finfo, $_realFilePath);
                 if ($mimeType !== false) {
-                    if (PHP_VERSION_ID >= 70300 && ($mimeLen = strlen($mimeType)) % 2 === 0 &&
-                        substr($mimeType, 0, $mimeLen / 2) === substr($mimeType, $mimeLen / 2)) {
+                    if (($mimeLen = strlen($mimeType)) % 2 === 0 && substr($mimeType, 0, $mimeLen / 2) === substr($mimeType, $mimeLen / 2)) {
                         $mimeType = substr($mimeType, 0, $mimeLen / 2);
                     }
                 } else {
                     $mimeType = null;
                 }
-                finfo_close($finfo);
+                unset($finfo);
             } else {
                 if (Tinebase_Core::isLogLevel(Zend_Log::INFO)) Tinebase_Core::getLogger()->info(__METHOD__ . '::' . __LINE__
                     . ' finfo_open() is not available: Could not get file information.');
@@ -1539,7 +1553,11 @@ class Tinebase_FileSystem implements
                 'mode' => $_mode,
                 'node' => $node
             ));
-            stream_context_set_option($handle, $contextOptions);
+            if (PHP_VERSION_ID >= 80300) {
+                stream_context_set_options($handle, $contextOptions);
+            } else {
+                stream_context_set_option($handle, $contextOptions);
+            }
         }
         
         return $handle;
@@ -3401,17 +3419,25 @@ class Tinebase_FileSystem implements
     public function checkPathACL(Tinebase_Model_Tree_Node_Path $_path, string $_action = 'get', bool $_topLevelAllowed = true, bool $_throw = true): bool
     {
         $hasPermission = false;
+        $user = Tinebase_Core::getUser();
+        if (!$user) {
+            if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) {
+                Tinebase_Core::getLogger()->debug(__METHOD__ . '::'
+                    . __LINE__ . ' No user set ... we might be in setup - skip acl check');
+            }
+            return true;
+        }
         if ($_topLevelAllowed || !$_path->isToplevelPath()) {
             switch ($_path->containerType) {
                 case Tinebase_FileSystem::FOLDER_TYPE_PERSONAL:
                     $hasPermission = $_path->isToplevelPath() ?
-                        ($_path->containerOwner === Tinebase_Core::getUser()->accountLoginName || $_action === 'get') :
+                        ($_path->containerOwner === $user->accountLoginName || $_action === 'get') :
                         $this->_checkACLNode($_path->getNode(), $_action);
                     break;
                 case Tinebase_FileSystem::FOLDER_TYPE_SHARED:
                     if ($hasPermission = Tinebase_Acl_Roles::getInstance()->hasRight(
                         $_path->application->name,
-                        Tinebase_Core::getUser()->getId(),
+                        $user->getId(),
                         Tinebase_Acl_Rights::ADMIN
                     )) {
                         // admin, go ahead
@@ -3421,7 +3447,7 @@ class Tinebase_FileSystem implements
                         if ('add' === $_action) {
                             $hasPermission = Tinebase_Acl_Roles::getInstance()->hasRight(
                                 $_path->application->name,
-                                Tinebase_Core::getUser()->getId(),
+                                $user->getId(),
                                 Tinebase_Acl_Rights::MANAGE_SHARED_FOLDERS
                             );
                             break;
@@ -3456,7 +3482,7 @@ class Tinebase_FileSystem implements
             if ($parentPath->isToplevelPath()) {
                 switch ($parentPath->containerType) {
                     case Tinebase_FileSystem::FOLDER_TYPE_PERSONAL:
-                        $hasPermission = $parentPath->containerOwner && ($parentPath->containerOwner === Tinebase_Core::getUser()->accountLoginName ||
+                        $hasPermission = $parentPath->containerOwner && ($parentPath->containerOwner === $user->accountLoginName ||
                             $this->_checkACLNode($_path->getNode(), 'admin'));
                         break;
                     case Tinebase_FileSystem::FOLDER_TYPE_SHARED:
@@ -3477,7 +3503,8 @@ class Tinebase_FileSystem implements
         }
 
         if (true === $_throw && ! $hasPermission) {
-            throw new Tinebase_Exception_AccessDenied('No permission to ' . $_action . ' nodes in path ' . $_path->flatpath);
+            throw new Tinebase_Exception_AccessDenied('No permission to ' . $_action
+                . ' nodes in path ' . $_path->flatpath);
         }
 
         return $hasPermission;
@@ -3529,7 +3556,8 @@ class Tinebase_FileSystem implements
             if ($allChildIds != $deleteGrantChildIds) {
                 if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) {
                     Tinebase_Core::getLogger()->debug(__METHOD__ . '::'
-                        . __LINE__ . ' the following child nodes has no ' . $requiredGrant . ' grant for node : ' . $_node->name . ' : ' . print_r(array_diff($allChildIds, $deleteGrantChildIds), true));
+                        . __LINE__ . ' the following child nodes has no ' . $requiredGrant . ' grant for node : '
+                        . $_node->name . ' : ' . print_r(array_diff($allChildIds, $deleteGrantChildIds), true));
                 }
                 $result = false;
             }

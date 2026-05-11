@@ -314,7 +314,6 @@ const { y, arrivedState } = useScroll(tineDockRef, { behavior: 'smooth' })
         font-size: 8px;
       }
     }
-
     .dragged-item{
       opacity: 0.5;
       cursor: pointer;

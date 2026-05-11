@@ -111,7 +111,7 @@ services:
 
 {% if tinedockercompose_redis_service is defined and tinedockercompose_redis_service|bool %}
   cache:
-    image: redis:{{ tinedockercompose_redis_version }}
+    image: {{ tinedockercompose_redis_image }}
     restart: always
     networks:
       - internal_network
@@ -150,7 +150,7 @@ services:
 {% endif %}
 {% if tinedockercompose_edocument_service is defined and tinedockercompose_edocument_service|bool %}
   edocument:
-    image: registry.rz1.metaways.net/tine/edocument-services:0.0.14-amd64
+    image: registry.rz1.metaways.net/tine/edocument-services:0.0.15-amd64
     restart: always
     ports:
       - "3000:3000"
@@ -239,5 +239,13 @@ volumes:
 
 networks:
   external_network:
+{% if tinedockercompose_network_mtu is defined %}
+    driver_opts:
+      com.docker.network.driver.mtu: {{ tinedockercompose_network_mtu }}
+{% endif %}
   internal_network:
+{% if tinedockercompose_network_mtu is defined %}
+    driver_opts:
+      com.docker.network.driver.mtu: {{ tinedockercompose_network_mtu }}
+{% endif %}
     internal: true

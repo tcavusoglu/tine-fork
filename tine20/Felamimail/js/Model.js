@@ -53,6 +53,7 @@ Tine.Felamimail.Model.Message = Tine.Tinebase.data.Record.create([
       { name: 'from_node' }, // JS only - contains node data if opened from Filemanager
       { name: 'is_spam_suspicions', type: 'bool' },
       { name: 'expected_answer' },
+      { name: 'context' }, // virtual field for twig template
       { name: 'tags'},
     ], {
     appName: 'Felamimail',
@@ -83,23 +84,21 @@ Tine.Felamimail.Model.Message = Tine.Tinebase.data.Record.create([
      *
      * @returns {String}
      */
-    getTine20Icon: function() {
-        let flagConfigKey = null,
-            email = this.get('from_email');
-        const domainValidation = Tine.Tinebase.common.checkEmailDomain(email);
-        if (domainValidation.isInternalDomain) {
-            flagConfigKey = 'flagIconOwnDomain';
-        } else {
-            let otherDomainRegex = Tine.Tinebase.configManager.get('flagIconOtherDomainRegex', 'Felamimail');
-            if (email.match(otherDomainRegex)) {
-                flagConfigKey = 'flagIconOtherDomain';
-            }
+    getMailSenderIcon: function() {
+        const trustedDomainRegexData = Tine.Tinebase.registry.get('trustedMailDomains');
+        const flags = this.get('flags');
+        let result = null;
+
+        if (trustedDomainRegexData) {
+            Object.entries(trustedDomainRegexData).forEach((data) => {
+                if (flags.includes(data[1].id)) {
+                    data[1].qtip = this.get('from_name');
+                    result = data[1];
+                }
+            })
         }
-        if (flagConfigKey) {
-            return Tine.Tinebase.configManager.get(flagConfigKey, 'Felamimail');
-        } else {
-            return 'images/favicon.svg';
-        }
+
+        return result;
     },
     
     getFlagIcons() {
@@ -114,16 +113,22 @@ Tine.Felamimail.Model.Message = Tine.Tinebase.data.Record.create([
             icons.push({name: 'spam',src: 'images/icon-set/icon_spam.svg', qtip: app.i18n._('This message might be SPAM')});
         }
         if (this.hasFlag('\\Answered')) {
-            icons.push({name: 'answered', src: 'https://cdn.jsdelivr.net/npm/@tabler/icons@latest/icons/corner-up-left.svg', qtip: app.i18n._('Answered')});
+            icons.push({name: 'answered', cls: 'flag_answered', src: Ext.BLANK_IMAGE_URL, qtip: app.i18n._('Answered')});
         }
         if (this.hasFlag('Passed')) {
-            icons.push({name: 'passed',src: 'https://cdn.jsdelivr.net/npm/@tabler/icons@latest/icons/corner-up-right.svg', qtip: app.i18n._('Forwarded')});
+            icons.push({name: 'passed', cls: 'flag_passed', src: Ext.BLANK_IMAGE_URL, qtip: app.i18n._('Forwarded')});
         }
         if (this.get('content_type') === 'multipart/encrypted') {
             icons.push({name: 'encrypted',src: 'images/icon-set/icon_lock.svg', qtip: app.i18n._('Encrypted Message')});
         }
+
         if (this.hasFlag('Tine20')) {
-            icons.push({name: 'tine20',src: this.getTine20Icon(), qtip: app.i18n._('Tine20')});
+            icons.push({name: 'tine20', src: 'images/favicon.svg', qtip: app.i18n._('Tine20')});
+        }
+
+        const mailServerIcon = this.getMailSenderIcon();
+        if (mailServerIcon && mailServerIcon.image) {
+            icons.push({name: mailServerIcon.id, src: mailServerIcon.image, qtip: mailServerIcon.qtip});
         }
         return icons;
     },
@@ -329,12 +334,19 @@ Tine.Felamimail.messageBackend = new Tine.Tinebase.data.RecordProxy({
      * @param account
      */
     getFormatConfig(formatConfig, message, account = null) {
+        const defaultDisplayFormat = Tine.Felamimail.registry.get('preferences').get('displayFormat');
+
         account = account ?? Tine.Tinebase.appMgr.get('Felamimail').getAccountStore().getById(message.get('account_id'));
         // set default mimeType to text/plain when no account found, might happen for .eml emails
         let mimeType = 'text/plain';
         
         if (account) {
             mimeType = account.get(formatConfig);
+
+            if (formatConfig === 'display_format' && mimeType === 'follow_preference') {
+                mimeType = defaultDisplayFormat ?? 'text/html';
+            }
+
             if (mimeType === 'content_type') {
                 mimeType = message.get('body_content_type');
             } else {
@@ -677,11 +689,7 @@ Tine.Felamimail.vacationBackend = new Tine.Tinebase.data.RecordProxy({
  * Rule Record Definition
  */ 
 Tine.Felamimail.Model.Rule = Tine.Tinebase.data.Record.create(Tine.Tinebase.Model.modlogFields.concat([
-    { name: 'id', sortType: function(value) {
-        // should be sorted as int
-        return parseInt(value, 10);
-    }
-    },
+    { name: 'id'},
     { name: 'action_type' },
     { name: 'action_argument' },
     { name: 'conjunction' },

@@ -1,11 +1,11 @@
-<?php
+<?php declare(strict_types=1);
 /**
  * Tine 2.0
  * 
  * @package     Tinebase
  * @subpackage  Record
  * @license     http://www.gnu.org/licenses/agpl.html AGPL Version 3
- * @copyright   Copyright (c) 2007-2017 Metaways Infosystems GmbH (http://www.metaways.de)
+ * @copyright   Copyright (c) 2007-2026 Metaways Infosystems GmbH (http://www.metaways.de)
  * @author      Cornelius Weiss <c.weiss@metaways.de>
  */
 
@@ -41,10 +41,17 @@ class Tinebase_Model_PersistentObserver extends Tinebase_Record_Abstract
         'observable_model'       => array('presence' => 'required', 'allowEmpty' => false),
         'observable_identifier'  => array('allowEmpty' => true, 'Alnum'),
         'observer_model'         => array('presence' => 'required', 'allowEmpty' => false),
-        'observer_identifier'    => array('presence' => 'required', 'allowEmpty' => false, 'Alnum'),
+        'observer_identifier'    => array('presence' => 'required', 'allowEmpty' => false),
         'observed_event'         => array('presence' => 'required', 'allowEmpty' => false),
         'do_acl'                 => array( Zend_Filter_Input::ALLOW_EMPTY => true,
                                            Zend_Filter_Input::DEFAULT_VALUE => true,
                                            array('InArray', array(true, false))),
     );
+
+    protected $_filters = [
+        'observable_identifier'  => [
+            [Tinebase_Record_Filter_NotSetDefault::class, ''],
+            [Zend_Filter_Empty::class, ''],
+        ],
+    ];
 }

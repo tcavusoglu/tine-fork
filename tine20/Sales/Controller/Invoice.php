@@ -469,6 +469,13 @@ class Sales_Controller_Invoice extends Sales_Controller_NumberableAbstract
                     'ac' => $relation->related_record,
                     'pa' => $modelsToBill[$relation->related_model]
                 );
+
+                if (Timetracker_Model_Timeaccount::class === $relation->related_model && ($modelsToBill[Timetracker_Model_TimeaccountNotBillable::class] ?? false)) {
+                    $billableAccountables[] = array(
+                        'ac' => new Timetracker_Model_TimeaccountNotBillable($relation->related_record->toArray()),
+                        'pa' => $modelsToBill[Timetracker_Model_TimeaccountNotBillable::class]
+                    );
+                }
         
             } elseif ((! in_array($relation->related_model, $modelsToSkip)) && in_array('Sales_Model_Accountable_Interface', class_implements($relation->related_model))) {
                 // no product aggregate definition has been found -> use default values
@@ -1617,7 +1624,7 @@ class Sales_Controller_Invoice extends Sales_Controller_NumberableAbstract
                 }
             }
 
-            $attachmentName = str_replace('/', '-', $customer->getTitle() . '_' . $invoice->number . '-xrechnung.xml');
+            $attachmentName = str_replace('/', '_', $customer->getTitle() . '_' . $invoice->number . '-xrechnung.xml');
             Tinebase_FileSystem_RecordAttachments::getInstance()->addRecordAttachment($invoice, $attachmentName, $stream);
             Tinebase_FileSystem_RecordAttachments::getInstance()->getRecordAttachments($invoice);
         } catch (Tinebase_Exception_HtmlReport $e) {
@@ -1896,8 +1903,6 @@ class Sales_Controller_Invoice extends Sales_Controller_NumberableAbstract
                     throw new Tinebase_Exception_AccessDenied("You don't have the right to manage invoices!");
                 }
                 break;
-            default;
-            break;
         }
 
         parent::_checkRight($_action);

@@ -5,8 +5,8 @@
  *
  * @package     Tinebase
  * @subpackage  Setup
- * @license     http://www.gnu.org/licenses/agpl.html AGPL3
- * @copyright   Copyright (c) 2024 Metaways Infosystems GmbH (http://www.metaways.de)
+ * @license     https://www.gnu.org/licenses/agpl.html AGPL3
+ * @copyright   Copyright (c) 2024-2026 Metaways Infosystems GmbH (https://www.metaways.de)
  * @author      Philipp Schüle <p.schuele@metaways.de>
  *
  * this is 2025.11 (ONLY!)
@@ -31,7 +31,12 @@ class Tinebase_Setup_Update_18 extends Setup_Update_Abstract
     protected const RELEASE018_UPDATE015 = self::class . '::update015';
     protected const RELEASE018_UPDATE016 = self::class . '::update016';
     protected const RELEASE018_UPDATE017 = self::class . '::update017';
-
+    protected const RELEASE018_UPDATE018 = self::class . '::update018';
+    protected const RELEASE018_UPDATE019 = self::class . '::update019';
+    protected const RELEASE018_UPDATE020 = self::class . '::update020';
+    protected const RELEASE018_UPDATE021 = self::class . '::update021';
+    protected const RELEASE018_UPDATE022 = self::class . '::update022';
+    protected const RELEASE018_UPDATE023 = self::class . '::update023';
 
     static protected $_allUpdates = [
         self::PRIO_TINEBASE_BEFORE_EVERYTHING => [
@@ -85,6 +90,22 @@ class Tinebase_Setup_Update_18 extends Setup_Update_Abstract
                 self::CLASS_CONST                   => self::class,
                 self::FUNCTION_CONST                => 'update016',
             ],
+            self::RELEASE018_UPDATE019          => [
+                self::CLASS_CONST                   => self::class,
+                self::FUNCTION_CONST                => 'update019',
+            ],
+            self::RELEASE018_UPDATE020          => [
+                self::CLASS_CONST                   => self::class,
+                self::FUNCTION_CONST                => 'update020',
+            ],
+            self::RELEASE018_UPDATE021          => [
+                self::CLASS_CONST                   => self::class,
+                self::FUNCTION_CONST                => 'update021',
+            ],
+            self::RELEASE018_UPDATE022          => [
+                self::CLASS_CONST                   => self::class,
+                self::FUNCTION_CONST                => 'update022',
+            ],
         ],
         self::PRIO_TINEBASE_UPDATE          => [
             self::RELEASE018_UPDATE011          => [
@@ -113,6 +134,14 @@ class Tinebase_Setup_Update_18 extends Setup_Update_Abstract
                 self::CLASS_CONST                   => self::class,
                 self::FUNCTION_CONST                => 'update016',
             ],
+            self::RELEASE018_UPDATE018          => [
+                self::CLASS_CONST                   => self::class,
+                self::FUNCTION_CONST                => 'update018',
+            ],
+            self::RELEASE018_UPDATE023          => [
+                self::CLASS_CONST                   => self::class,
+                self::FUNCTION_CONST                => 'update023',
+            ],
         ],
     ];
 
@@ -136,8 +165,14 @@ class Tinebase_Setup_Update_18 extends Setup_Update_Abstract
             $this->setTableVersion('accounts', 20);
         }
 
-        Tinebase_Core::getDb()->query('UPDATE ' . SQL_TABLE_PREFIX . 'accounts SET login_failures = ' .
-            'JSON_OBJECT("JSON-RPC", CAST(login_failures AS INTEGER)) WHERE login_failures IS NOT NULL');
+        try {
+            Tinebase_Core::getDb()->query('UPDATE ' . SQL_TABLE_PREFIX . 'accounts SET login_failures = ' .
+                'JSON_OBJECT("JSON-RPC", CAST(login_failures AS INTEGER)) WHERE login_failures IS NOT NULL');
+        } catch (Zend_Db_Statement_Exception $zdse) {
+            // skip trying to use the old value - mysql 8.0 does not like the above statement
+            Tinebase_Core::getDb()->query('UPDATE ' . SQL_TABLE_PREFIX
+                . 'accounts SET login_failures = NULL WHERE login_failures IS NOT NULL');
+        }
         $this->addApplicationUpdate(Tinebase_Config::APP_NAME, '18.1', self::RELEASE018_UPDATE001);
     }
 
@@ -270,6 +305,7 @@ class Tinebase_Setup_Update_18 extends Setup_Update_Abstract
 
     public function update010(): void
     {
+        Tinebase_TransactionManager::getInstance()->rollBack();
         Setup_SchemaTool::updateSchema([
             Tinebase_Model_TwigTemplate::class,
         ]);
@@ -387,6 +423,114 @@ class Tinebase_Setup_Update_18 extends Setup_Update_Abstract
         Tinebase_Config::getInstance()->set(Tinebase_Config::SMTP, $smtpconfig);
         Tinebase_Config::getInstance()->set(Tinebase_Config::IMAP, $imapconfig);
 
-        $this->addApplicationUpdate(Tinebase_Config::APP_NAME, '18.17', self::RELEASE018_UPDATE017);
+        $this->addApplicationUpdate(Tinebase_Config::APP_NAME, '18.17',
+            self::RELEASE018_UPDATE017);
+    }
+
+    public function update018(): void
+    {
+        $db = Tinebase_Core::getDb();
+        // disable scheduler tasks without valid app (because app might have been removed / cleanup failed / ...)
+        $db->query('UPDATE ' . $db->quoteIdentifier(SQL_TABLE_PREFIX . 'scheduler_task') . ' SET ' .
+            'active = 0 WHERE application_id = ""');
+
+        $this->addApplicationUpdate(Tinebase_Config::APP_NAME, '18.18',
+            self::RELEASE018_UPDATE018);
+    }
+
+    public function update019(): void
+    {
+        Tinebase_TransactionManager::getInstance()->rollBack();
+
+        if ($this->getTableVersion('record_observer') < 7) {
+            $this->setTableVersion('record_observer', 7);
+        }
+
+        ($db = $this->getDb())->query('UPDATE ' . $db->quoteIdentifier(SQL_TABLE_PREFIX . 'record_observer') . ' SET observable_identifier = "" WHERE observable_identifier IS NULL');
+
+        $this->_backend->alterCol('record_observer', new Setup_Backend_Schema_Field_Xml('
+            <field>
+                    <name>observable_identifier</name>
+                    <type>text</type>
+                    <length>40</length>
+                    <notnull>true</notnull>
+                </field>'));
+
+        $this->addApplicationUpdate(Tinebase_Config::APP_NAME, '18.19', self::RELEASE018_UPDATE019);
+    }
+
+    public function update020(): void
+    {
+        Tinebase_TransactionManager::getInstance()->rollBack();
+
+        if ($this->getTableVersion('customfield_config') < 10) {
+            $this->setTableVersion('customfield_config', 10);
+        }
+
+        $this->_backend->alterCol('customfield_config', new Setup_Backend_Schema_Field_Xml('
+            <field>
+                <name>model</name>
+                <type>text</type>
+                <length>100</length>
+                <notnull>true</notnull>
+            </field>'));
+
+        $this->addApplicationUpdate(Tinebase_Config::APP_NAME, '18.20', self::RELEASE018_UPDATE020);
+    }
+
+    public function update021(): void
+    {
+        Tinebase_TransactionManager::getInstance()->rollBack();
+
+        Setup_SchemaTool::updateSchema([
+            Tinebase_Model_AppPassword::class,
+        ]);
+
+        $this->_db->update(
+            Tinebase_Controller_AppPassword::getInstance()->getBackend()->getPrefixedTableName(),
+            ['auth_token' => new Zend_Db_Expr('CONCAT("sha1_", auth_token)')],
+            'auth_token IS NOT NULL AND auth_token NOT LIKE "sha1_%"'
+        );
+
+        foreach ($this->_db->query('SELECT `key_id`, `account_id`, `key`, `routes`, `ttl` FROM ' . SQL_TABLE_PREFIX . 'jwt_access_routes WHERE `is_deleted` = 0 AND (`ttl` IS NULL OR `ttl` > NOW())')->fetchAll(Zend_Db::FETCH_ASSOC) as $row) {
+            Tinebase_Controller_AppPassword::getInstance()->create(new Tinebase_Model_AppPassword([
+                Tinebase_Model_AppPassword::FLD_ACCOUNT_ID => $row['account_id'],
+                Tinebase_Model_AppPassword::FLD_JWT_KEY_ID => $row['key_id'],
+                Tinebase_Model_AppPassword::FLD_JWT_PRIVAT_KEY => $row['key'],
+                Tinebase_Model_AppPassword::FLD_CHANNELS => array_fill_keys(json_decode($row['routes'], true), true),
+                Tinebase_Model_AppPassword::FLD_VALID_UNTIL => $row['ttl'] ?? Tinebase_DateTime::now()->addYear(100),
+            ]));
+        }
+
+        $this->dropTable('jsw_access_routes');
+
+        Tinebase_Core::getScheduler()->removeTask('Admin_Controller_JWTAccessRoutes::cleanTTL');
+
+        $this->addApplicationUpdate(Tinebase_Config::APP_NAME, '18.21', self::RELEASE018_UPDATE021);
+    }
+
+    public function update022(): void
+    {
+        $this->dropTable('jwt_access_routes');
+
+        $this->addApplicationUpdate(Tinebase_Config::APP_NAME, '18.22', self::RELEASE018_UPDATE022);
+    }
+
+    public function update023()
+    {
+        Tinebase_TransactionManager::getInstance()->rollBack();
+        $db = $this->getDb();
+
+        $db->update(SQL_TABLE_PREFIX . 'container',
+            ['hierarchy' => null],
+            [
+                $db->quoteInto('model = ?', 'Addressbook_Model_Contact'),
+                'hierarchy IS NOT NULL',
+                'hierarchy != name',
+                'is_deleted = 0'
+            ]
+        );
+
+        $this->addApplicationUpdate(Tinebase_Config::APP_NAME, '18.23', self::RELEASE018_UPDATE023);
     }
 }

@@ -5,13 +5,14 @@
  * @package     Sales
  * @subpackage  Model
  * @license     http://www.gnu.org/licenses/agpl.html AGPL Version 3
- * @copyright   Copyright (c) 2021-2025 Metaways Infosystems GmbH (http://www.metaways.de)
+ * @copyright   Copyright (c) 2021-2026 Metaways Infosystems GmbH (http://www.metaways.de)
  * @author      Paul Mehrer <p.mehrer@metaways.de>
  */
 
 use GoetasWebservices\Xsd\XsdToPhpRuntime\Jms\Handler\BaseTypesHandler;
 use GoetasWebservices\Xsd\XsdToPhpRuntime\Jms\Handler\XmlSchemaDateHandler;
 use JMS\Serializer\Handler\HandlerRegistryInterface;
+use Tinebase_Model_Filter_Abstract as TMFA;
 
 /**
  * Invoice Document Model
@@ -30,6 +31,8 @@ class Sales_Model_Document_Invoice extends Sales_Model_Document_Abstract
     public const FLD_IS_SHARED = 'is_shared';
 
     public const FLD_LAST_DATEV_SEND_DATE = 'last_datev_send_date';
+
+    public const FLD_PAYMENT_REMINDERS = 'payment_reminders';
 
     /**
      * invoice status
@@ -50,16 +53,9 @@ class Sales_Model_Document_Invoice extends Sales_Model_Document_Abstract
         $_definition[self::RECORD_NAME] = 'Invoice'; // gettext('GENDER_Invoice')
         $_definition[self::RECORDS_NAME] = 'Invoices'; // ngettext('Invoice', 'Invoices', n)
 
-        $_definition[self::VERSION] = 4;
+        $_definition[self::VERSION] = 5;
         $_definition[self::MODEL_NAME] = self::MODEL_NAME_PART;
-        $_definition[self::TABLE] = [
-            self::NAME                      => self::TABLE_NAME,
-            /*self::INDEXES                   => [
-                self::FLD_PRODUCT_ID            => [
-                    self::COLUMNS                   => [self::FLD_PRODUCT_ID],
-                ],
-            ]*/
-        ];
+        $_definition[self::TABLE][self::NAME] = self::TABLE_NAME;
 
         // invoice recipient type
         $_definition[self::FIELDS][self::FLD_RECIPIENT_ID][self::CONFIG][self::TYPE] = Sales_Model_Document_Address::TYPE_BILLING;
@@ -81,8 +77,6 @@ class Sales_Model_Document_Invoice extends Sales_Model_Document_Abstract
         ]);
 
         $_definition[self::FIELDS][self::FLD_DOCUMENT_NUMBER][self::NULLABLE] = true;
-        $_definition[self::FIELDS][self::FLD_DOCUMENT_NUMBER][self::CONFIG][Tinebase_Numberable::CONFIG_OVERRIDE] =
-            Sales_Controller_Document_Invoice::class . '::documentNumberConfigOverride';
 
         $translate = Tinebase_Translation::getDefaultTranslation(Sales_Config::APP_NAME);
 
@@ -101,19 +95,40 @@ class Sales_Model_Document_Invoice extends Sales_Model_Document_Abstract
                         Sales_Controller_Document_Invoice::class . '::documentProformaNumberConfigOverride',
                 ],
             ],
-            self::FLD_LAST_DATEV_SEND_DATE       => [
-                self::LABEL                 => 'Last Datev send date', // _('Last Datev send date')
-                self::TYPE                  => self::TYPE_DATETIME,
-                self::VALIDATORS            => array(Zend_Filter_Input::ALLOW_EMPTY => true),
-                self::NULLABLE              => true,
-                self::SHY                   => true,
-            ],
         ]);
 
         $_definition[self::FIELDS][self::FLD_IS_SHARED] = [
             self::TYPE                  => self::TYPE_BOOLEAN,
             self::LABEL                 => 'Shared Document', //_('Shared Document')
             self::DEFAULT_VAL           => false,
+            self::SHY                   => true,
+        ];
+
+        $_definition[self::FIELDS][self::FLD_PAYMENT_REMINDERS] = [
+            self::LABEL             => 'Payment Reminders', // _('Payment Reminders')
+            self::TYPE              => self::TYPE_RECORDS,
+            self::CONFIG            => [
+                self::APP_NAME          => Sales_Config::APP_NAME,
+                self::MODEL_NAME        => Sales_Model_Document_PaymentReminder::MODEL_NAME_PART,
+                self::DEPENDENT_RECORDS => true,
+                self::REF_ID_FIELD      => Sales_Model_Document_PaymentReminder::FLD_DOCUMENT_ID,
+                self::FORCE_VALUES      => [
+                    Sales_Model_Document_PaymentReminder::FLD_DOCUMENT_TYPE => static::class,
+                ],
+                self::ADD_FILTERS       => [
+                    [TMFA::FIELD => Sales_Model_Document_SalesTax::FLD_DOCUMENT_TYPE, TMFA::OPERATOR => TMFA::OP_EQUALS, TMFA::VALUE => static::class],
+                ],
+            ],
+            self::UI_CONFIG         => [
+                'xtype'                 => 'wdgt.pickergrid-layercombo'
+            ],
+        ];
+
+        $_definition[self::FIELDS][self::FLD_LAST_DATEV_SEND_DATE] = [
+            self::LABEL                 => 'Last Datev send date', // _('Last Datev send date')
+            self::TYPE                  => self::TYPE_DATETIME,
+            self::VALIDATORS            => array(Zend_Filter_Input::ALLOW_EMPTY => true),
+            self::NULLABLE              => true,
             self::SHY                   => true,
         ];
     }

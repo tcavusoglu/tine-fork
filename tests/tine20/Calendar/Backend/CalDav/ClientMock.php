@@ -17,28 +17,12 @@
  */
 class Calendar_Backend_CalDav_ClientMock extends Calendar_Backend_CalDav_Client
 {
-    /**
-     * needs to be overwritten because of the added flavor (osxical)
-     * 
-     * @var string
-     */
-    const findAllCalendarsRequest = '<?xml version="1.0"?>
-<d:propfind xmlns:d="DAV:">
-  <d:prop>
-    <d:resourcetype/>
-    <d:acl/>
-    <d:displayname/>
-    <x:supported-calendar-component-set xmlns:x="urn:ietf:params:xml:ns:caldav"/>
-  <osxical:calendar-color xmlns:osxical="http://apple.com/ns/ical/"/></d:prop>
-</d:propfind>
-';
-    
     protected $_currentUserPrincipalResponse = array(
-        '{DAV:}current-user-principal' => '/principals/__uids__/0AA03A3B-F7B6-459A-AB3E-4726E53637D0/'
+        '{DAV:}current-user-principal' => [['value' => '/principals/__uids__/0AA03A3B-F7B6-459A-AB3E-4726E53637D0/']],
     );
     
     protected $_calendarHomeSetResponse =  array (
-        '{urn:ietf:params:xml:ns:caldav}calendar-home-set' => '/calendars/__uids__/0AA03A3B-F7B6-459A-AB3E-4726E53637D0',
+        '{urn:ietf:params:xml:ns:caldav}calendar-home-set' => [['value' => '/calendars/__uids__/0AA03A3B-F7B6-459A-AB3E-4726E53637D0']],
     );
     
     protected $_calendarICSResponse = array (
@@ -299,7 +283,17 @@ END:VCALENDAR',
           '/calendars/__uids__/0AA03A3B-F7B6-459A-AB3E-4726E53637D0/' => 
                array(
                   '{DAV:}resourcetype' => new Sabre\DAV\Xml\Property\ResourceType(array('{DAV:}collection')),
-                  '{DAV:}acl' => new Sabre\DAVACL\Xml\Property\Acl(array(
+                   '{DAV:}current-user-privilege-set' => [
+                       [
+                           'name' => '{DAV:}privilege',
+                           'value' => [
+                               [
+                                   'name' => '{DAV:}all',
+                               ]
+                           ]
+                       ]
+                   ],
+                  /*'{DAV:}acl' => new Sabre\DAVACL\Xml\Property\Acl(array(
                     array (
                       'principal' => '/principals/__uids__/0AA03A3B-F7B6-459A-AB3E-4726E53637D0/',
                       'protected' => true,
@@ -335,16 +329,30 @@ END:VCALENDAR',
                       'protected' => true,
                       'privilege' => '{DAV:}write',
                     ),
-                )),
+                )),*/
                 '{DAV:}displayname' => 'User1 Test',
-                '{urn:ietf:params:xml:ns:caldav}supported-calendar-component-set' => new
-                    Sabre\CalDAV\Xml\Property\SupportedCalendarComponentSet(array(
-                        0 => 'VEVENT',
-                        1 => 'VTODO',
-                        2 => 'VTIMEZONE',
-                        3 => 'VJOURNAL',
-                        4 => 'VFREEBUSY',
-                    )),
+                '{urn:ietf:params:xml:ns:caldav}supported-calendar-component-set' => [
+                    [
+                        'name' => '{urn:ietf:params:xml:ns:caldav}comp',
+                        'attributes' => ['name' => 'VEVENT']
+                    ],
+                    [
+                        'name' => '{urn:ietf:params:xml:ns:caldav}comp',
+                        'attributes' => ['name' => 'VTODO']
+                    ],
+                    [
+                        'name' => '{urn:ietf:params:xml:ns:caldav}comp',
+                        'attributes' => ['name' => 'VTIMEZONE']
+                    ],
+                    [
+                        'name' => '{urn:ietf:params:xml:ns:caldav}comp',
+                        'attributes' => ['name' => 'VJOURNAL']
+                    ],
+                    [
+                        'name' => '{urn:ietf:params:xml:ns:caldav}comp',
+                        'attributes' => ['name' => 'VFREEBUSY']
+                    ],
+                ],
                ),
             '/calendars/__uids__/0AA03A3B-F7B6-459A-AB3E-4726E53637D0/calendar/' =>
             array (
@@ -353,7 +361,17 @@ END:VCALENDAR',
                     0 => '{DAV:}collection',
                     1 => '{urn:ietf:params:xml:ns:caldav}calendar',
                 )),
-                '{DAV:}acl' =>
+                '{DAV:}current-user-privilege-set' => [
+                    [
+                        'name' => '{DAV:}privilege',
+                        'value' => [
+                            [
+                                'name' => '{DAV:}all',
+                            ]
+                        ]
+                    ]
+                ],
+                /*'{DAV:}acl' =>
                 new Sabre\DAVACL\Xml\Property\Acl(array(
                     array (
                         'principal' => '/principals/__uids__/0AA03A3B-F7B6-459A-AB3E-4726E53637D0/',
@@ -390,16 +408,30 @@ END:VCALENDAR',
                         'protected' => true,
                         'privilege' => '{DAV:}write',
                     ),
-                )),
+                )),*/
                 '{DAV:}displayname' => 'calendar',
-                '{urn:ietf:params:xml:ns:caldav}supported-calendar-component-set' =>
-                new Sabre\CalDAV\Xml\Property\SupportedCalendarComponentSet(array(
-                    0 => 'VEVENT',
-                    1 => 'VTODO',
-                    2 => 'VTIMEZONE',
-                    3 => 'VJOURNAL',
-                    4 => 'VFREEBUSY',
-                )),
+                '{urn:ietf:params:xml:ns:caldav}supported-calendar-component-set' => [
+                    [
+                        'name' => '{urn:ietf:params:xml:ns:caldav}comp',
+                        'attributes' => ['name' => 'VEVENT']
+                    ],
+                    [
+                        'name' => '{urn:ietf:params:xml:ns:caldav}comp',
+                        'attributes' => ['name' => 'VTODO']
+                    ],
+                    [
+                        'name' => '{urn:ietf:params:xml:ns:caldav}comp',
+                        'attributes' => ['name' => 'VTIMEZONE']
+                    ],
+                    [
+                        'name' => '{urn:ietf:params:xml:ns:caldav}comp',
+                        'attributes' => ['name' => 'VJOURNAL']
+                    ],
+                    [
+                        'name' => '{urn:ietf:params:xml:ns:caldav}comp',
+                        'attributes' => ['name' => 'VFREEBUSY']
+                    ],
+                ],
                 '{http://apple.com/ns/ical/}calendar-color' => '#711A76FF',
             ),
             );

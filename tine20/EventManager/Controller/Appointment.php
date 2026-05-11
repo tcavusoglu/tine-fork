@@ -1,23 +1,27 @@
 <?php
+
+declare(strict_types=1);
+
 /**
- * Event controller
+ * Appointment controller
  *
  * @package     EventManager
  * @subpackage  Controller
- * @license     http://www.gnu.org/licenses/agpl.html AGPL Version 3
- * @author      Tonia Leuschel <t.leuschel@metaways.de>
- * @copyright   Copyright (c) 2025 Metaways Infosystems GmbH (http://www.metaways.de)
+ * @license     https://www.gnu.org/licenses/agpl.html AGPL Version 3
+ * @author      Tonia Wulff <t.leuschel@metaways.de>
+ * @copyright   Copyright (c) 2025 Metaways Infosystems GmbH (https://www.metaways.de)
  *
  */
 
 /**
- * Event controller
+ * Appointment controller
  *
  * @package     EventManager
  * @subpackage  Controller
  */
 class EventManager_Controller_Appointment extends Tinebase_Controller_Record_Abstract
 {
+    /** @use Tinebase_Controller_SingletonTrait<EventManager_Controller_Appointment> */
     use Tinebase_Controller_SingletonTrait;
 
     /**

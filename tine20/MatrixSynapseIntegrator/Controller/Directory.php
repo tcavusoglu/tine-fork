@@ -21,6 +21,7 @@ use function PHPUnit\Framework\returnArgument;
  */
 class MatrixSynapseIntegrator_Controller_Directory extends Tinebase_Controller_Record_Abstract
 {
+    /** @use Tinebase_Controller_SingletonTrait<MatrixSynapseIntegrator_Controller_Directory> */
     use Tinebase_Controller_SingletonTrait;
 
     protected const INCLUDED_USER_FIELDS = [
@@ -90,6 +91,11 @@ class MatrixSynapseIntegrator_Controller_Directory extends Tinebase_Controller_R
         }
 
         $contact = Addressbook_Controller_Contact::getInstance()->getContactByUserId($user);
+
+        if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) {
+            Tinebase_Core::getLogger()->trace(__METHOD__ . '::' . __LINE__
+                . ' ' . print_r($contact->toArray(), true));
+        }
 
         foreach (self::INCLUDED_CONTACT_FIELDS as $field) {
             $value = $contact->{$field};

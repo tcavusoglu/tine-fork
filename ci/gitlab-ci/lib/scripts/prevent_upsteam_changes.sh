@@ -11,17 +11,23 @@ function prevent_upstream_change() {
 
     changes="$(git diff --name-only -r --diff-filter=a origin/$downstream)"
 
-    for allowed in $(cat ci/upstream-change-global-whitelist.txt) $(cat ci/upstream-change-whitelist.txt || true); do
-        changes="$(echo "$changes" | grep -v -E "^$allowed$" || true)"
+    for f in ci/upstream-change-global-whitelist.txt ci/upstream-change-whitelist.txt; do
+        if [ -f $f ]; then
+            while read allowed; do
+                changes="$(echo "$changes" | grep -v -E "^$allowed$" || true)"
+            done < <(grep "" $f) # using grep as it adds a new line to the end of the file. If there is no newline at the end of the last line, the loop will skip it
+        fi
     done
 
     if [[ -z "$changes" ]]; then
         return
     fi
 
+    echo -e "\033[0;31m"
     echo 'Changing downstream files upstream is not encouraged! If changing them is necessary, either:'
     echo '* disable this job with the merge request label "allow-failure-prevent-upstream-changes"'
     echo '* or add an permanent exception to "ci/upstream-change-whitelist.txt".'
+    echo -n -e "\033[0m"
     echo Changes:
     echo "$changes"
 

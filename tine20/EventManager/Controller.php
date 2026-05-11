@@ -1,12 +1,15 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * EventManager Controller
  *
  * @package      EventManager
  * @subpackage   Controller
- * @license      http://www.gnu.org/licenses/agpl.html AGPL Version 3
- * @author       Philipp Schüle <p.schuele@metaways.de>
- * @copyright    Copyright (c) 2020 Metaways Infosystems GmbH (http://www.metaways.de)
+ * @license      https://www.gnu.org/licenses/agpl.html AGPL Version 3
+ * @author       Philipp Schüle <p.schuele@metaways.de> Tonia Wulff <t.leuschel@metaways.de>
+ * @copyright    Copyright (c) 2020-2025 Metaways Infosystems GmbH (https://www.metaways.de)
  *
  */
 
@@ -18,6 +21,7 @@
  */
 class EventManager_Controller extends Tinebase_Controller_Event
 {
+    /** @use Tinebase_Controller_SingletonTrait<EventManager_Controller> */
     use Tinebase_Controller_SingletonTrait;
 
     protected static $_defaultModel = EventManager_Model_Event::class;
@@ -35,33 +39,37 @@ class EventManager_Controller extends Tinebase_Controller_Event
                 'publicApiGetRssFeed',
                 [Tinebase_Expressive_RouteHandler::IS_PUBLIC => true]
             ))->toArray());
-
+            $routeCollector->get('/view[/{path:.+}]', (new Tinebase_Expressive_RouteHandler(
+                EventManager_Controller_Event::class,
+                'publicApiMainScreen',
+                [Tinebase_Expressive_RouteHandler::IS_PUBLIC => true]
+            ))->toArray());
             $routeCollector->get('/getFile/{node_id}', (new Tinebase_Expressive_RouteHandler(
                 EventManager_Controller_Registration::class,
                 'publicApiGetFile',
                 [Tinebase_Expressive_RouteHandler::IS_PUBLIC => true]
             ))->toArray());
-            $routeCollector->get('/view', (new Tinebase_Expressive_RouteHandler(
+            $routeCollector->get('/events', (new Tinebase_Expressive_RouteHandler(
                 EventManager_Controller_Event::class,
-                'publicApiMainScreen',
+                'publicApiEvents',
                 [Tinebase_Expressive_RouteHandler::IS_PUBLIC => true]
             ))->toArray());
-            $routeCollector->get('/view/search/event', (new Tinebase_Expressive_RouteHandler(
+            $routeCollector->get('/contact', (new Tinebase_Expressive_RouteHandler(
                 EventManager_Controller_Event::class,
-                'publicApiSearchEvents',
+                'publicApiStatic',
                 [Tinebase_Expressive_RouteHandler::IS_PUBLIC => true]
             ))->toArray());
-            $routeCollector->get('/view/event/{event_id}', (new Tinebase_Expressive_RouteHandler(
+            $routeCollector->get('/event/{event_id}[/registration/{token}]', (new Tinebase_Expressive_RouteHandler(
                 EventManager_Controller_Event::class,
                 'publicApiGetEvent',
                 [Tinebase_Expressive_RouteHandler::IS_PUBLIC => true]
             ))->toArray());
-            $routeCollector->get('/get/contact/{token}/{event_id}', (new Tinebase_Expressive_RouteHandler(
+            $routeCollector->get('/account/{token}', (new Tinebase_Expressive_RouteHandler(
                 EventManager_Controller_Event::class,
-                'publicApiGetEventContactDetails',
+                'publicApiGetAccountDetails',
                 [Tinebase_Expressive_RouteHandler::IS_PUBLIC => true]
             ))->toArray());
-            $routeCollector->post('/register/{event_id}/{is_update}', (new Tinebase_Expressive_RouteHandler(
+            $routeCollector->post('/register/{event_id}', (new Tinebase_Expressive_RouteHandler(
                 EventManager_Controller_Registration::class,
                 'publicApiPostRegistration',
                 [Tinebase_Expressive_RouteHandler::IS_PUBLIC => true]
@@ -78,11 +86,14 @@ class EventManager_Controller extends Tinebase_Controller_Event
                 'publicApiPostDoubleOptIn',
                 [Tinebase_Expressive_RouteHandler::IS_PUBLIC => true]
             ))->toArray());
-            $routeCollector->post('/deregistration/{event_id}/{token}', (new Tinebase_Expressive_RouteHandler(
-                EventManager_Controller_Registration::class,
-                'publicApiPostDeregistration',
-                [Tinebase_Expressive_RouteHandler::IS_PUBLIC => true]
-            ))->toArray());
+            $routeCollector->post(
+                '/deregistration/{event_id}/{token}[/{registration_id}]',
+                (new Tinebase_Expressive_RouteHandler(
+                    EventManager_Controller_Registration::class,
+                    'publicApiPostDeregistration',
+                    [Tinebase_Expressive_RouteHandler::IS_PUBLIC => true]
+                ))->toArray()
+            );
         });
     }
 
@@ -93,8 +104,13 @@ class EventManager_Controller extends Tinebase_Controller_Event
             ->get(EventManager_Config::ALLOWED_FILE_TYPE));
     }
 
-    public static function processFileUpload($tempFileId, $fileName, $eventId, array $folderPath, $updateCallback = null)
-    {
+    public static function processFileUpload(
+        $tempFileId,
+        $fileName,
+        $eventId,
+        array $folderPath,
+        $updateCallback = null
+    ) {
         try {
             $tempFile = Tinebase_TempFile::getInstance()->getTempFile($tempFileId);
 
@@ -135,18 +151,18 @@ class EventManager_Controller extends Tinebase_Controller_Event
                         [Tinebase_Model_Tree_FileObject::TYPE_FILE],
                         [$tempFile->getId()]
                     )->getFirstRecord();
-
-                    if ($updateCallback && is_callable($updateCallback)) {
-                        $updateCallback($node);
-                    }
-                    return $node;
                 } else {
-                    if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) {
-                        Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__
-                            . ' File already exists: ' . $prefix . $fullFileName);
-                    }
-                    return false;
+                    $node = $nodeController->createNodes(
+                        [$fullFileName],
+                        [Tinebase_Model_Tree_FileObject::TYPE_FILE],
+                        [$tempFile->getId()],
+                        true
+                    )->getFirstRecord();
                 }
+                if ($updateCallback && is_callable($updateCallback)) {
+                    $updateCallback($node);
+                }
+                return $node;
             }
         } catch (Tinebase_Exception_NotFound $e) {
             if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) {

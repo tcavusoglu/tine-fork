@@ -1,10 +1,10 @@
 <?php
 /**
- * Tine 2.0 - http://www.tine20.org
+ * tine Groupware
  *
  * @package     Felamimail
- * @license     http://www.gnu.org/licenses/agpl.html
- * @copyright   Copyright (c) 2009-2024 Metaways Infosystems GmbH (http://www.metaways.de)
+ * @license     https://www.gnu.org/licenses/agpl.html
+ * @copyright   Copyright (c) 2009-2026 Metaways Infosystems GmbH (https://www.metaways.de)
  * @author      Philipp Schüle <p.schuele@metaways.de>
  */
 
@@ -2580,10 +2580,7 @@ sich gerne an XXX unter <font color="#0000ff">mail@mail.de</font>&nbsp;oder 000<
 
         $this->assertFalse(isset($regData['defaults']));
         $this->assertFalse(isset($regData['accounts']));
-        $supportedFlags = Felamimail_Config::getInstance()->featureEnabled(Felamimail_Config::FEATURE_TINE20_FLAG)
-            ? 7
-            : 6;
-        $this->assertEquals($supportedFlags, $regData['supportedFlags']['totalcount']);
+        $this->assertEquals(8, $regData['supportedFlags']['totalcount']);
     }
 
     /**
@@ -3215,22 +3212,30 @@ sich gerne an XXX unter <font color="#0000ff">mail@mail.de</font>&nbsp;oder 000<
 
     public function testCleanupAutoSavedDrafts()
     {
-        $draftFolder = Felamimail_Controller_Account::getInstance()->getSystemFolder($this->_account, Felamimail_Model_Folder::FOLDER_DRAFTS);
+        Felamimail_Config::getInstance()->{Felamimail_Config::CLEAR_AUTO_SAVED_DRAFTS_BEFORE_MONTHS} = 0;
+
+        $draftFolder = Felamimail_Controller_Account::getInstance()->getSystemFolder($this->_account,
+            Felamimail_Model_Folder::FOLDER_DRAFTS);
         $filter = [['field' => 'folder_id', 'operator' => 'equals', 'value' => $draftFolder->getId()]];
         
         $this->_saveDraft();
         $result = $this->_json->searchMessages($filter, []);
-        self::assertEquals(1, count($result['results']), 'auto saved draft should be removed: ' . print_r($result, TRUE));
+        self::assertEquals(1, count($result['results']), 'auto saved draft should be removed: '
+            . print_r($result, true));
 
         $messageToSave = $this->_getMessageData('', 'test2');
         $this->_json->saveMessageInFolder($this->_account->drafts_folder, $messageToSave);
         $this->_searchForMessageBySubject($messageToSave['subject'], $this->_account->drafts_folder);
         $result = $this->_json->searchMessages($filter, []);
-        self::assertEquals(2, count($result['results']), 'auto saved draft should be removed: ' . print_r($result, TRUE));
+        self::assertEquals(2, count($result['results']), 'auto saved draft should be removed: '
+            . print_r($result, true));
 
         Felamimail_Controller_Message::getInstance()->cleanupAutoSavedDrafts([$this->_account->getId()]);
         $result = $this->_json->searchMessages($filter, []);
-        self::assertEquals(1, count($result['results']), 'auto saved draft should be removed: ' . print_r($result, TRUE));
+        self::assertEquals(1, count($result['results']), 'auto saved draft should be removed: '
+            . print_r($result, true));
+
+        Felamimail_Config::getInstance()->{Felamimail_Config::CLEAR_AUTO_SAVED_DRAFTS_BEFORE_MONTHS} = 1;
     }
 
     /**
@@ -3243,9 +3248,14 @@ sich gerne an XXX unter <font color="#0000ff">mail@mail.de</font>&nbsp;oder 000<
         $messageToSave = $this->_getMessageData();
         $messageToSave['messageuid'] = '';
         $messageToSave['bcc'] = array('bccaddress@email.org', 'bccaddress2@email.org');
+        $messageToSave['headers'][Felamimail_Model_Message::HEADER_DRAFT_MESSAGE_ID] = Tinebase_Record_Abstract::generateUID();
         $draft = $this->_json->saveDraft($messageToSave);
         $this->_foldersToClear = array($this->_account->drafts_folder);
         self::assertNotEmpty($draft['messageuid'], 'messageuid of draft message missing: ' . print_r($draft, true));
+        self::assertArrayHasKey('headers', $draft);
+        self::assertArrayHasKey(Felamimail_Model_Message::HEADER_DRAFT_MESSAGE_ID, $draft['headers']);
+        self::assertEquals($messageToSave['headers'][Felamimail_Model_Message::HEADER_DRAFT_MESSAGE_ID],
+            $draft['headers'][Felamimail_Model_Message::HEADER_DRAFT_MESSAGE_ID]);
 
         // check if message is in drafts folder and recipients are present
         $message = $this->_searchForMessageBySubject($messageToSave['subject'], $this->_account->drafts_folder);
@@ -3270,7 +3280,8 @@ sich gerne an XXX unter <font color="#0000ff">mail@mail.de</font>&nbsp;oder 000<
     public function testDeleteDraft()
     {
         $draft = $this->_saveDraft();
-        $result = $this->_json->deleteDraft($draft['messageuid'], $draft['account_id']);
+        $result = $this->_json->deleteDraft($draft['headers'][Felamimail_Model_Message::HEADER_DRAFT_MESSAGE_ID],
+            $draft['account_id']);
         self::assertTrue($result['success']);
         $this->_assertDraftNotFound($draft);
     }

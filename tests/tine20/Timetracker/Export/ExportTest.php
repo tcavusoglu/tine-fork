@@ -37,11 +37,11 @@ class Timetracker_Export_ExportTest extends Timetracker_AbstractTest
         try {
             rewind($fh);
 
-            $row = fgetcsv($fh, 0, "\t", '"');
+            $row = fgetcsv($fh, 0, "\t", '"', escape: '\\');
             static::assertTrue(is_array($row), 'could not read csv ');
             static::assertStringContainsString('Tags', $row[0]);
 
-            $row = fgetcsv($fh, 0, "\t", '"');
+            $row = fgetcsv($fh, 0, "\t", '"', escape: '\\');
             static::assertTrue(is_array($row), 'could not read csv ');
             static::assertStringContainsString('blabla', $row[0]);
         } finally {
@@ -149,7 +149,7 @@ class Timetracker_Export_ExportTest extends Timetracker_AbstractTest
         $result = $odsExportClass->generate();
         
         $this->assertTrue(file_exists($result));
-        
+
         $xmlBody = $odsExportClass->getDocument()->asXML();
         $this->assertEquals(1, preg_match("/". $timeaccountData['description'] ."/", $xmlBody), 'no description');
         
@@ -183,7 +183,9 @@ class Timetracker_Export_ExportTest extends Timetracker_AbstractTest
         $result = $odsExportClass->generate();
         
         $this->assertTrue(file_exists($result));
-        
+        $this->assertEquals('export_timetracker_abcde-1234.ods', $odsExportClass->getDownloadFilename('timetracker', 'ods'));
+
+
         $xmlBody = $odsExportClass->getDocument()->asXML();
         
         $doc = $odsExportClass->getDocument()->getBody();

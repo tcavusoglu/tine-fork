@@ -64,12 +64,23 @@ Ext.apply(Ext.form.HtmlEditor.prototype, {
         };
         event.preventDefault();
 
+        // save selection
+        const win = this.win;
+        const sel = win.getSelection();
+        const savedRange = sel.rangeCount ? sel.getRangeAt(0).cloneRange() : null;
+
         if (htmlText) {
             try {
                 const app = Tine.Tinebase.appMgr.get('Tinebase');
+                let msg = app.i18n._('Do you want to copy the HTML content with styles?') +
+                    `<br><br>`
+                    + `<br><i>` + app.i18n._('Hint: You can paste content without formatting by pressing Ctrl + Shift + V') + `<i>`;
                 if (await Ext.MessageBox.confirm(
                     app.i18n._('Confirm'),
-                    app.i18n._('Do you want to copy the HTML content with styles?'),
+                    msg,
+                    null,
+                    null,
+                    'Confirm-Dialog-copyTextWithHTMLFormat'
                 ) === 'yes') {
                     const html = await Tine.Tinebase.purifyHTML(htmlText);
                     result = {
@@ -79,6 +90,14 @@ Ext.apply(Ext.form.HtmlEditor.prototype, {
                 }
             } catch (e) {}
         }
+
+        // restore selection after await
+        if (savedRange) {
+            const s = win.getSelection();
+            s.removeAllRanges();
+            s.addRange(savedRange);
+        }
+
         this.execCmd(result.method, result.content);
     },
 });

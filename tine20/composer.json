@@ -26,15 +26,19 @@
     },
     {
       "type": "git",
+      "url": "https://github.com/tine-groupware/openid-connect-server.git"
+    },
+    {
+      "type": "git",
       "url": "https://github.com/tine-groupware/sddl-parser.git"
     },
     {
       "type": "git",
-      "url": "https://github.com/tine-groupware/simplesamlphp.git"
+      "url": "https://github.com/tine-groupware/timezoneconvert.git"
     },
     {
       "type": "git",
-      "url": "https://github.com/tine-groupware/timezoneconvert.git"
+      "url": "https://github.com/tine-groupware/twig-html-extra"
     },
     {
       "type": "git",
@@ -74,6 +78,10 @@
     },
     {
       "type": "git",
+      "url": "https://github.com/tine-groupware/sentry-php.git"
+    },
+    {
+      "type": "git",
       "url": "https://github.com/tine20/syncroton.git"
     },
     {
@@ -82,11 +90,31 @@
     },
     {
       "type": "git",
+      "url": "https://github.com/tine-groupware/DKIMValidator.git"
+    },
+    {
+      "type": "git",
       "url": "https://github.com/tine-groupware/basic-feeds.git"
+    },
+    {
+      "type": "git",
+      "url": "https://github.com/tine-groupware/simplesamlphp.git"
+    },
+    {
+      "type": "git",
+      "url": "https://github.com/tine-groupware/ssaml-xml-common.git"
+    },
+    {
+      "type": "git",
+      "url": "https://github.com/tine-groupware/ssamlassert.git"
+    },
+    {
+      "type": "git",
+      "url": "https://github.com/tine-groupware/http-foundation.git"
     }
   ],
   "require": {
-    "php": "8.1 - 8.3",
+    "php": "8.2 - 8.4 | ~8.5.4",
     "ext-SPL": "*",
     "ext-SimpleXML": "*",
     "ext-bcmath": "*",
@@ -108,7 +136,7 @@
     "ext-xmlreader": "*",
     "ext-xmlwriter": "*",
     "ext-zip": "*",
-    "antibodies-online/bootstrap-email": "^1.0",
+    "antibodies-online/bootstrap-email": "^2.0",
     "aschmelyun/basic-feeds": "^0.0.2",
     "benmorel/gsm-charset-converter": "^0.2",
     "clean/phpdoc-md": "^0.19.3",
@@ -124,7 +152,7 @@
     "hfig/mapi": "^1.3",
     "jms/serializer": "^3.30",
     "jumbojett/openid-connect-php": "dev-master",
-    "laminas/laminas-diactoros": "^2.7",
+    "laminas/laminas-diactoros": "^3.8",
     "laminas/laminas-http": "^2.16",
     "laminas/laminas-httphandlerrunner": "^2",
     "laminas/laminas-stdlib": "^3.5",
@@ -136,27 +164,33 @@
     "metaways/timezoneconvert": "1.*",
     "mlocati/ip-lib": "^1.18",
     "nikic/fast-route": "^1.2",
-    "nl.idaas/openid-server": "0.*",
+    "nl.idaas/openid-server": "v0.4.3pl1 as v0.4.3",
     "palepurple/rate-limit": "^2.0",
     "pear/ole": "^1.0",
     "pear/pear-core-minimal": "^1.10",
     "php-http/curl-client": "^2.1",
-    "phpoffice/phpexcel": "1.8.2pl8 as 1.8.2",
-    "phpoffice/phpspreadsheet": "1.24.1pl5 as 1.24.1",
-    "phpoffice/phpword": "^0.18",
+    "phpmailer/dkimvalidator": "v0.3.1pl1 as v0.3.1",
+    "phpoffice/phpexcel": "1.8.2pl13 as 1.8.2",
+    "phpoffice/phpspreadsheet": "1.24.1pl6 as 1.24.1",
+    "phpoffice/phpword": "1.*",
     "psr/http-server-middleware": "^1.0",
     "ramsey/collection": "^1.2",
     "ramsey/uuid": "^4.7",
     "sabre/dav": "^4.5",
     "sabre/vobject": "^4.5",
-    "sentry/sentry": "^3",
-    "simplesamlphp/simplesamlphp": "dev-pu/pm/replaceAssertOptions as v1.19.9",
+    "sentry/sentry": "3.22.1pl3 as 3.22.1",
+    "simplesamlphp/assert": "v1.9.1pl1 as v1.9.1",
+    "simplesamlphp/simplesamlphp": "v2.5.0pl4 as v2.5.0",
+    "simplesamlphp/xml-common": "dev-master as v2.4.3",
+    "smalot/pdfparser": "^2.12",
+    "spomky-labs/base64url": "^2.0",
     "spomky-labs/otphp": "^10.0",
     "strobotti/php-jwk": "^1.4",
     "symfony/cache": "^5.3",
-    "symfony/config": "^4",
-    "symfony/dependency-injection": "^4",
+    "symfony/config": "^7",
+    "symfony/dependency-injection": "^7",
     "symfony/http-client": "5.2 - 7",
+    "symfony/http-foundation": "v7.4.1pl1 as v7.4.1",
     "symfony/intl": "^5.4",
     "syncroton/syncroton": "^1.5",
     "tine-groupware/sddl-parser": "0.0.2",
@@ -164,10 +198,10 @@
     "tine20/composerapploader": "1.0.*",
     "twig/cssinliner-extra": "^3.7",
     "twig/extensions": "^1.5",
-    "twig/html-extra": "^3.7",
-    "twig/twig": "v2.15.5",
+    "twig/html-extra": "v3.7.1pl1 as v3.7.1",
+    "twig/twig": "v2.16.1pl1 as v2.16.1",
     "validator/livr": "dev-master#6309697f926a20e1267cc15ee5b847b5c6ecdbcd",
-    "web-auth/webauthn-lib": "^3.3",
+    "web-auth/webauthn-lib": "^5.0",
     "xenolope/quahog": "^2.1",
     "zbateson/mail-mime-parser": "3.*",
     "zendframework/zendframework1": "1.12.20.*"
@@ -176,6 +210,7 @@
     "digitalrevolution/php-codesniffer-baseline": "^1.1",
     "laminas/laminas-psr7bridge": "^1",
     "phing/phing": "2.16.*",
+    "php-mock/php-mock-phpunit": "^2.14",
     "phpstan/phpstan": "^1.6",
     "phpunit/phpunit": "^9.6",
     "rector/rector": "^1.2",
@@ -183,7 +218,6 @@
     "tedivm/jshrink": "~1.0"
   },
   "autoload": {
-    "files": [],
     "psr-4": {
       "UBL21\\": "ubl/php"
     },
@@ -206,37 +240,44 @@
     "library"
   ],
   "config": {
+    "audit": {
+      "ignore": {
+        "PKSA-yhcn-xrg3-68b1": "twig v2.16.1",
+        "PKSA-2wrf-1xmk-1pky": "twig v2.16.1"
+      }
+    },
     "secure-http": false,
     "platform": {
-      "php": "8.1",
-      "ext-spl": "8.1",
-      "ext-simplexml": "8.1",
-      "ext-bcmath": "8.1",
-      "ext-ctype": "8.1",
-      "ext-curl": "8.1",
-      "ext-date": "8.1",
-      "ext-dom": "8.1",
-      "ext-gd": "8.1",
-      "ext-hash": "8.1",
-      "ext-iconv": "8.1",
-      "ext-intl": "8.1",
-      "ext-json": "8.1",
-      "ext-libxml": "8.1",
-      "ext-mbstring": "8.1",
-      "ext-openssl": "8.1",
-      "ext-pdo": "8.1",
-      "ext-redis": "8.1",
-      "ext-xml": "8.1",
-      "ext-xmlreader": "8.1",
-      "ext-xmlwriter": "8.1",
-      "ext-zip": "8.1"
+      "php": "8.2",
+      "ext-spl": "8.2",
+      "ext-simplexml": "8.2",
+      "ext-bcmath": "8.2",
+      "ext-ctype": "8.2",
+      "ext-curl": "8.2",
+      "ext-date": "8.2",
+      "ext-dom": "8.2",
+      "ext-gd": "8.2",
+      "ext-hash": "8.2",
+      "ext-iconv": "8.2",
+      "ext-intl": "8.2",
+      "ext-json": "8.2",
+      "ext-libxml": "8.2",
+      "ext-mbstring": "8.2",
+      "ext-openssl": "8.2",
+      "ext-pdo": "8.2",
+      "ext-redis": "8.2",
+      "ext-xml": "8.2",
+      "ext-xmlreader": "8.2",
+      "ext-xmlwriter": "8.2",
+      "ext-zip": "8.2"
     },
     "sort-packages": true,
     "allow-plugins": {
-      "tine20/composerapploader": true,
-      "simplesamlphp/composer-module-installer": false,
       "digitalrevolution/php-codesniffer-baseline": true,
-      "php-http/discovery": true
+      "php-http/discovery": true,
+      "simplesamlphp/composer-module-installer": false,
+      "simplesamlphp/composer-xmlprovider-installer": false,
+      "tine20/composerapploader": true
     },
     "autoloader-suffix": "stable",
     "audit": {

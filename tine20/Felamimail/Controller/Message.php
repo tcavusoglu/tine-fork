@@ -1,12 +1,12 @@
 <?php
 /**
- * Tine 2.0
+ * tine Groupware
  *
  * @package     Felamimail
  * @subpackage  Controller
- * @license     http://www.gnu.org/licenses/agpl.html AGPL Version 3
+ * @license     https://www.gnu.org/licenses/agpl.html AGPL Version 3
  * @author      Philipp Schüle <p.schuele@metaways.de>
- * @copyright   Copyright (c) 2009-2025 Metaways Infosystems GmbH (http://www.metaways.de)
+ * @copyright   Copyright (c) 2009-2026 Metaways Infosystems GmbH (https://www.metaways.de)
  */
 
 use Hfig\MAPI\OLE\Pear;
@@ -201,13 +201,15 @@ class Felamimail_Controller_Message extends Tinebase_Controller_Record_Abstract
      * get complete message by id
      *
      * @param string|Felamimail_Model_Message $_id
-     * @param string $_partId
+     * @param null $_partId
      * @param string $mimeType
-     * @param boolean $_setSeen
      * @return Felamimail_Model_Message
-     * @throws Exception
+     * @throws Setup_Exception
+     * @throws Tinebase_Exception_AccessDenied
+     * @throws Tinebase_Exception_InvalidArgument
+     * @throws Tinebase_Exception_NotFound
      */
-    public function getCompleteMessage($_id, $_partId = NULL, $mimeType = 'configured', $_setSeen = FALSE)
+    public function getCompleteMessage($_id, $_partId = NULL, $mimeType = 'configured')
     {
         if ($_id instanceof Felamimail_Model_Message) {
             $message = $_id;
@@ -226,17 +228,9 @@ class Felamimail_Controller_Message extends Tinebase_Controller_Record_Abstract
 
         $message = $this->_getCompleteMessageContent($message, $account, $_partId, $mimeType);
 
-        if (Felamimail_Controller_Message_Flags::getInstance()->tine20FlagEnabled($message)) {
-            Felamimail_Controller_Message_Flags::getInstance()->setTine20Flag($message);
-        }
-
         if (Felamimail_Config::getInstance()->featureEnabled(Felamimail_Config::FEATURE_SPAM_SUSPICION_STRATEGY)) {
             $strategy = Felamimail_Spam_SuspicionStrategy_Factory::factory();
             $message->is_spam_suspicions = $strategy->apply($message);
-        }
-
-        if ($_setSeen) {
-            Felamimail_Controller_Message_Flags::getInstance()->setSeenFlag($message);
         }
 
         $this->prepareAndProcessParts($message, $account);
@@ -817,7 +811,7 @@ class Felamimail_Controller_Message extends Tinebase_Controller_Record_Abstract
             return $messageBody;
         }
 
-        if (count($bodyParts) === 1 && isset($bodyParts[$_partId]['contentType'])
+        if (null !== $_partId && count($bodyParts) === 1 && isset($bodyParts[$_partId]['contentType'])
             && $bodyParts[$_partId]['contentType'] === Felamimail_Model_Message::CONTENT_TYPE_MESSAGE_RFC822
             && isset($structure['messageStructure']['type']) && $structure['messageStructure']['type'] === 'multipart') {
             // fetch first sub-part of rfc822 message if it is a multipart message
@@ -1596,20 +1590,25 @@ class Felamimail_Controller_Message extends Tinebase_Controller_Record_Abstract
         $draftFolder = Felamimail_Controller_Account::getInstance()->getSystemFolder($account,
             Felamimail_Model_Folder::FOLDER_DRAFTS);
 
-        // remove old draft if uid given
-        if ($_message->messageuid && $draftFolder) {
-            $this->_deleteDraftByUid($_message->messageuid, $account, $draftFolder);
-        }
-
-        // add custom header (for easy removal)
         $headers = is_array($_message->headers) ? $_message->headers : [];
-        $headers['X-Tine20-AutoSaved'] = true;
+        // add custom header (for easy removal)
+        $headers[Felamimail_Model_Message::HEADER_DRAFT_AUTO_SAVED] = true;
         $_message->headers = $headers;
         
         $draft = Felamimail_Controller_Message_Send::getInstance()->saveMessageInFolder($draftFolder, $_message,
             [Zend_Mail_Storage::FLAG_SEEN]);
-        if (Tinebase_Core::isLogLevel(Zend_Log::INFO)) Tinebase_Core::getLogger()->info(
-            __METHOD__ . '::' . __LINE__ . ' Saved draft with uid ' . $draft->messageuid);
+        if (Tinebase_Core::isLogLevel(Zend_Log::INFO)) {
+            Tinebase_Core::getLogger()->info(
+                __METHOD__ . '::' . __LINE__ . ' Saved draft with uid ' . $draft->messageuid);
+        }
+        Felamimail_Controller_Cache_Message::getInstance()->updateCache($draftFolder);
+
+        // add new draft first, delete old drafts with draft ID afterwards
+        if (isset($headers[Felamimail_Model_Message::HEADER_DRAFT_MESSAGE_ID]) && $draftFolder) {
+            $this->_deleteDraftByMessageIDHeader($headers[Felamimail_Model_Message::HEADER_DRAFT_MESSAGE_ID],
+                $account, $draftFolder, true);
+        }
+
         return $draft;
     }
 
@@ -1622,8 +1621,10 @@ class Felamimail_Controller_Message extends Tinebase_Controller_Record_Abstract
     public function cleanupAutoSavedDrafts($accountIds): ?Tinebase_Record_RecordSet
     {
         if (!Felamimail_Config::getInstance()->featureEnabled(Felamimail_Config::FEATURE_AUTOSAVE_DRAFTS)) {
-            if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(
-                __METHOD__ . '::' . __LINE__ . ' FEATURE_AUTOSAVE_DRAFTS is disabled');
+            if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) {
+                Tinebase_Core::getLogger()->debug(
+                    __METHOD__ . '::' . __LINE__ . ' FEATURE_AUTOSAVE_DRAFTS is disabled');
+            }
             return null;
         }
         $draftFolderIds = [];
@@ -1654,20 +1655,40 @@ class Felamimail_Controller_Message extends Tinebase_Controller_Record_Abstract
             return null;
         }
 
+        $receivedBefore = Tinebase_DateTime::now()->subMonth(
+            Felamimail_Config::getInstance()->{Felamimail_Config::CLEAR_AUTO_SAVED_DRAFTS_BEFORE_MONTHS}
+        );
+        return $this->_removeMessagesByHeader($draftFolderIds, receivedBefore: $receivedBefore);
+    }
+
+    protected function _removeMessagesByHeader(array $folderIds,
+                                               $headerKey = Felamimail_Model_Message::HEADER_DRAFT_AUTO_SAVED,
+                                               $headerValue = '1',
+                                               ?Tinebase_DateTime $receivedBefore = null,
+                                               bool $keepLatest = false): ?Tinebase_Record_RecordSet
+    {
         $messages = null;
+        $filter = [
+            ['field' => 'folder_id', 'operator' => 'in', 'value' => $folderIds],
+        ];
+        if ($receivedBefore) {
+            $filter[] = ['field' => 'received', 'operator' => 'before', 'value' => $receivedBefore];
+        }
         try {
             $messages = $this->_backend->search(Tinebase_Model_Filter_FilterGroup::getFilterForModel(
-                Felamimail_Model_Message::class, [
-                ['field' => 'folder_id', 'operator' => 'in', 'value' => $draftFolderIds]
-            ]));
-            $messages = $messages->filter(function($record) {
+                Felamimail_Model_Message::class, $filter));
+            $messages = $messages->filter(function($record) use ($headerKey, $headerValue) {
                 $headers = $this->getMessageHeaders($record, null, true);
-                return isset($headers['x-tine20-autosaved']);
+                return isset($headers[$headerKey]) && $headers[$headerKey] == $headerValue;
             });
             if (count($messages) > 0) {
+                if ($keepLatest) {
+                    $messages = $messages->sort('received');
+                    $messages->removeLast();
+                }
                 if (Tinebase_Core::isLogLevel(Zend_Log::INFO)) {
                     Tinebase_Core::getLogger()->info(__METHOD__ . '::' . __LINE__
-                        . ' Remove ' . count($messages) . ' auto-saved messages from Drafts');
+                        . ' Remove ' . count($messages) . ' auto-saved messages');
                 }
                 Felamimail_Controller_Message_Flags::getInstance()->addFlags($messages,
                     [Zend_Mail_Storage::FLAG_DELETED]);
@@ -1679,46 +1700,48 @@ class Felamimail_Controller_Message extends Tinebase_Controller_Record_Abstract
                 Tinebase_Exception::log($e);
             }
         }
-
         return $messages;
     }
 
     /**
-     * @param string $uid
+     * @param string $draftMessageID
      * @param Felamimail_Model_Account $account
-     * @param Felamimail_Model_Folder $draftFolder
-     * @throws Felamimail_Exception_IMAPInvalidCredentials
-     * @return boolean
+     * @param ?Felamimail_Model_Folder $draftFolder
+     * @param bool $keepLatest
+     * @return bool
      */
-    protected function _deleteDraftByUid($uid, Felamimail_Model_Account $account, ?\Felamimail_Model_Folder $draftFolder = null)
+    protected function _deleteDraftByMessageIDHeader(string $draftMessageID,
+                                                     Felamimail_Model_Account $account,
+                                                     ?\Felamimail_Model_Folder $draftFolder = null,
+                                                     bool $keepLatest = false): bool
     {
         if (! $draftFolder) {
-            $draftFolder = Felamimail_Controller_Account::getInstance()->getSystemFolder($account, Felamimail_Model_Folder::FOLDER_DRAFTS);
+            $draftFolder = Felamimail_Controller_Account::getInstance()->getSystemFolder($account,
+                Felamimail_Model_Folder::FOLDER_DRAFTS);
             if (! $draftFolder) {
                 return false;
             }
         }
 
-        // TODO use uid expunge?
-        if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(
-            __METHOD__ . '::' . __LINE__ . ' Remove old draft with uid ' . $uid);
-        $imap = Felamimail_Backend_ImapFactory::factory($account);
-        $imap->selectFolder(Felamimail_Model_Folder::encodeFolderName($draftFolder->globalname));
-        $imap->addFlags([$uid], [Zend_Mail_Storage::FLAG_DELETED]);
+        $this->_removeMessagesByHeader([$draftFolder->getId()],
+            Felamimail_Model_Message::HEADER_DRAFT_MESSAGE_ID,
+            $draftMessageID,
+            keepLatest: $keepLatest
+        );
 
         return true;
     }
 
     /**
-     * @param string $uid
+     * @param string $draftMessageID
      * @param string $accountid
      * @return bool
      * @throws Felamimail_Exception_IMAPInvalidCredentials
      */
-    public function deleteDraft($uid, $accountid)
+    public function deleteDraft(string $draftMessageID, string $accountid)
     {
         $account = Felamimail_Controller_Account::getInstance()->get($accountid);
-        return $this->_deleteDraftByUid($uid, $account);
+        return $this->_deleteDraftByMessageIDHeader($draftMessageID, $account);
     }
 
     /**

@@ -24,6 +24,8 @@ class Felamimail_Config extends Tinebase_Config_Abstract
      */
     const CACHE_EMAIL_BODY = 'cacheEmailBody';
 
+    const CLEAR_AUTO_SAVED_DRAFTS_BEFORE_MONTHS = 'clearAutoSavedDraftsBeforeMonths';
+
     /**
      * delete archived mail
      *
@@ -51,14 +53,6 @@ class Felamimail_Config extends Tinebase_Config_Abstract
      * @const string
      */
     const FEATURE_AUTOSAVE_DRAFTS = 'autoSaveDrafts';
-
-    /**
-     * Tine 2.0 flag feature
-     *
-     * @var string
-     * @see 0010576: show a tine20 icon on each message which was written in tine20
-     */
-    const FEATURE_TINE20_FLAG = 'tine20Flag';
 
     /**
      * allow only send password download link as attachment
@@ -200,6 +194,8 @@ class Felamimail_Config extends Tinebase_Config_Abstract
 
     const SIEVE_NOTIFICATION_MOVE_STATUS = 'sieveNotificationMoveStatus';
 
+    const TRUSTED_MAIL_DOMAINS = 'trustedMailDomains';
+
     /**
      * (non-PHPdoc)
      * @see tine20/Tinebase/Config/Definition::$_properties
@@ -309,6 +305,17 @@ class Felamimail_Config extends Tinebase_Config_Abstract
             self::SETBYSETUPMODULE      => TRUE,
             self::DEFAULT_STR           => 1,
         ),
+        self::CLEAR_AUTO_SAVED_DRAFTS_BEFORE_MONTHS => [
+        //_('Clear Auto-Saved Drafts Before Months')
+            self::LABEL                 => 'Clear Auto-Saved Drafts Before Months',
+        // _('Remove all auto-saved drafts that are older than this number of months')
+            self::DESCRIPTION           => 'Remove all auto-saved drafts that are older than this number of months',
+            self::TYPE                  => Tinebase_Config_Abstract::TYPE_INT,
+            self::CLIENTREGISTRYINCLUDE => false,
+            self::SETBYADMINMODULE      => false,
+            self::SETBYSETUPMODULE      => true,
+            self::DEFAULT_STR           => 1,
+        ],
         self::DELETE_ARCHIVED_MAIL => array(
             //_('Delete Archived Mail')
             self::LABEL                 => 'Delete Archived Mail',
@@ -380,14 +387,6 @@ class Felamimail_Config extends Tinebase_Config_Abstract
                     //_('Allow only password-protected download links')
                     self::TYPE                  => self::TYPE_BOOL,
                     self::DEFAULT_STR           => false,
-                ],
-                self::FEATURE_TINE20_FLAG   => [
-                    self::LABEL                 => 'Tine 2.0 Flag',
-                    //_('Tine 2.0 Flag')
-                    self::DESCRIPTION           => 'Add a Tine 2.0 flag to sent messages',
-                    //_('Add a Tine 2.0 flag to sent messages')
-                    self::TYPE                  => self::TYPE_BOOL,
-                    self::DEFAULT_STR           => true,
                 ],
                 self::FEATURE_SHOW_REPLY_TO   => [
                     self::LABEL                 => 'Show Reply-To',
@@ -568,6 +567,23 @@ class Felamimail_Config extends Tinebase_Config_Abstract
                 self::DEFAULT_STR => Felamimail_Model_Account::SIEVE_NOTIFICATION_MOVE_AUTO,
             ],
         ],
+        self::TRUSTED_MAIL_DOMAINS => array(
+            //_('Trusted Mail Servers (via DKIM)')
+            self::LABEL                 => 'Trusted Mail Servers (via DKIM)',
+            // _('Map: Trusted Mail Domains (regex) => Flag Icon. Mail client shows a special flag for mails from this domain if DKIM signature is valid.')
+            self::DESCRIPTION           => 'Map: Trusted Mail Domains (regex) => Flag Icon. Mail client shows a special flag for mails from this domain if DKIM signature is valid.',
+            self::TYPE                  => Tinebase_Config_Abstract::TYPE_ARRAY,
+            self::CLIENTREGISTRYINCLUDE => true,
+            self::SETBYADMINMODULE      => false,
+            self::SETBYSETUPMODULE      => false,
+            self::DEFAULT_STR           => [
+                'metaways\.(de|net)'   => [
+                    'id' => 'Metaways',
+                    'name' => 'Metaways Infosystems GmbH',
+                    'image' => 'images/icon-set/icon_flag_mw.png',
+                ],
+            ],
+        ),
     );
 
     /**

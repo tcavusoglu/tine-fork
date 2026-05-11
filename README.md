@@ -9,7 +9,7 @@ For more information please visit our [homepage](https://www.tine-groupware.de) 
 * [Matrix chat room #tine20org:matrix.org](https://matrix.to/#/!gGPNgDOyMWwSPjFFXa:matrix.org)
 * [Mastodon](https://mastodon.social/@tinegroupware)
 * [Bluesky](https://bsky.app/profile/tine-groupware.bsky.social)
-* [Documentation](https://tine-docu.s3web.rz1.metaways.net)
+* [Documentation](https://docs.tine-groupware.de/)
 * [OCI images](https://hub.docker.com/u/tinegroupware)
 * [Video Tutorials](https://tutorials.tine-groupware.de/)
 
@@ -40,7 +40,7 @@ There is no commercial support for the developers' community versions at all. Pl
 resources if you are not willing or able to contribute to the community.
 
 ## documentation & training
-A nightly version of our documentation is published to https://tine-docu.s3web.rz1.metaways.net.
+A nightly version of our documentation is published to https://docs.tine-groupware.de/.
 
 As tine is extremely powerful, feature rich and customizable we emphasize to train your operators, admins and users properly.
 Introducing tine in your organisation is a project itself.
@@ -81,13 +81,12 @@ and follow the instructions of the repo.
 - iOS to version 26
 - Android to version 16
 
-### WebDAV/CardDAV Clients
+### WebDAV Clients
 - OwnCloud Client to version 5.3
 - Windows Explorer to version 11
 - macOS X Finder to macOS 26
 - KDE Plasma to version 6.4
 - Gnome/Nautilus to version 48
-- CardBook (Thunderbird addon)
 
 ### CalDAV Clients
 - Mozilla Thunderbird to version 140.3
@@ -97,10 +96,16 @@ and follow the instructions of the repo.
 - iOS to version 26
 - DAVx5 to version 4.5
 
+### CardDAV Clients
+- macOS/iOS Contacts to version 26
+- CardBook (Thunderbird addon)
+- DAVx5 to version 4.5
+
 ### Server
-- PHP version 8.1 to 8.3
+- PHP version 8.2 to 8.5
 - MySQL 8.0.12 to version 8.0.44
 - MariaDB 10.4 to version 12.2
 - Apache to version 2.4
 - Nginx to version 1.26
 - Redis to version 7.0
+- Valkey to version 9.0

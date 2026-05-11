@@ -465,7 +465,7 @@ class Admin_Frontend_JsonTest extends Admin_Frontend_TestCase
         
         // check results
         $this->assertTrue(isset($results['results']));
-        $this->assertEquals(12, $results['totalcount']);
+        $this->assertEquals(11, $results['totalcount']);
         $this->assertEquals($prefData['Tinebase'][$pref->getId()]['value'], $results['results'][2]['value']);
         $this->assertEquals($prefData['Tinebase'][$pref->getId()]['type'], $results['results'][2]['type']);
     }
@@ -1427,6 +1427,13 @@ class Admin_Frontend_JsonTest extends Admin_Frontend_TestCase
         $emailUser = $user['emailUser'];
         self::assertArrayHasKey('emailMailSize', $emailUser, print_r($emailUser, true));
         self::assertArrayHasKey('emailMailQuota', $emailUser, print_r($emailUser, true));
+    }
+
+    public function testSearchUsersEmptyResultSortEmailUser()
+    {
+        $filter = [['field' => "query", 'operator' => "contains", 'value' => Tinebase_Record_Abstract::generateUID()]];
+        $users = $this->_json->searchUsers($filter, ['sort' => 'emailUser']);
+        self::assertEquals(0, $users['totalcount'], print_r($users, true));
     }
 
     public function testSearchCustomfields()

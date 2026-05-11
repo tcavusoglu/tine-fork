@@ -744,7 +744,7 @@ class Tinebase_FileSystemTest extends TestCase
         ), /* $_condition = */ '', /* $_options */ array('ignoreAcl' => true));
         $result = $this->_controller->search($filter);
         $this->assertEquals(1, $result->count(), 'didn\'t find file');
-        $this->assertTrue((boolean)$result->getFirstRecord()->isIndexed, 'isIndexed should be true');
+        $this->assertTrue((bool) $result->getFirstRecord()->isIndexed, 'isIndexed should be true');
 
 
         $filter = new Tinebase_Model_Tree_Node_Filter(array(
@@ -934,11 +934,8 @@ class Tinebase_FileSystemTest extends TestCase
 
         /** @noinspection PhpDeprecationInspection */
         $contentType = $this->_controller->getContentType($this->_basePath . '/PHPUNIT/phpunit.txt');
-        
-        // finfo_open() for content type detection is only available in php versions >= 5.3.0'
-        $expectedContentType = (version_compare(PHP_VERSION, '5.3.0', '>=') && function_exists('finfo_open')) ? 'text/plain' : 'application/octet-stream';
-        
-        $this->assertEquals($expectedContentType, $contentType);
+
+        $this->assertEquals('text/plain', $contentType);
     }
     
     public function testGetMTime()
@@ -1461,8 +1458,6 @@ class Tinebase_FileSystemTest extends TestCase
         $tinebaseApplication = $applicationController->getApplicationByName('Tinebase');
 
         try {
-            $applicationController->setApplicationState($tinebaseApplication,
-                Tinebase_Application::STATE_FILESYSTEM_ROOT_SIZE, 10000000);
             $applicationController->setApplicationState($tinebaseApplication,
                 Tinebase_Application::STATE_FILESYSTEM_ROOT_SIZE, 10000000);
             $quotaConfig->{Tinebase_Config::QUOTA_FILESYSTEM_TOTALINMB} = 1;

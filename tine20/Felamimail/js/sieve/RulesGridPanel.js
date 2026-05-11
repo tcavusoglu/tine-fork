@@ -50,6 +50,7 @@ Tine.Felamimail.sieve.RulesGridPanel = Ext.extend(Tine.widgets.grid.GridPanel, {
     newRecordIcon: 'action_new_rule',
     editDialogClass: Tine.Felamimail.sieve.RuleEditDialog,
     stateful: false,
+    copyEditAction: true,
     gridConfig: {
         enableDragDrop: true,
         ddGroup: 'sieveRulesDDGroup',
@@ -412,9 +413,9 @@ Tine.Felamimail.sieve.RulesGridPanel = Ext.extend(Tine.widgets.grid.GridPanel, {
      * generic delete handler
      */
     onDeleteRecords: function(btn, e) {
-        var sm = this.grid.getSelectionModel();
-        var records = sm.getSelections();
-        Ext.each(records, function(record) {
+        const sm = this.grid.getSelectionModel();
+        const records = sm.getSelections();
+        Ext.each(records, (record) => {
             this.store.remove(record);
         });
     }

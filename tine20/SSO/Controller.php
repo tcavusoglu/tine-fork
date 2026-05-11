@@ -14,7 +14,6 @@ use Jumbojett\OpenIDConnectClientException;
 use League\OAuth2\Server\CryptKey;
 use Tinebase_Model_Filter_Abstract as TMFA;
 
-use League\OAuth2\Server\AuthorizationValidators\BearerTokenValidator;
 use SAML2\AuthnRequest;
 use SAML2\Binding;
 use SAML2\Constants;
@@ -30,6 +29,7 @@ use Strobotti\JWK\KeyFactory;
  */
 class SSO_Controller extends Tinebase_Controller_Event
 {
+    /** @use Tinebase_Controller_SingletonTrait<SSO_Controller> */
     use Tinebase_Controller_SingletonTrait;
 
     public const WEBFINGER_REL = 'http://openid.net/specs/connect/1.0/issuer';
@@ -100,6 +100,10 @@ class SSO_Controller extends Tinebase_Controller_Event
 
     public static function serviceNotEnabled(): \Psr\Http\Message\ResponseInterface
     {
+        if (Tinebase_Core::isLogLevel(Zend_Log::INFO)) {
+            Tinebase_Core::getLogger()->info(
+                __METHOD__ . '::' . __LINE__ . ' SSO service not enabled!');
+        }
         return new \Laminas\Diactoros\Response('php://memory', 403);
     }
 
@@ -547,12 +551,17 @@ class SSO_Controller extends Tinebase_Controller_Event
             return self::serviceNotEnabled();
         }
 
+        if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) {
+            Tinebase_Core::getLogger()->debug(__METHOD__ . '::'
+                . __LINE__ . ' Collecting saml2 metadata');
+        }
+
         $serverUrl = rtrim(Tinebase_Core::getUrl(), '/');
 
         static::initSAMLServer();
         $idpentityid = SSO_Config::getInstance()->{SSO_Config::SAML2}->{SSO_Config::SAML2_ENTITYID};
 
-        $certInfo = \SimpleSAML\Utils\Crypto::loadPublicKey(\SimpleSAML\Configuration::getInstance(), true);
+        $certInfo = (new \SimpleSAML\Utils\Crypto)->loadPublicKey(\SimpleSAML\Configuration::getInstance(), true);
 
         $metaArray = [
             'metadata-set'          => 'saml20-idp-remote',
@@ -561,9 +570,15 @@ class SSO_Controller extends Tinebase_Controller_Event
             'SingleSignOnService'   => [[
                 'Binding'  => Constants::BINDING_HTTP_REDIRECT,
                 'Location' => $serverUrl . '/sso/saml2/redirect/signon',
+            ], [
+                'Binding'  => Constants::BINDING_HTTP_POST,
+                'Location' => $serverUrl . '/sso/saml2/redirect/signon',
             ]],
             'SingleLogoutService'   => [[
                 'Binding'  => Constants::BINDING_HTTP_REDIRECT,
+                'Location' => $serverUrl . '/sso/saml2/redirect/logout',
+            ], [
+                'Binding'  => Constants::BINDING_HTTP_POST,
                 'Location' => $serverUrl . '/sso/saml2/redirect/logout',
             ]],
             'certData'              => $certInfo['certData'],
@@ -597,8 +612,9 @@ class SSO_Controller extends Tinebase_Controller_Event
             static::initSAMLServer();
             $idp = \SimpleSAML\IdP::getById('saml2:' . SSO_Config::getInstance()->{SSO_Config::SAML2}->{SSO_Config::SAML2_ENTITYID});
 
+            \SimpleSAML\Session::getSessionFromRequest()->doLogout(substr($idp->getId(), 6));
             // @phpstan-ignore-next-line
-            if ($logoutMessages = \SimpleSAML\Session::getSessionFromRequest()->doLogout(substr($idp->getId(), 6))) {
+            if ($logoutMessages = \SimpleSAML\Session::getSessionFromRequest()->getLastLogoutMessages()) {
                 $urls = [];
                 foreach ($logoutMessages as $binding => $messages) {
                     switch ($binding) {
@@ -677,8 +693,9 @@ class SSO_Controller extends Tinebase_Controller_Event
         \SimpleSAML\Module\saml\Message::validateMessage($spMetadata, $idpMetadata, $message);
 
         if ($message instanceof \SAML2\LogoutRequest) {
+            \SimpleSAML\Session::getSessionFromRequest()->doLogout(substr($idp->getId(), 6));
             // @phpstan-ignore-next-line
-            $logoutRequests = \SimpleSAML\Session::getSessionFromRequest()->doLogout(substr($idp->getId(), 6));
+            $logoutRequests = \SimpleSAML\Session::getSessionFromRequest()->getLastLogoutMessages();
 
             if (SSO_Config::getInstance()->{SSO_Config::SAML2}->{SSO_Config::SAML2_TINELOGOUT}) {
                 try {
@@ -774,16 +791,8 @@ class SSO_Controller extends Tinebase_Controller_Event
         static::initSAMLServer();
         $idp = \SimpleSAML\IdP::getById('saml2:' . SSO_Config::getInstance()->{SSO_Config::SAML2}->{SSO_Config::SAML2_ENTITYID});
         $simpleSampleIsReallyGreat = new ReflectionProperty(\SimpleSAML\IdP::class, 'authSource');
-        $simpleSampleIsReallyGreat->setAccessible(true);
-        if ($simpleSampleIsReallyGreat->getValue($idp) instanceof \SimpleSAML\Auth\Simple) {
-            $simpleSampleIsReallyGreat2 = new ReflectionProperty(\SimpleSAML\Auth\Simple::class, 'authSource');
-            $simpleSampleIsReallyGreat2->setAccessible(true);
-            $newSimple = new SSO_Facade_SAML_AuthSimple($simpleSampleIsReallyGreat2->getValue($simpleSampleIsReallyGreat
-                ->getValue($idp)));
-            $simpleSampleIsReallyGreat->setValue($idp, $newSimple);
-        } elseif (! $simpleSampleIsReallyGreat->getValue($idp) instanceof SSO_Facade_SAML_AuthSimple) {
-            throw new Tinebase_Exception('simple samle auth source config failure ');
-        }
+        $newSimple = new SSO_Facade_SAML_AuthSimple('tine20');
+        $simpleSampleIsReallyGreat->setValue($idp, $newSimple);
 
         try {
             $binding = Binding::getCurrentBinding();
@@ -799,7 +808,6 @@ class SSO_Controller extends Tinebase_Controller_Event
         } else {
             throw new Tinebase_Exception('can\'t resolve request issuer');
         }
-
 
         try {
             \SimpleSAML\Module\saml\IdP\SAML2::receiveAuthnRequest($idp);
@@ -904,12 +912,12 @@ class SSO_Controller extends Tinebase_Controller_Event
 
     protected static function initSAMLServer()
     {
-        (new ReflectionProperty(\SimpleSAML\Session::class, 'instance'))->setAccessible(true);
         (new ReflectionClass(\SimpleSAML\Session::class))->setStaticPropertyValue('instance', new SSO_Facade_SAML_Session());
 
         $saml2Config = SSO_Config::getInstance()->{SSO_Config::SAML2};
 
-        \SAML2\Compat\ContainerSingleton::setContainer(new SSO_Facade_SAML_Container());
+        \SAML2\Compat\ContainerSingleton::setContainer(new SSO_Facade_SAML_Container);
+        \SimpleSAML\SAML2\Compat\ContainerSingleton::setContainer(new SSO_Facade_SAML_SimpleSamlContainer);
         \SimpleSAML\Configuration::setPreLoadedConfig(new \SimpleSAML\Configuration([
             'metadata.sources' => [['type' => SSO_Facade_SAML_MetaDataStorage::class]],
             'metadata.sign.enable' => true,
@@ -918,6 +926,7 @@ class SSO_Controller extends Tinebase_Controller_Event
             'certificate' => $saml2Config->{SSO_Config::SAML2_KEYS}[0]['certificate'],
             'enable.saml20-idp' => true,
             'logging.level' => -1,
+            'NameIDFormat' => \SAML2\Constants::NAMEID_PERSISTENT,
         ], 'tine20'));
         \SimpleSAML\Configuration::setPreLoadedConfig(new \SimpleSAML\Configuration([
             'tine20' => [SSO_Facade_SAML_AuthSourceFactory::class]

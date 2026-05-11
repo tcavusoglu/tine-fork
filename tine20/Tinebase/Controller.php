@@ -1573,6 +1573,7 @@ class Tinebase_Controller extends Tinebase_Controller_Event
      * - returns http error code 500 on fail
      * - checks: config, db, temp dir, files dir
      * - client ip address needs to be in Tinebase_Config::ALLOWEDHEALTHCHECKIPS
+     * - returns 503 if maintenance mode is ond and MAINTENANCE_MODE_HEALTH_CHECK = true
      *
      * @return \Laminas\Diactoros\Response
      *
@@ -1587,6 +1588,16 @@ class Tinebase_Controller extends Tinebase_Controller_Event
                 Tinebase_Core::getLogger()->notice(__METHOD__ . '::' . __LINE__ . ' client ip not allowed: '
                     . $clientIp);
             return new \Laminas\Diactoros\Response('php://memory', 404);
+        }
+
+        if (Tinebase_Core::inMaintenanceModeAll()
+            && Tinebase_Config::getInstance()->{Tinebase_Config::MAINTENANCE_MODE_HEALTH_CHECK}
+        ) {
+            $data = [
+                'status' => 'maintenance',
+                'problems' => [],
+            ];
+            return new \Laminas\Diactoros\Response\JsonResponse($data, 503);
         }
 
         $status = 'pass';
@@ -1872,9 +1883,11 @@ class Tinebase_Controller extends Tinebase_Controller_Event
         }
 
         if (! in_array($colorSchema, ['light', 'dark'])) {
-            if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG))
-                Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . ' Unknown colorSchema: ' . $colorSchema
+            if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) {
+                Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__
+                    . ' Unknown colorSchema: ' . $colorSchema
                     . ' Using default "light"');
+            }
             $colorSchema = 'light';
         }
 
@@ -1883,6 +1896,10 @@ class Tinebase_Controller extends Tinebase_Controller_Event
 
         if (!$imageBlob) {
             $path = Tinebase_Core::getLogo($type, $colorSchema, $mime === 'image/svg+xml');
+            if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) {
+                Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__
+                    . ' Fetching image blob from ' . $path);
+            }
             $blob = Tinebase_Helper::getFileOrUriContents($path);
 
             if ($mime === 'image/svg+xml' && str_starts_with((string) $blob, '<?xml')) {
@@ -2207,8 +2224,9 @@ class Tinebase_Controller extends Tinebase_Controller_Event
         /** @var \Laminas\Diactoros\Request $request */
         $request = Tinebase_Core::getContainer()->get(RequestInterface::class);
         $body = Tinebase_Helper::mbConvertTo((string)$request->getBody());
-        if (Tinebase_Core::isLogLevel(Tinebase_Log::DEBUG))
+        if (Tinebase_Core::isLogLevel(Tinebase_Log::DEBUG)) {
             Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__ . ' request body: ' . $body);
+        }
         $reqXml = simplexml_load_string($body);
         $view = new Zend_View();
         $view->setScriptPath(__DIR__ . '/views/autodiscover');
@@ -2324,6 +2342,12 @@ class Tinebase_Controller extends Tinebase_Controller_Event
             'application_id' => $application,
             'model' => Tinebase_Model_BankHolidayCalendar::class,
 //            'label' => 'Bank Holiday Calendar' // _('Bank Holiday Calendar')
+        )));
+
+        $result->addRecord(new CoreData_Model_CoreData(array(
+            'id' => Tinebase_Model_Instance::class,
+            'application_id' => $application,
+            'model' => Tinebase_Model_Instance::class,
         )));
 
         return $result;

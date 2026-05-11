@@ -78,7 +78,8 @@ Ext.MessageBox = function(){
         waitConfig: null,
         width: 600,
         skinColor: '#FFFFFF',
-        bodyCls: ""
+        bodyCls: "",
+        stateId: null,
     })
 
     // modal container config
@@ -95,8 +96,11 @@ Ext.MessageBox = function(){
     // end vue properties
 
     // private
-    const handleButton = function({buttonName, textElValue} = arg){
+    const handleButton = function({buttonName, textElValue, dialogStateIdData} = arg){
         handleHide()
+        if (opt.stateId && dialogStateIdData) {
+            Ext.state.Manager.set(opt.stateId, dialogStateIdData);
+        }
         Ext.callback(opt.fn, opt.scope||window, [buttonName, textElValue, opt], 1);
     }
     
@@ -244,10 +248,11 @@ Ext.Msg.show({
          * @return {Ext.MessageBox} this
          */
         show: async function(options){
+            clearInterval(this.animateProgressInterval);
             options.skinColor = skinShades[Math.floor(Math.random()*skinShades.length)]
             synchronousVisibilityState = !__HIDDEN
             Ext.getBody().mask("Loading");
-            const {MessageBoxApp, SymbolKeys} = await import(/* webpackChunkName: "Tinebase/js/VueMessageBox"*/'./VueMessageBox')
+            const {MessageBoxApp, SymbolKeys} = await import(/* webpackChunkName: "Tinebase/js/VueMessageBox" */ 'ux/vue/VueMessageBox/index.js')
 
             // initializing vue stuff
             if(!initialized){
@@ -278,6 +283,7 @@ Ext.Msg.show({
                     }
                 });
 
+                vueHandle.config.globalProperties.window = window;
                 vueHandle.config.globalProperties.ExtEventBus = vueEmitter;
                 vueHandle.provide(SymbolKeys.ExtEventBusInjectKey, vueEmitter);
                 vueHandle.use(BootstrapVueNext)
@@ -289,8 +295,9 @@ Ext.Msg.show({
             }
 
             opt = {...defaultConfigs,...options};
-            opt["closable"] = (opt.closable !== false && opt.progress !== true && opt.wait !== true);
+            opt["closable"] = opt.hasOwnProperty('closable') ? !!opt.closable : (opt.progress !== true && opt.wait !== true);
             opt["prompt"] = opt.prompt || (opt.multiline ? true : false);
+            opt["progress"] = opt.progress;
 
             // if a MessageBox.show() came right after the first MessageBox calls
             // the async module are being loaded, so
@@ -378,18 +385,38 @@ Ext.MessageBox.ERROR
          * @return {Ext.MessageBox} this
          */
         wait : function(msg, title, config){
+            if (_.get(config, 'estimate')) _.delay(_.bind(this.animateProgress, this, config.estimate), 250)
             return this.show({
                 title : title,
                 msg : msg,
                 buttons: false,
-                closable:false,
-                wait:true,
+                closable: _.get(config, 'closable', false),
+                wait: !_.get(config, 'estimate', false),
+                progress:true,
                 modal:true,
                 minWidth: this.minProgressWidth,
                 waitConfig: config,
                 fn: 'fake',
                 icon: this.INFO_WAIT
             });
+        },
+
+        animateProgress: function(estimate) {
+            clearInterval(this.animateProgressInterval);
+            const steps = Math.ceil(estimate / 1000 * 2);
+            let step = 0;
+
+            const interval = this.animateProgressInterval = setInterval(() => {
+                if (interval !== this.animateProgressInterval) return
+                step++;
+                const progress = Math.sqrt(step / steps); //Math.log(1 + (step / steps) * (Math.E - 1));
+
+                this.updateProgress(Math.min(progress, 0.999));
+
+                if (step >= steps) {
+                    clearInterval(interval);
+                }
+            }, 500);
         },
 
         /**
@@ -424,9 +451,14 @@ Ext.MessageBox.ERROR
          * @param {String} msg The message box body text
          * @param {Function} fn (optional) The callback function invoked after the message box is closed
          * @param {Object} scope (optional) The scope (<code>this</code> reference) in which the callback is executed. Defaults to the browser wnidow.
+         * @param stateId
          * @return {Ext.MessageBox} this
          */
-        confirm : function(title, msg, fn, scope){
+        confirm : function(title, msg, fn, scope, stateId = null){
+            if (stateId) {
+                const state = Ext.state.Manager.get(stateId);
+                if (state?.doNotShowAgain) return Promise.resolve('yes');
+            }
             return this.show({
                 title : title,
                 msg : msg,
@@ -434,7 +466,8 @@ Ext.MessageBox.ERROR
                 fn: fn,
                 scope : scope,
                 icon: this.QUESTION,
-                minWidth: this.minWidth
+                minWidth: this.minWidth,
+                stateId: stateId
             });
         },
 

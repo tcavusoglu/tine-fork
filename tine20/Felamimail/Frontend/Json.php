@@ -240,7 +240,7 @@ class Felamimail_Frontend_Json extends Tinebase_Frontend_Json_Abstract
             $partId    = null;
         }
         
-        $message = Felamimail_Controller_Message::getInstance()->getCompleteMessage($messageId, $partId, $mimeType, false);
+        $message = Felamimail_Controller_Message::getInstance()->getCompleteMessage($messageId, $partId, $mimeType);
         $message->id = $id;
         
         return $this->_recordToJson($message);
@@ -310,14 +310,14 @@ class Felamimail_Frontend_Json extends Tinebase_Frontend_Json_Abstract
     }
 
     /**
-     * @param integer $uid
+     * @param string $draftMessageID
      * @param string $accountid
      * @return array
      */
-    public function deleteDraft($uid, $accountid)
+    public function deleteDraft(string $draftMessageID, string $accountid)
     {
         return [
-            'success' => Felamimail_Controller_Message::getInstance()->deleteDraft($uid, $accountid)
+            'success' => Felamimail_Controller_Message::getInstance()->deleteDraft($draftMessageID, $accountid)
         ];
     }
 
@@ -903,7 +903,6 @@ class Felamimail_Frontend_Json extends Tinebase_Frontend_Json_Abstract
     public function getRegistryData()
     {
         $supportedFlags = Felamimail_Controller_Message_Flags::getInstance()->getSupportedFlags();
-        
         $result = array(
             'supportedFlags'        => array(
                 'results'       => $supportedFlags,
@@ -1047,7 +1046,7 @@ class Felamimail_Frontend_Json extends Tinebase_Frontend_Json_Abstract
         $params->host     = isset($fields['host'])     ? $fields['host']    : 'localhost';
         $params->password = isset($fields['password']) ? $fields['password'] : '';
         $params->port     = isset($fields['port'])     ? $fields['port']     : null;
-        $params->ssl      = isset($fields['ssl'])      ? $fields['ssl']      : false;
+        $params->ssl      = strtoupper(isset($fields['ssl']) ? $fields['ssl'] : 'none');
         $params->account = $account;
 
         $fieldsWithoutPw = $fields;

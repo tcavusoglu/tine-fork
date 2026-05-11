@@ -26,6 +26,7 @@ class MatrixSynapseIntegrator_Frontend_Json extends Tinebase_Frontend_Json_Abstr
      */
     protected $_configuredModels = [
         MatrixSynapseIntegrator_Model_MatrixAccount::MODEL_NAME_PART,
+        MatrixSynapseIntegrator_Model_Room::MODEL_NAME_PART,
     ];
 
     public function setRecoveryPassword(string $password): array
@@ -89,6 +90,7 @@ class MatrixSynapseIntegrator_Frontend_Json extends Tinebase_Frontend_Json_Abstr
 
         $userData = $this->_recordToJson($matrixAccount);
         return [
+            'mx_account' => $userData,
             'mx_user_id' => $userData[MatrixSynapseIntegrator_Model_MatrixAccount::FLD_MATRIX_ID],
             'recovery_key' => $matrixAccount->getPasswordFromProperty(
                 MatrixSynapseIntegrator_Model_MatrixAccount::FLD_MATRIX_RECOVERY_KEY
@@ -101,4 +103,12 @@ class MatrixSynapseIntegrator_Frontend_Json extends Tinebase_Frontend_Json_Abstr
             ),
         ];
     }
+
+    public function saveOwnMatrixAccount(array $accountData): array
+    {
+        $record = $this->_jsonToRecord($accountData, MatrixSynapseIntegrator_Model_MatrixAccount::class);
+        $updatedRecord = MatrixSynapseIntegrator_Controller_MatrixAccount::getInstance()->saveOwnMatrixAccount($record);
+        return $this->_recordToJson($updatedRecord);
+    }
+
 }

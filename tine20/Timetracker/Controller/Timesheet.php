@@ -4,9 +4,9 @@
  * 
  * @package     Timetracker
  * @subpackage  Controller
- * @license     http://www.gnu.org/licenses/agpl.html AGPL Version 3
+ * @license     https://www.gnu.org/licenses/agpl.html AGPL Version 3
  * @author      Philipp Schüle <p.schuele@metaways.de>
- * @copyright   Copyright (c) 2007-2024 Metaways Infosystems GmbH (http://www.metaways.de)
+ * @copyright   Copyright (c) 2007-2026 Metaways Infosystems GmbH (https://www.metaways.de)
  */
 
 use Tinebase_Model_Filter_Abstract as TMFA;
@@ -19,6 +19,7 @@ use Tinebase_Model_Filter_Abstract as TMFA;
  */
 class Timetracker_Controller_Timesheet extends Tinebase_Controller_Record_Abstract
 {
+    /** @use Tinebase_Controller_SingletonTrait<Timetracker_Controller_Timesheet> */
     use Tinebase_Controller_SingletonTrait;
 
     /**
@@ -227,7 +228,10 @@ class Timetracker_Controller_Timesheet extends Tinebase_Controller_Record_Abstra
         $timeaccount = Timetracker_Controller_Timeaccount::getInstance()->get($_record->timeaccount_id);
         
         if (isset($timeaccount->deadline) && $timeaccount->deadline == Timetracker_Model_Timeaccount::DEADLINE_LASTWEEK) {
-            if (Tinebase_Core::isLogLevel(Zend_Log::INFO)) Tinebase_Core::getLogger()->info(__METHOD__ . '::' . __LINE__ . ' Check if deadline is exceeded for timeaccount ' . $timeaccount->title);
+            if (Tinebase_Core::isLogLevel(Zend_Log::INFO)) {
+                Tinebase_Core::getLogger()->info(__METHOD__ . '::' . __LINE__
+                    . ' Check if deadline is exceeded for timeaccount ' . $timeaccount->title);
+            }
             
             // it is only on monday allowed to add timesheets for last week
             $date = new Tinebase_DateTime();
@@ -387,35 +391,31 @@ class Timetracker_Controller_Timesheet extends Tinebase_Controller_Record_Abstra
         $this->_calcAmounts($_record);
     }
 
+    /**
+     * @param Timetracker_Model_Timesheet $_record
+     * @return void
+     * @throws Tinebase_Exception_AccessDenied
+     * @throws Tinebase_Exception_SystemGeneric
+     */
     protected function _inspectEndDate(Timetracker_Model_Timesheet $_record): void
     {
         if ($_record->{Timetracker_Model_Timesheet::FLD_END_DATE} &&
-            $_record->{Timetracker_Model_Timesheet::FLD_END_DATE}->format('Y-m-d') !== $_record->start_date->format('Y-m-d')) {
-            if (strcmp($_record->{Timetracker_Model_Timesheet::FLD_END_DATE}->format('Y-m-d'), $_record->start_date->format('Y-m-d')) < 1) {
-                Tinebase_Exception::log(new Tinebase_Exception('FE error: End date cannot be before start date'));
-                throw new Tinebase_Exception_SystemGeneric(
-                /*Tinebase_Translation::getTranslation(Timetracker_Config::APP_NAME)->_(*/'End date cannot be before start date'//)
-                );
-            }
-            if (!$_record->start_time || !$_record->end_time) {
-                Tinebase_Exception::log(new Tinebase_Exception('FE error: start time and end time need to be set for multi day'));
-                throw new Tinebase_Exception_SystemGeneric(
-                /*Tinebase_Translation::getTranslation(Timetracker_Config::APP_NAME)->_(*/'start time and end time need to be set for multi day'//)
-                );
-            }
-
+            $_record->{Timetracker_Model_Timesheet::FLD_END_DATE}->format('Y-m-d')
+                !== $_record->{Timetracker_Model_Timesheet::FLD_START_DATE}->format('Y-m-d')
+        ) {
+            $this->_validateEndDate($_record);
 
             $_record->{Timetracker_Model_Timesheet::FLD_CORRELATION_ID} = Tinebase_Record_Abstract::generateUID();
             $endTime = $_record->end_time;
             $_record->end_time = '00:00:00';
-            $startDate = $_record->start_date->getClone();
+            $startDate = $_record->{Timetracker_Model_Timesheet::FLD_START_DATE}->getClone();
             $done = false;
             do {
                 $startDate->addDay(1);
 
                 $newRecord = clone $_record;
                 $newRecord->setId(null);
-                $newRecord->start_date = $startDate->getClone();
+                $newRecord->{Timetracker_Model_Timesheet::FLD_START_DATE} = $startDate->getClone();
                 $newRecord->end_date = null;
                 $newRecord->start_time = '00:00:00';
 
@@ -426,6 +426,32 @@ class Timetracker_Controller_Timesheet extends Tinebase_Controller_Record_Abstra
 
                 $this->create($newRecord);
             } while(false === $done);
+        }
+    }
+
+    /**
+     * @param Timetracker_Model_Timesheet $_record
+     * @return void
+     * @throws Tinebase_Exception_SystemGeneric
+     */
+    protected function _validateEndDate(Timetracker_Model_Timesheet $_record): void
+    {
+        $start = $_record->{Timetracker_Model_Timesheet::FLD_START_DATE}->format('Y-m-d');
+        $end = $_record->{Timetracker_Model_Timesheet::FLD_END_DATE}->format('Y-m-d');
+        if (strcmp($end, $start) < 1) {
+            throw new Tinebase_Exception_SystemGeneric(
+                sprintf(Tinebase_Translation::getTranslation(Timetracker_Config::APP_NAME)
+                    ->_('End date cannot be before start date: %s is before %s'),
+                    $end,
+                    $start
+                )
+            );
+        }
+        if (!$_record->start_time || !$_record->end_time) {
+            throw new Tinebase_Exception_SystemGeneric(
+                Tinebase_Translation::getTranslation(Timetracker_Config::APP_NAME)
+                    ->_('Start time and end time need to be set for multi day timesheet')
+            );
         }
     }
 
@@ -600,19 +626,16 @@ class Timetracker_Controller_Timesheet extends Tinebase_Controller_Record_Abstra
      * @param Timetracker_Model_Timeaccount $_record
      * @param string $_action
      * @param boolean $_throw
-     * @param string $_errorMessage
+     * @param ?string $_errorMessage
      * @param Timetracker_Model_Timesheet $_oldRecord
      * @return boolean
      * @throws Tinebase_Exception_AccessDenied
      * @throws Tinebase_Exception_Confirmation
-     *
-     * @todo think about just setting the default values when user
-     *       hasn't the required grant to change the field (instead of throwing exception)
      */
-    protected function _checkGrant($_record, $_action, $_throw = TRUE, $_errorMessage = 'No Permission.', $_oldRecord = NULL)
+    protected function _checkGrant($_record, $_action, $_throw = true, $_errorMessage = null, $_oldRecord = null)
     {
         if (! $this->_doTimesheetContainerACLChecks) {
-            return TRUE;
+            return true;
         }
 
         $isAdmin = false;
@@ -625,7 +648,7 @@ class Timetracker_Controller_Timesheet extends Tinebase_Controller_Record_Abstra
         // only TA managers are allowed to alter TS of closed TAs, but they have to confirm first that they really want to do it
         if ($_action != 'get') {
             if ($isAdmin && ($this->_requestContext['skipClosedCheck'] ?? false)) {
-               return true;
+                return true;
             }
 
             $this->_validateRelations($_record, $_oldRecord);
@@ -645,7 +668,7 @@ class Timetracker_Controller_Timesheet extends Tinebase_Controller_Record_Abstra
         }
 
 
-        $hasGrant = FALSE;
+        $hasGrant = false;
 
         switch ($_action) {
             case 'get':
@@ -662,35 +685,20 @@ class Timetracker_Controller_Timesheet extends Tinebase_Controller_Record_Abstra
                 );
                 break;
             case 'create':
-                $hasGrant = (
-                    ($_record->account_id == Tinebase_Core::getUser()->getId() && Timetracker_Controller_Timeaccount::getInstance()->hasGrant($_record->timeaccount_id, array_merge([
-                            Timetracker_Model_TimeaccountGrants::BOOK_OWN
-                        ], Timetracker_Config::TS_PROCESS_STATUS_REQUESTED === $_record->process_status ? [
-                            Timetracker_Model_TimeaccountGrants::REQUEST_OWN
-                        ] : [])))
-                    || Timetracker_Controller_Timeaccount::getInstance()->hasGrant($_record->timeaccount_id, Timetracker_Model_TimeaccountGrants::BOOK_ALL)
-                );
-
+                $hasGrant = $this->_hasBookOrRequestOwnGrant($_record);
                 if ($hasGrant) {
                     foreach ($this->_fieldGrants as $field => $config) {
                         $fieldValue = $_record->$field;
                         if (isset($fieldValue) && $fieldValue != $config['default']) {
-                            $hasGrant &= Timetracker_Controller_Timeaccount::getInstance()->hasGrant($_record->timeaccount_id, $config['requiredGrant']);
+                            $hasGrant &= Timetracker_Controller_Timeaccount::getInstance()->hasGrant(
+                                $_record->timeaccount_id, $config['requiredGrant']);
                         }
                     }
                 }
 
                 break;
             case 'update':
-                $hasGrant = (
-                    ($_record->account_id == Tinebase_Core::getUser()->getId() && Timetracker_Controller_Timeaccount::getInstance()->hasGrant($_record->timeaccount_id, array_merge([
-                            Timetracker_Model_TimeaccountGrants::BOOK_OWN
-                        ], Timetracker_Config::TS_PROCESS_STATUS_REQUESTED === $_record->process_status && $_record->process_status === $_oldRecord->process_status ? [
-                            Timetracker_Model_TimeaccountGrants::REQUEST_OWN
-                        ] : [])))
-                    || Timetracker_Controller_Timeaccount::getInstance()->hasGrant($_record->timeaccount_id, Timetracker_Model_TimeaccountGrants::BOOK_ALL)
-                );
-
+                $hasGrant = $this->_hasBookOrRequestOwnGrant($_record);
                 if ($hasGrant) {
                     foreach ($this->_fieldGrants as $field => $config) {
                         if (isset($_record->$field) && $_record->$field != $_oldRecord->$field) {
@@ -709,10 +717,31 @@ class Timetracker_Controller_Timesheet extends Tinebase_Controller_Record_Abstra
         }
 
         if ($_throw && !$hasGrant) {
+            if (!$_errorMessage) {
+                $_errorMessage = $this->_getTranslatedNoPermissionMessage($_action);
+            }
             throw new Tinebase_Exception_AccessDenied($_errorMessage);
         }
 
         return $hasGrant;
+    }
+
+    protected function _hasBookOrRequestOwnGrant(Timetracker_Model_Timesheet $timesheet): bool
+    {
+        $grantsToCheck = array_merge([
+            Timetracker_Model_TimeaccountGrants::BOOK_OWN
+        ], Timetracker_Config::TS_PROCESS_STATUS_REQUESTED === $timesheet->process_status ? [
+            Timetracker_Model_TimeaccountGrants::REQUEST_OWN
+        ] : []);
+        $timesheetAccountId = is_string($timesheet->account_id)
+            ? $timesheet->account_id
+            : $timesheet->account_id['accountId'];
+        $hasBookOrRequestOwn = ($timesheetAccountId === Tinebase_Core::getUser()->getId()
+            && Timetracker_Controller_Timeaccount::getInstance()->hasGrant($timesheet->timeaccount_id, $grantsToCheck));
+        return $hasBookOrRequestOwn
+            || Timetracker_Controller_Timeaccount::getInstance()->hasGrant(
+                $timesheet->timeaccount_id, Timetracker_Model_TimeaccountGrants::BOOK_ALL
+            );
     }
 
     /**

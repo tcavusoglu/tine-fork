@@ -154,7 +154,11 @@ class Calendar_Model_Attender extends Tinebase_Record_Abstract
 
         self::FIELDS          => [
             self::FLD_USER_ID => [
-                self::TYPE       => self::TYPE_STRING,
+                self::TYPE          => self::TYPE_RECORD, // type record?
+                self::CONFIG        => [
+                    self::APP_NAME      => Addressbook_Config::APP_NAME,
+                    self::MODEL_NAME    => 'Contact',
+                ],
                 self::LENGTH     => 40,
                 self::NULLABLE   => true,
                 self::LABEL      => 'User', // _('User')
@@ -190,7 +194,8 @@ class Calendar_Model_Attender extends Tinebase_Record_Abstract
                 self::NULLABLE   => true,
             ],
             self::FLD_ROLE     => [
-                self::TYPE          => self::TYPE_STRING,
+                self::TYPE                  => self::TYPE_KEY_FIELD,
+                self::NAME                  => Calendar_Config::ATTENDEE_ROLES,
                 self::LENGTH        => 32,
                 self::DEFAULT_VAL   => self::ROLE_REQUIRED,
                 self::NULLABLE      => false,
@@ -223,7 +228,8 @@ class Calendar_Model_Attender extends Tinebase_Record_Abstract
                 self::VALIDATORS  => [Zend_Filter_Input::ALLOW_EMPTY => true],
             ],
             self::FLD_STATUS => [
-                self::TYPE       => self::TYPE_STRING,
+                self::TYPE                  => self::TYPE_KEY_FIELD,
+                self::NAME                  => Calendar_Config::ATTENDEE_STATUS,
                 self::LENGTH     => 40,
                 self::NULLABLE   => false,
                 self::DEFAULT_VAL   => self::STATUS_NEEDSACTION,
@@ -267,9 +273,16 @@ class Calendar_Model_Attender extends Tinebase_Record_Abstract
             return null;
         }
 
+        if (is_array($this->user_id) && isset($this->user_id['pollReplies'])) {
+            if (Tinebase_Core::isLogLevel(Zend_Log::NOTICE))
+                Tinebase_Core::getLogger()->notice(__METHOD__ . '::' . __LINE__ . " user_id should not have pollReplies : " . print_r($this->user_id['pollReplies'], true));
+            return null;
+        }
+
         $adbController = Addressbook_Controller_Contact::getInstance();
         $adbAcl = $adbController->doContainerACLChecks(false);
         try {
+
             $contact = $adbController->get($this->user_id, null, false);
             return $contact->account_id ? $contact->account_id : null;
         } catch (Tinebase_Exception_NotFound $e) {

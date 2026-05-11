@@ -578,7 +578,7 @@ var combo = new Ext.form.ComboBox({
 
             if (this.ownerCt && !zindex){
                 this.findParentBy(function(ct){
-                    zindex = parseInt(ct.getPositionEl().getStyle('z-index'), 10);
+                    zindex = parseInt(ct.getPositionEl()?.getStyle('z-index'), 10);
                     return !!zindex;
                 });
             }
@@ -1263,14 +1263,14 @@ var menu = new Ext.menu.Menu({
         q = qe.query;
         forceAll = qe.forceAll;
         if(forceAll === true || (q.length >= this.minChars)){
-            if(this.lastQuery !== q){
+            if(this.lastQuery !== q || this.forceReload){
                 this.lastQuery = q;
                 if(this.mode == 'local'){
                     this.selectedIndex = -1;
                     if(forceAll){
                         this.store.clearFilter();
                     }else{
-                        this.store.filter(this.displayField, q);
+                        this.store.filter(this.displayField, q, this.filterAnyMatch);
                     }
                     this.onLoad();
                 }else{

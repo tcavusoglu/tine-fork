@@ -142,13 +142,19 @@ abstract class Sales_Controller_Document_Abstract extends Tinebase_Controller_Re
             $document->{Sales_Model_Document_Abstract::FLD_PAYMENT_TERMS} = $document->{Sales_Model_Document_Abstract::FLD_CUSTOMER_ID}->credit_term;
         }
 
-        if ($document->has(Sales_Model_Document_Abstract::FLD_INVOICE_DISCOUNT_PERCENTAGE) && empty($document->{Sales_Model_Document_Abstract::FLD_INVOICE_DISCOUNT_PERCENTAGE}) &&
-                empty($document->{Sales_Model_Document_Abstract::FLD_INVOICE_DISCOUNT_SUM}) &&
-                intval($document->{Sales_Model_Document_Abstract::FLD_INVOICE_DISCOUNT_PERCENTAGE}) === 0 &&
-                intval($document->{Sales_Model_Document_Abstract::FLD_INVOICE_DISCOUNT_SUM}) === 0 &&
-                !empty($document->{Sales_Model_Document_Abstract::FLD_CUSTOMER_ID}?->discount)) {
+        // avoid a very strange jit issue :-/
+        $applyCustomerDiscount = $document->has(Sales_Model_Document_Abstract::FLD_INVOICE_DISCOUNT_PERCENTAGE);
+        $applyCustomerDiscount = $applyCustomerDiscount && empty($document->{Sales_Model_Document_Abstract::FLD_INVOICE_DISCOUNT_PERCENTAGE});
+        $applyCustomerDiscount = $applyCustomerDiscount && empty($document->{Sales_Model_Document_Abstract::FLD_INVOICE_DISCOUNT_SUM});
+        $applyCustomerDiscount = $applyCustomerDiscount && !empty($document->{Sales_Model_Document_Abstract::FLD_CUSTOMER_ID}?->discount);
+        if ($applyCustomerDiscount) {
             $document->{Sales_Model_Document_Abstract::FLD_INVOICE_DISCOUNT_TYPE} = Sales_Config::INVOICE_DISCOUNT_PERCENTAGE;
             $document->{Sales_Model_Document_Abstract::FLD_INVOICE_DISCOUNT_PERCENTAGE} = $document->{Sales_Model_Document_Abstract::FLD_CUSTOMER_ID}->discount;
+            if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ .
+                '::' . __LINE__ . ' set customer default discount');
+        } else {
+            if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ .
+                '::' . __LINE__ . ' customer default discount NOT set');
         }
 
         if ($document->has(Sales_Model_Document_Abstract::FLD_VAT_PROCEDURE) && empty($document->{Sales_Model_Document_Abstract::FLD_VAT_PROCEDURE}) &&
@@ -282,8 +288,7 @@ abstract class Sales_Controller_Document_Abstract extends Tinebase_Controller_Re
                 ], true));
                 $customer = Sales_Controller_Customer::getInstance()->update($customer);
                 $orgDebitor = $_record->{Sales_Model_Document_Abstract::FLD_DEBITOR_ID} =
-                    $customer->{Sales_Model_Customer::FLD_DEBITORS}->find(Sales_Model_Debitor::FLD_DIVISION_ID,
-                        $divisionId);
+                    $customer->{Sales_Model_Customer::FLD_DEBITORS}->find(fn($rec) => $rec->getIdFromProperty(Sales_Model_Debitor::FLD_DIVISION_ID) === $divisionId, null);
             }
         }
         
@@ -300,7 +305,7 @@ abstract class Sales_Controller_Document_Abstract extends Tinebase_Controller_Re
         }
 
         if (1 !== $_record->{Sales_Model_Document_Abstract::FLD_PAYMENT_MEANS}
-                ->filter(Sales_Model_PaymentMeans::FLD_DEFAULT, true)->count()
+                ?->filter(Sales_Model_PaymentMeans::FLD_DEFAULT, true)->count()
         ) {
             throw new Tinebase_Exception_UnexpectedValue('payment means need to have one default record');
         }
@@ -587,10 +592,12 @@ abstract class Sales_Controller_Document_Abstract extends Tinebase_Controller_Re
      */
     protected function _deleteRecord(Tinebase_Record_Interface $_record)
     {
-        $_record->{Sales_Model_Document_Abstract::FLD_CUSTOMER_ID} = Sales_Controller_Document_Customer::getInstance()
-            ->search(Tinebase_Model_Filter_FilterGroup::getFilterForModel(Sales_Model_Document_Customer::class, [
-                ['field' => Sales_Model_Document_Customer::FLD_DOCUMENT_ID, 'operator' => 'equals', 'value' => $_record->getId()],
-            ]))->getFirstRecord();
+        if ($_record->has(Sales_Model_Document_Abstract::FLD_CUSTOMER_ID)) {
+            $_record->{Sales_Model_Document_Abstract::FLD_CUSTOMER_ID} = Sales_Controller_Document_Customer::getInstance()
+                ->search(Tinebase_Model_Filter_FilterGroup::getFilterForModel(Sales_Model_Document_Customer::class, [
+                    ['field' => Sales_Model_Document_Customer::FLD_DOCUMENT_ID, 'operator' => 'equals', 'value' => $_record->getId()],
+                ]))->getFirstRecord();
+        }
         parent::_deleteRecord($_record);
     }
 

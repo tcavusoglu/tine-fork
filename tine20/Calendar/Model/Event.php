@@ -200,7 +200,7 @@ class Calendar_Model_Event extends Tinebase_Record_Abstract
          * 'class'                 => array('filter' => 'Tinebase_Model_Filter_Text'),
          * 'status'                => array('filter' => 'Tinebase_Model_Filter_Text'),
          * 'tag'                   => array('filter' => 'Tinebase_Model_Filter_Tag', 'options' => array(
-         * 'idProperty' => 'cal_events.id',
+         * 'idProperty' => 'cal_events.id',CONFIRM
          * 'applicationName' => 'Calendar',
          * )),
          * 'grants'                => array('filter' => 'Calendar_Model_GrantFilter'),
@@ -340,21 +340,26 @@ class Calendar_Model_Event extends Tinebase_Record_Abstract
                 self::QUERY_FILTER  => true,
             ],
             'location_record'      => [
-                self::TYPE          => self::TYPE_STRING, // type record?
+                self::TYPE       => self::TYPE_RECORD,
+                self::CONFIG     => [
+                    self::APP_NAME     => Addressbook_Config::APP_NAME,
+                    self::MODEL_NAME   => 'Contact',
+                ],
                 self::LENGTH        => 40,
                 self::NULLABLE      => true,
                 self::DEFAULT_VAL   => null,
                 self::FILTER_DEFINITION => [
                     self::FILTER => Addressbook_Model_ContactIdFilter::class,
                     self::OPTIONS => [
-                        self::MODEL_NAME => Addressbook_Model_Contact::class,
+                        self::MODEL_NAME => 'Contact',
+                        self::APP_NAME      => Addressbook_Config::APP_NAME,
                     ],
                 ],
             ],
             'event_site' => [
                 self::LABEL      => 'Site',    // _('Site')
                 self::TYPE       => self::TYPE_RECORD,
-                self::CONFIG => [
+                self::CONFIG     => [
                     self::APP_NAME     => Addressbook_Config::APP_NAME,
                     self::MODEL_NAME   => 'Contact',
                 ],
@@ -370,12 +375,20 @@ class Calendar_Model_Event extends Tinebase_Record_Abstract
                 ],
             ],
             'organizer'      => [
-                self::TYPE          => self::TYPE_STRING, // type record?
+                self::TYPE          => self::TYPE_RECORD, // type record?
+                self::CONFIG        => [
+                    self::APP_NAME      => Addressbook_Config::APP_NAME,
+                    self::MODEL_NAME    => 'Contact',
+                ],
                 self::LENGTH        => 40,
                 self::NULLABLE      => true,
                 self::DEFAULT_VAL   => null,
                 self::FILTER_DEFINITION => [
                     self::FILTER => Addressbook_Model_ContactIdFilter::class,
+                    self::OPTIONS => [
+                        self::MODEL_NAME => 'Contact',
+                        self::APP_NAME      => Addressbook_Config::APP_NAME,
+                    ],
                 ],
             ],
             'organizer_type'      => [
@@ -430,6 +443,7 @@ class Calendar_Model_Event extends Tinebase_Record_Abstract
             ],
             'uid'      => [
                 self::TYPE          => self::TYPE_STRING,
+                self::COPY_OMIT     => true,
                 self::LENGTH        => 255,
             ],
             'external_uid'      => [
@@ -468,6 +482,7 @@ class Calendar_Model_Event extends Tinebase_Record_Abstract
             'recurid'      => [
                 self::TYPE          => self::TYPE_STRING,
                 self::LENGTH        => 255,
+                self::COPY_OMIT     => true,
                 self::NULLABLE      => true,
                 self::DEFAULT_VAL   => null,
             ],
@@ -506,7 +521,12 @@ class Calendar_Model_Event extends Tinebase_Record_Abstract
                 self::DOCTRINE_IGNORE => true, //  legacy! needed :-/
             ],
             'rrule'      => [
-                self::TYPE          => self::TYPE_STRING,
+                self::TYPE          => self::TYPE_JSON,
+//                self::TYPE          => self::TYPE_RECORD, // type record?
+//                self::CONFIG        => [
+//                    self::APP_NAME      => Calendar_Config::APP_NAME,
+//                    self::MODEL_NAME    => 'Rrule',
+//                ],
                 self::LENGTH        => 255,
                 self::NULLABLE      => true,
                 self::DEFAULT_VAL   => null,
@@ -525,7 +545,7 @@ class Calendar_Model_Event extends Tinebase_Record_Abstract
                 self::DEFAULT_VAL   => null,
             ],
             'rrule_constraints'      => [
-                self::TYPE          => self::TYPE_TEXT,
+                self::TYPE          => self::TYPE_JSON,
                 self::INPUT_FILTERS => [], // we need this to overwrite default text filter!
                 self::NULLABLE      => true,
             ],
@@ -536,7 +556,11 @@ class Calendar_Model_Event extends Tinebase_Record_Abstract
                 self::DEFAULT_VAL   => null,
             ],
             'poll_id'      => [
-                self::TYPE          => self::TYPE_STRING, // record?
+                self::TYPE          => self::TYPE_RECORD,
+                self::CONFIG        => [
+                    self::APP_NAME      => Calendar_Config::APP_NAME,
+                    self::MODEL_NAME    => 'Poll',
+                ],
                 self::LENGTH        => 40,
                 self::NULLABLE      => true,
                 self::DEFAULT_VAL   => null,
@@ -931,7 +955,7 @@ class Calendar_Model_Event extends Tinebase_Record_Abstract
      */
     public function isRecurInstance()
     {
-        return (boolean) preg_match('/^fakeid/', $this->getId());
+        return (bool) preg_match('/^fakeid/', $this->getId());
     }
 
     /**
@@ -1149,10 +1173,16 @@ class Calendar_Model_Event extends Tinebase_Record_Abstract
             $_data['rrule'] = new Calendar_Model_Rrule($_data['rrule'], $this->bypassFilters, $this->convertDates);
         }
 
-        if (isset($_data['rrule_constraints']) && ! empty($_data['rrule_constraints']) && ! $_data['rrule_constraints'] instanceof Calendar_Model_EventFilter) {
-            // rrule can be array or string
-            $_data['rrule_constraints'] = new Calendar_Model_EventFilter($_data['rrule_constraints']);
-
+        if (isset($_data['rrule_constraints']) && !empty($_data['rrule_constraints']) && !$_data['rrule_constraints'] instanceof Calendar_Model_EventFilter) {
+            // rrule can be an array or string - filter only accepts array
+            if (!is_array($_data['rrule_constraints'])) {
+                // TODO: should be fixed! maybe client sends wrong data or json string is not converted to array by CalFrontendJson
+                $e = new Tinebase_Exception_Record_Validation('rrule_constraints must be an array: '
+                    . print_r($_data['rrule_constraints'], true));
+                Tinebase_Exception::log($e);
+            } else {
+                $_data['rrule_constraints'] = new Calendar_Model_EventFilter($_data['rrule_constraints']);
+            }
         }
 
         if (isset($_data['alarms']) && is_array($_data['alarms'])) {
@@ -1314,7 +1344,7 @@ class Calendar_Model_Event extends Tinebase_Record_Abstract
     // TODO remove the runConvert methods when migration to Modelconfig!
     public function runConvertToRecord()
     {
-        if (isset($this->_properties['xprops'])) {
+        if (isset($this->_properties['xprops']) && is_string($this->_properties['xprops'])) {
             $this->_properties['xprops'] = json_decode($this->_properties['xprops'], true);
         }
     }

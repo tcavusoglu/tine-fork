@@ -85,15 +85,17 @@ class Sales_SuppliersTest extends TestCase
             'currency'    => 'EUR',
             'curreny_trans_rate' => 7.034,
             'discount'    => 12.5,
-        
-            'adr_prefix1' => 'no prefix 1',
-            'adr_prefix2' => 'no prefix 2',
-            'adr_street' => 'Mao st. 2000',
-            'adr_postalcode' => '1',
-            'adr_locality' => 'Shanghai',
-            'adr_region' => 'Shanghai',
-            'adr_countryname' => 'China',
-            'adr_pobox'   => '7777777'
+
+            'postal_id' => [
+                'prefix1' => 'no prefix 1',
+                'prefix2' => 'no prefix 2',
+                'street' => 'Mao st. 2000',
+                'postalcode' => '1',
+                'locality' => 'Shanghai',
+                'region' => 'Shanghai',
+                'countryname' => 'China',
+                'pobox'   => '7777777',
+            ],
         );
         
         return $this->_json->saveSupplier($customerData);
@@ -121,7 +123,7 @@ class Sales_SuppliersTest extends TestCase
         $this->assertEquals(1, $deletedSupplier->is_deleted);
         
         $addressBackend = new Sales_Backend_Address();
-        $deletedAddresses = $addressBackend->getMultipleByProperty($retVal['id'], 'customer_id', TRUE);
+        $deletedAddresses = $addressBackend->getMultipleByProperty($retVal['id'], 'supplier_id', true);
 
         $this->assertEquals(1, $deletedAddresses->count());
         
@@ -161,16 +163,16 @@ class Sales_SuppliersTest extends TestCase
     public function testUpdateSupplier()
     {
         $retVal = $this->_createSupplier();
-        $retVal['adr_name'] = 'test Name';
-        $retVal['adr_email'] = 'testMail@mail.test';
+        $retVal['postal_id']['name'] = 'test Name';
+        $retVal['postal_id']['email'] = 'testMail@mail.test';
 
         $result = $this->_json->saveSupplier($retVal);
         $this->assertEquals('test Name', $result['postal_id']['name']);
         $this->assertEquals('testMail@mail.test', $result['postal_id']['email']);
 
-        $retVal['adr_name'] = '';
-        $retVal['adr_email'] = '';
-        $result = $this->_json->saveSupplier($retVal);
+        $result['postal_id']['name'] = '';
+        $result['postal_id']['email']= '';
+        $result = $this->_json->saveSupplier($result);
         $this->assertEquals('', $result['postal_id']['name']);
         $this->assertEquals('', $result['postal_id']['email']);
     }

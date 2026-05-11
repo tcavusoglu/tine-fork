@@ -134,7 +134,6 @@ abstract class TestCase extends \PHPUnit\Framework\TestCase
 
         Tinebase_FileSystem_Previews::$unittestTransactionId = $this->_transactionId = Tinebase_TransactionManager::getInstance()->startTransaction(Tinebase_Core::getDb());
 
-        (new ReflectionProperty(Felamimail_Controller_Account::class, '_instance'))->setAccessible(true);
         (new ReflectionClass(Felamimail_Controller_Account::class))
             ->setStaticPropertyValue('_instance', Felamimail_Controller_AccountMock::getInstance());
         
@@ -473,10 +472,10 @@ abstract class TestCase extends \PHPUnit\Framework\TestCase
      *
      * TODO use array as param (with array_merge)
      */
-    protected function _getTestContainer($applicationName, $model, $shared = false, $name = null): Tinebase_Model_Container
+    protected function _getTestContainer(string $applicationName, string $model, bool $shared = false, ?string $name = null, array $additionalData = []): Tinebase_Model_Container
     {
         $name = $name ?: 'PHPUnit ' . $model . ($shared ? ' shared' : '') . ' container';
-        $container = new Tinebase_Model_Container(array(
+        $container = new Tinebase_Model_Container(array_merge([
             'name' => $name,
             'type'           => $shared ? Tinebase_Model_Container::TYPE_SHARED :
                 Tinebase_Model_Container::TYPE_PERSONAL,
@@ -484,7 +483,7 @@ abstract class TestCase extends \PHPUnit\Framework\TestCase
             'backend'        => 'Sql',
             'application_id' => Tinebase_Application::getInstance()->getApplicationByName($applicationName)->getId(),
             'model'          => $model,
-        ), true);
+        ], $additionalData), true);
         return Tinebase_Container::getInstance()->addContainer($container, null, false, true);
     }
     
@@ -991,7 +990,7 @@ abstract class TestCase extends \PHPUnit\Framework\TestCase
             'accountStatus'         => 'enabled',
             'accountExpires'        => NULL,
             'accountPrimaryGroup'   => Tinebase_Group::getInstance()->getDefaultGroup()->getId(),
-            'accountLastName'       => 'Tine 2.0',
+            'accountLastName'       => Tinebase_Record_Abstract::generateUID(10),
             'accountFirstName'      => 'PHPUnit User',
             'accountEmailAddress'   => 'phpunit@' . $emailDomain,
         ], $userdata));
@@ -1246,7 +1245,7 @@ abstract class TestCase extends \PHPUnit\Framework\TestCase
     protected function _createGroup()
     {
         $group = Tinebase_Group::getInstance()->addGroup(new Tinebase_Model_Group([
-            'name'      => 'unittestgroup' . Tinebase_Record_Abstract::generateUID(5)
+            'name' => 'unittestgroup' . Tinebase_Record_Abstract::generateUID(5)
         ]));
         $this->_listsToDelete[] = $group->list_id;
 

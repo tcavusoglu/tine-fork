@@ -736,7 +736,7 @@ class Tinebase_Core
     /**
      * tines error exception handler for catchable fatal errors
      *
-     * NOTE: PHP < 5.3 don't throws exceptions for Catchable fatal errors per default,
+     * NOTE: PHP < 5.3 don't throw exceptions for Catchable fatal errors per default,
      * so we convert them into exceptions manually
      *
      * @param integer $severity
@@ -779,7 +779,6 @@ class Tinebase_Core
                 break;
                 
             case E_NOTICE:
-            case E_STRICT:
             case E_USER_NOTICE:
             default:
                 if (Tinebase_Core::isRegistered(Tinebase_Core::LOGGER)) {
@@ -1047,22 +1046,29 @@ class Tinebase_Core
                 if (Tinebase_Core::isLogLevel(Zend_Log::TRACE)) Tinebase_Core::getLogger()->trace(__METHOD__
                     . '::' . __LINE__ . ' Adding exception logger to Redis Backend');
                 $refProp = new ReflectionProperty(Zend_Cache_Backend_Redis::class, '_redis');
-                $refProp->setAccessible(true);
                 $refProp->getValue($cacheBackend)->setLogDelegator(function($exception) {
                     Tinebase_Exception::log($exception);
                 });
             }
             
         } catch (Exception $e) {
-            Tinebase_Exception::log($e);
+            if (Tinebase_Core::isLogLevel(Zend_Log::ERR)) {
+                Tinebase_Core::getLogger()->err(__METHOD__
+                    . '::' . __LINE__ . ' ' . $e->getMessage());
+            }
 
             $enabled = false;
             if ('File' === $backendType && isset($backendOptions['cache_dir']) && ! is_dir($backendOptions['cache_dir'])) {
-                if (Tinebase_Core::isLogLevel(Zend_Log::INFO)) Tinebase_Core::getLogger()->info(__METHOD__
-                    . '::' . __LINE__ . ' Create cache directory and re-try');
+                if (Tinebase_Core::isLogLevel(Zend_Log::INFO)) {
+                    Tinebase_Core::getLogger()->info(__METHOD__
+                        . '::' . __LINE__ . ' Create cache directory and re-try');
+                }
                 if (@mkdir($backendOptions['cache_dir'], 0770, true)) {
                     $enabled = $_enabled;
                 }
+            } else if (Tinebase_Core::isLogLevel(Zend_Log::INFO)) {
+                Tinebase_Core::getLogger()->info(__METHOD__
+                    . '::' . __LINE__ . ' Disable caching');
             }
 
             self::setupCache($enabled);
@@ -1222,9 +1228,12 @@ class Tinebase_Core
                     . ' Using MySQL charset: ' . $dbConfigArray['charset']);
 
                 // force some driver options
-                $driverOptions = $dbConfigArray['driver_options'] ?? [];
-                // be aware of the difference of array_merge and [] + [] with numeric keys!
-                $dbConfigArray['driver_options'] = $driverOptions + [PDO::MYSQL_ATTR_USE_BUFFERED_QUERY => FALSE];
+                if (PHP_VERSION_ID < 80500) {
+                    $dbConfigArray['driver_options'][PDO::MYSQL_ATTR_USE_BUFFERED_QUERY] = false;
+                } else {
+                    /** @phpstan-ignore-next-line  */
+                    $dbConfigArray['driver_options'][Pdo\Mysql::ATTR_USE_BUFFERED_QUERY] = false;
+                }
                 $dbConfigArray['options']['init_commands'] = array(
                     "SET NAMES $upperCaseCharset",
                     "SET time_zone = '+0:00'",
@@ -1537,24 +1546,12 @@ class Tinebase_Core
      */
     public static function logMemoryUsage()
     {
-        if (function_exists('memory_get_peak_usage')) {
-            $memory = memory_get_peak_usage(true);
-        } else {
-            $memory = memory_get_usage(true);
-        }
-        
-        return  ' Memory usage: ' . ($memory / 1024 / 1024) . ' MB';
+        return  ' Memory usage: ' . (memory_get_peak_usage(true) / 1024 / 1024) . ' MB';
     }
-    
+
     public static function logCacheSize()
     {
-        if(function_exists('realpath_cache_size')) {
-            $realPathCacheSize = realpath_cache_size();
-        } else {
-            $realPathCacheSize = 'unknown';
-        }
-        
-        return ' Real patch cache size: ' . $realPathCacheSize;
+        return ' Real patch cache size: ' . realpath_cache_size();
     }
     
     /******************************* REGISTRY ************************************/
@@ -1831,12 +1828,18 @@ class Tinebase_Core
         }
         
         $symbols = Zend_Locale::getTranslationList('symbols', $locale);
-        
         try {
             $assetHash = Tinebase_Frontend_Http_SinglePageApplication::getAssetHash();
         } catch (Exception $e) {
             // unittests
             $assetHash = Tinebase_Record_Abstract::generateUID(8);
+        }
+
+        $trustedMailDomains = [];
+        try {
+            $trustedMailDomains = Tinebase_Controller_Instance::getInstance()->getTrustedMailDomains();
+        } catch (Exception $e) {
+            Tinebase_Exception::log($e);
         }
 
         $externalIdps = [];
@@ -1903,10 +1906,12 @@ class Tinebase_Core
             'websiteUrl'        => Tinebase_Config::getInstance()->get(Tinebase_Config::WEBSITE_URL),
             'fulltextAvailable' => Tinebase_Config::getInstance()->featureEnabled(Tinebase_Config::FEATURE_FULLTEXT_INDEX),
             'is_anonymous'      => Tinebase_Core::getUser()->accountLoginName == 'anonymoususer',
+            'isInMaintenanceMode'   => Tinebase_Core::inMaintenanceModeAll(),
             'jsonKey'           => Tinebase_Core::get('jsonKey'),
             'licenseStatus'     => Tinebase_License::getInstance()->getStatus(),
             'licenseData'       => Tinebase_License::getInstance()->getCertificateData(),
             'loginExternalIdps' => $externalIdps,
+            'trustedMailDomains'   => $trustedMailDomains,
         ];
 
         return $registryData;
@@ -2607,7 +2612,7 @@ class Tinebase_Core
             return;
         }
 
-        $tinebaseConfig = Setup_Controller::getInstance()->isInstalled('Tinebase')
+        $tinebaseConfig = Setup_Controller::getInstance()->isInstalled()
             ? Tinebase_Config::getInstance()
             : self::getConfig();
         $sentryServerUri = $tinebaseConfig->{Tinebase_Config::SENTRY_URI};

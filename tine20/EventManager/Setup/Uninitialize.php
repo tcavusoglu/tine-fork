@@ -1,12 +1,15 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * Tine 2.0
  *
  * @package     EventManager
  * @subpackage  Setup
- * @license     http://www.gnu.org/licenses/agpl.html AGPL Version 3
- * @author      Tonia Leuschel <p.mehrer@metaways.de>
- * @copyright   Copyright (c) 2025 Metaways Infosystems GmbH (http://www.metaways.de)
+ * @license     https://www.gnu.org/licenses/agpl.html AGPL Version 3
+ * @author      Paul Mehrer <p.mehrer@metaways.de> Tonia Wulff <t.wulff@metaways.de>
+ * @copyright   Copyright (c) 2025-2026 Metaways Infosystems GmbH (https://www.metaways.de)
  */
 
 /**
@@ -17,19 +20,6 @@
  */
 class EventManager_Setup_Uninitialize extends Setup_Uninitialize
 {
-    protected function _uninitializeDeleteEventContacts()
-    {
-        if (Tinebase_Core::isReplica()) {
-            return;
-        }
-
-        $container_id = EventManager_Config::getInstance()
-            ->get(EventManager_Config::DEFAULT_CONTACT_EVENT_CONTAINER);
-        if ($container_id) {
-            Tinebase_Container::getInstance()->deleteContainer($container_id);
-        }
-    }
-
     protected function _uninitializeDeleteEventFolderFilemanager()
     {
         if (Tinebase_Core::isReplica()) {
@@ -37,8 +27,8 @@ class EventManager_Setup_Uninitialize extends Setup_Uninitialize
         }
 
         $prefix = Tinebase_FileSystem::getInstance()->getApplicationBasePath('Filemanager') . '/folders/';
-        $path = EventManager_Config::getInstance()
-            ->get(EventManager_Config::EVENT_FOLDER_FILEMANAGER_PATH);
+        $translation = Tinebase_Translation::getTranslation(EventManager_Config::APP_NAME);
+        $path = Tinebase_FileSystem::FOLDER_TYPE_SHARED . '/' . $translation->_('Events');
         Filemanager_Controller_Node::getInstance()->deleteNodes([$prefix . $path]);
     }
 

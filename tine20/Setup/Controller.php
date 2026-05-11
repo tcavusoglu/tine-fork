@@ -2994,7 +2994,7 @@ class Setup_Controller
             $configDir = dirname($configFile);
 
             $files = file_exists("$configDir/index.php") ? 'config.inc.php' : '.';
-            `cd $configDir; tar cjf $backupDir/tine20_config.tar.bz2 $files`;
+            shell_exec('cd ' . $configDir . '; tar cjf ' . $backupDir . '/tine20_config.tar.bz2 ' . $files);
 
             Setup_Core::getLogger()->info(__METHOD__ . '::' . __LINE__ . ' Backup of config file successful');
         }
@@ -3042,7 +3042,7 @@ class Setup_Controller
 
         $filesDir = isset($config->filesdir) ? $config->filesdir : false;
         if (isset($options['files']) && $options['files'] && $filesDir) {
-            `cd $filesDir; tar cjf $backupDir/tine20_files.tar.bz2 .`;
+            shell_exec('cd ' . $filesDir . '; tar cjf ' . $backupDir . '/tine20_files.tar.bz2 .');
 
             Setup_Core::getLogger()->info(__METHOD__ . '::' . __LINE__ . ' Backup of files successful');
         }
@@ -3142,7 +3142,7 @@ class Setup_Controller
                 $configDir = dirname($configFile);
             }
 
-            `cd $configDir; tar xf $configBackupFile`;
+            shell_exec('cd ' . $configDir . '; tar xf ' . $configBackupFile);
 
             Setup_Core::getLogger()->info(__METHOD__ . '::' . __LINE__ . ' Restore of config file successful');
         }
@@ -3164,7 +3164,7 @@ class Setup_Controller
                 throw new Setup_Exception("$filesBackupFile not found");
             }
             Setup_Core::getLogger()->info(__METHOD__ . '::' . __LINE__ . ' Starting files restore');
-            `cd $filesDir; tar xf $filesBackupFile`;
+            shell_exec('cd ' . $filesDir . '; tar xf ' . $filesBackupFile);
             Setup_Core::getLogger()->info(__METHOD__ . '::' . __LINE__ . ' Restore of files successful');
         }
 
@@ -3184,87 +3184,12 @@ class Setup_Controller
     }
 
     /**
-     * @return array
-     */
-    public function upgradeMysql564()
-    {
-        $setupBackend = Setup_Backend_Factory::factory();
-        if (!$setupBackend->supports('mysql >= 5.6.4 | mariadb >= 10.0.5')) {
-            return ['DB backend does not support the features - upgrade to mysql >= 5.6.4 or mariadb >= 10.0.5'];
-        }
-        if (!Tinebase_Config::getInstance()->featureEnabled(Tinebase_Config::FEATURE_FULLTEXT_INDEX)) {
-            return ['full text index feature is disabled'];
-        }
-
-        $failures = array();
-        $setupUpdate = new Setup_Update_Abstract($setupBackend);
-
-        /** @var Tinebase_Model_Application $application */
-        foreach (Tinebase_Application::getInstance()->getApplications() as $application) {
-            try {
-                $xml = $this->getSetupXml($application->name);
-            } catch (Setup_Exception_NotFound $senf) {
-                // app is not available any more
-                $failures[] = $senf->getMessage();
-                continue;
-            }
-            // should we check $xml->enabled? I don't think so, we asked Tinebase_Application for the applications...
-
-            // get all MCV2 models for all apps, you never know...
-            $controllerInstance = null;
-            try {
-                $controllerInstance = Tinebase_Core::getApplicationInstance($application->name, '', true);
-            } catch(Tinebase_Exception_NotFound $tenf) {
-                $failures[] = 'could not get application controller for app: ' . $application->name;
-            }
-            if (null !== $controllerInstance) {
-                try {
-                    $setupUpdate->updateSchema($application->name, $controllerInstance->getModels(true));
-                } catch (Exception $e) {
-                    $failures[] = 'could not update MCV2 schema for app: ' . $application->name;
-                }
-            }
-
-            if (!empty($xml->tables)) {
-                foreach ($xml->tables->table as $table) {
-                    if (!empty($table->requirements) && !$setupBackend->tableExists((string)$table->name)) {
-                        foreach ($table->requirements->required as $requirement) {
-                            if (!$setupBackend->supports((string)$requirement)) {
-                                continue 2;
-                            }
-                        }
-                        $setupBackend->createTable(new Setup_Backend_Schema_Table_Xml($table->asXML()));
-                        continue;
-                    }
-
-                    // check for fulltext index
-                    foreach ($table->declaration->index as $index) {
-                        if (empty($index->fulltext)) {
-                            continue;
-                        }
-                        $declaration = new Setup_Backend_Schema_Index_Xml($index->asXML());
-                        // TODO should check if index already exists
-                        try {
-                            $setupBackend->addIndex((string)$table->name, $declaration);
-                        } catch (Exception $e) {
-                            $failures[] = (string)$table->name . ': ' . (string)$index->name . '(error: ' . $e->getMessage() . ')';
-                        }
-                    }
-                }
-            }
-        }
-
-        return $failures;
-    }
-
-
-    /**
      * Add a new auth token to table tine20_auth_token
      *
      * Parameter $options has to be array with this structure:
      *      array(
      *          'user'          => string   // Username to create the token for
-     *          'id'            => string   // Value for field tine20_auth_token.id
+     *          'id'            => string   // Value for field tine20_auth_token.id (optional)
      *          'auth_token'    => string   // Value for field tine20_auth_token.auth_token
      *          'valid_until'   => string   // Value for field tine20_auth_token.valid_until
      *          'channels'      => string   // Comma separated list of channel names. Values for JSON array in field tine20_auth_token.channels
@@ -3276,6 +3201,10 @@ class Setup_Controller
     public function addAuthToken($options)
     {
         $result = null;
+
+        if (! isset($options['id'])) {
+            $options['id'] = Tinebase_Record_Abstract::generateUID();
+        }
 
         $db = Setup_Core::getDb();
 

@@ -6,9 +6,9 @@
  *
  * @package     Admin
  * @subpackage  Frontend
- * @license     http://www.gnu.org/licenses/agpl.html AGPL Version 3
+ * @license     https://www.gnu.org/licenses/agpl.html AGPL Version 3
  * @author      Lars Kneschke <l.kneschke@metaways.de>
- * @copyright   Copyright (c) 2007-2021 Metaways Infosystems GmbH (http://www.metaways.de)
+ * @copyright   Copyright (c) 2007-2026 Metaways Infosystems GmbH (https://www.metaways.de)
  * 
  * @todo        try to split this into smaller parts (record proxy should support 'nested' json frontends first)
  * @todo        use functions from Tinebase_Frontend_Json_Abstract
@@ -430,21 +430,8 @@ class Admin_Frontend_Json extends Tinebase_Frontend_Json_Abstract
         
         $result = $this->_recordToJson($account);
 
-        // @TODO should we delete matrix accounts when they are no longer assigned here?
-        if (Tinebase_Application::getInstance()->isInstalled('MatrixSynapseIntegrator')
-            && isset($recordData[Tinebase_Model_FullUser::FLD_MATRIX_ACCOUNT_ID][MatrixSynapseIntegrator_Model_MatrixAccount::FLD_MATRIX_ID])
-        ) {
-            $matrixAccountData = $recordData[Tinebase_Model_FullUser::FLD_MATRIX_ACCOUNT_ID];
-            if (empty($matrixAccountData[MatrixSynapseIntegrator_Model_MatrixAccount::FLD_ACCOUNT_ID])) {
-                $matrixAccountData[MatrixSynapseIntegrator_Model_MatrixAccount::FLD_ACCOUNT_ID] = $account->getId();
-                MatrixSynapseIntegrator_Controller_MatrixAccount::getInstance()->create(
-                    new MatrixSynapseIntegrator_Model_MatrixAccount($matrixAccountData));
-            } else {
-                MatrixSynapseIntegrator_Controller_MatrixAccount::getInstance()->update(
-                    new MatrixSynapseIntegrator_Model_MatrixAccount($matrixAccountData));
-            }
-        }
-        
+        $this->_saveMatrixAccount($recordData, $account);
+
         $primaryGroup = Tinebase_Group::getInstance()->getGroupById($account->accountPrimaryGroup);
         $userGroups = Tinebase_Group::getInstance()->getMultiple(Tinebase_Group::getInstance()->getGroupMemberships(
             $account->accountId))->toArray();
@@ -454,6 +441,33 @@ class Admin_Frontend_Json extends Tinebase_Frontend_Json_Abstract
         $this->_addUserGroupRolesEtc($result, $userGroups, $userRoles, $primaryGroup);
 
         return $result;
+    }
+
+    protected function _saveMatrixAccount(array $recordData, Tinebase_Model_FullUser $account)
+    {
+        // @TODO should we delete matrix accounts when they are no longer assigned here?
+
+        if (!Tinebase_Application::getInstance()->isInstalled('MatrixSynapseIntegrator')
+            || !isset($recordData[Tinebase_Model_FullUser::FLD_MATRIX_ACCOUNT_ID]
+                [MatrixSynapseIntegrator_Model_MatrixAccount::FLD_MATRIX_ID])
+        ) {
+            return;
+        }
+
+        $matrixAccountData = $recordData[Tinebase_Model_FullUser::FLD_MATRIX_ACCOUNT_ID];
+        if (empty($matrixAccountData[MatrixSynapseIntegrator_Model_MatrixAccount::FLD_ACCOUNT_ID])) {
+            $matrixAccountData[MatrixSynapseIntegrator_Model_MatrixAccount::FLD_ACCOUNT_ID] = $account->getId();
+            MatrixSynapseIntegrator_Controller_MatrixAccount::getInstance()->create(
+                new MatrixSynapseIntegrator_Model_MatrixAccount($matrixAccountData));
+        } else {
+            try {
+                MatrixSynapseIntegrator_Controller_MatrixAccount::getInstance()->update(
+                    new MatrixSynapseIntegrator_Model_MatrixAccount($matrixAccountData));
+            } catch (Tinebase_Exception_NotFound) {
+                MatrixSynapseIntegrator_Controller_MatrixAccount::getInstance()->create(
+                    new MatrixSynapseIntegrator_Model_MatrixAccount($matrixAccountData));
+            }
+        }
     }
     
     /**
@@ -1771,15 +1785,10 @@ class Admin_Frontend_Json extends Tinebase_Frontend_Json_Abstract
             $records->addRecord($node);
             
             $isFelamimailInstalled = Tinebase_Application::getInstance()->isInstalled('Felamimail');
-            if ($isFelamimailInstalled) {
-                $imapBackend = null;
-                try {
-                    $imapBackend = Tinebase_EmailUser::getInstance();
-                } catch (Tinebase_Exception_NotFound $tenf) {
-                }
-                if ($imapBackend instanceof Tinebase_EmailUser_Imap_Dovecot) {
+            if ($isFelamimailInstalled && Tinebase_EmailUser::manages(Tinebase_Config::IMAP)) {
+                $imapBackend = Tinebase_EmailUser::getInstance();
+                if ($imapBackend instanceof Tinebase_EmailUser_Sql) {
                     $emailPath = Tinebase_FileSystem::getInstance()->getApplicationBasePath('Felamimail');
-
                     /** @var Tinebase_Model_Tree_Node $emailNode */
                     $emailNode = clone $records->getFirstRecord();
                     $emailNode->setId(trim($emailPath, '/'));

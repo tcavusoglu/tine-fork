@@ -58,6 +58,11 @@ Tine.Calendar.SearchCombo = Ext.extend(Ext.ux.form.ClearableComboBox, {
     showReloadBtn: null,
 
     /**
+     * @cfg {Boolean} addFixedCalendars
+     */
+    addFixedCalendars: false,
+
+    /**
      * shows an today button in the datepager
      */
     showTodayBtn: null,
@@ -109,6 +114,7 @@ Tine.Calendar.SearchCombo = Ext.extend(Ext.ux.form.ClearableComboBox, {
     },
 
     setValue: Tine.Tinebase.widgets.form.RecordPickerComboBox.prototype.setValue,
+    setSelectedRecord: Tine.Tinebase.widgets.form.RecordPickerComboBox.prototype.setSelectedRecord,
 
     /**
      * @param {} store
@@ -123,6 +129,7 @@ Tine.Calendar.SearchCombo = Ext.extend(Ext.ux.form.ClearableComboBox, {
      * @param {} store
      */
     onBeforeStoreLoad: function(store) {
+        store.baseParams.addFixedCalendars = this.addFixedCalendars;
         store.baseParams.filter = [
             {field: 'query', operator: 'contains', value: this.getRawValue()}
         ];

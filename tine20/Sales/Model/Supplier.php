@@ -19,6 +19,12 @@
 class Sales_Model_Supplier extends Tinebase_Record_NewAbstract
 {
     public const TABLE_NAME = 'sales_suppliers';
+    public const MODEL_NAME_PART = 'Supplier';
+
+    public const FLD_EAS_ID = 'eas_id';
+    public const FLD_ELECTRONIC_ADDRESS = 'electronic_address';
+    public const FLD_PAYMENT_MEANS_DEFAULT = 'payment_means_default';
+
 
     /**
      * holds the configuration object (must be declared in the concrete class)
@@ -33,7 +39,7 @@ class Sales_Model_Supplier extends Tinebase_Record_NewAbstract
      * @var array
      */
     protected static $_modelConfiguration = array(
-        self::VERSION       => 5,
+        self::VERSION       => 6,
         'recordName'        => 'Supplier', // gettext('GENDER_Supplier')
         'recordsName'       => 'Suppliers', // ngettext('Supplier', 'Suppliers', n)
         'hasRelations'      => TRUE,
@@ -44,7 +50,6 @@ class Sales_Model_Supplier extends Tinebase_Record_NewAbstract
         'hasAttachments'    => TRUE,
         'createModule'      => TRUE,
         'containerProperty' => NULL,
-        'resolveVFGlobally' => TRUE,
         
         'titleProperty'     => '{{number}} - {{name}}',
         'appName'           => 'Sales',
@@ -63,6 +68,12 @@ class Sales_Model_Supplier extends Tinebase_Record_NewAbstract
                     self::FLAGS         => [self::TYPE_FULLTEXT],
                 ],
             ]
+        ],
+
+        self::JSON_EXPANDER     => [
+            Tinebase_Record_Expander::EXPANDER_PROPERTIES => [
+                'postal_id' => [],
+            ],
         ],
 
         'fields'            => array(
@@ -161,6 +172,21 @@ class Sales_Model_Supplier extends Tinebase_Record_NewAbstract
                 'shy'     => true,
                 'validators' => array(Zend_Filter_Input::ALLOW_EMPTY => true),
             ),
+            self::FLD_PAYMENT_MEANS_DEFAULT => [
+                self::LABEL             => 'Payment Means', // _('Payment Means')
+                self::TYPE              => self::TYPE_KEY_FIELD,
+                self::NAME              => Sales_Config::PAYMENT_METHODS,
+                self::NULLABLE          => true,
+                self::DEFAULT_VAL       => null,
+                self::LENGTH            => 255,
+                self::CONFIG            => [
+                    self::OWNING_APP            => Sales_Config::APP_NAME,
+                    self::NO_DEFAULT_VALIDATOR  => true,
+                ],
+                self::INPUT_FILTERS     => [
+                    Zend_Filter_Empty::class => null,
+                ],
+            ],
             'iban' => array (
                 'label'   => 'IBAN',
                 'group'   => 'accounting',
@@ -184,94 +210,15 @@ class Sales_Model_Supplier extends Tinebase_Record_NewAbstract
             #    //'shy' => TRUE,
             #),
             // the postal address
-            'postal_id' => array(
-                'type' => 'virtual',
-                'config' => array(
-                    'duplicateOmit' => TRUE,
-                    'label'         => NULL,
-                )
-            ),
-            'adr_prefix1' => array(
-                'config' => array(
-                    'duplicateOmit' => TRUE,
-                    'label'         => 'Prefix', //_('Prefix')
-                    'shy'           => TRUE
-                ),
-                'type'   => 'virtual',
-            ),
-            'adr_prefix2' => array(
-                'config' => array(
-                    'duplicateOmit' => TRUE,
-                    'label'         => 'Additional Prefix', //_('Additional Prefix')
-                    'shy'           => TRUE
-                ),
-                'type'   => 'virtual',
-            ),
-            'adr_name' => [
-                'config' => [
-                    'duplicateOmit' => TRUE,
-                    'label'         => 'Name', //_('Name')
-                    'shy'           => TRUE
+            'postal_id' => [
+                self::TYPE          => self::TYPE_RECORD,
+                self::CONFIG        => [
+                    self::APP_NAME      => Sales_Config::APP_NAME,
+                    self::MODEL_NAME    => Sales_Model_Address::MODEL_NAME_PART,
+                    self::REF_ID_FIELD  => Sales_Model_Address::FLD_SUPPLIER_ID,
+                    self::DEPENDENT_RECORDS => true,
                 ],
-                'type'   => 'virtual',
             ],
-            'adr_email' => [
-                'config' => [
-                    'duplicateOmit' => TRUE,
-                    'label'         => 'Email', //_('Name')
-                    'shy'           => TRUE
-                ],
-                'type'   => 'virtual',
-            ],
-            'adr_street' => array(
-                'config' => array(
-                    'duplicateOmit' => TRUE,
-                    'label'         => 'Street', //_('Street')
-                    'shy'           => TRUE
-                ),
-                'type' => 'virtual',
-            ),
-            'adr_postalcode' => array(
-                'type' => 'virtual',
-                'config' => array(
-                    'duplicateOmit' => TRUE,
-                    'label'         => 'Postal Code', //_('Postal Code')
-                    'shy'           => TRUE
-                ),
-            ),
-            'adr_locality' => array(
-                'type' => 'virtual',
-                'config' => array(
-                    'duplicateOmit' => TRUE,
-                    'label'         => 'Locality', //_('Locality')
-                    'shy'           => TRUE
-                ),
-            ),
-            'adr_region' => array(
-                'type' => 'virtual',
-                'config' => array(
-                    'duplicateOmit' => TRUE,
-                    'label'         => 'Region', //_('Region')
-                    'shy'           => TRUE
-                ),
-            ),
-            'adr_countryname' => array(
-                'type' => 'virtual',
-                'config' => array(
-                    'duplicateOmit' => TRUE,
-                    'label'         => 'Country', //_('Country')
-                    'shy'           => TRUE,
-                    'default'       => 'DE'
-                ),
-            ),
-            'adr_pobox' => array(
-                'type' => 'virtual',
-                'config' => array(
-                    'duplicateOmit' => TRUE,
-                    'label'         => 'Postbox', //_('Postbox')
-                    'shy'           => TRUE
-                ),
-            ),
             'fulltext' => array(
                 'type'   => 'virtual',
                 'config' => array(
@@ -279,6 +226,23 @@ class Sales_Model_Supplier extends Tinebase_Record_NewAbstract
                     'sortable' => false
                 )           
             ),
+            self::FLD_EAS_ID                => [
+                self::TYPE                      => self::TYPE_RECORD,
+                self::LABEL                     => 'Electronic Address Schema', // _('Electronic Address Schema')
+                self::DESCRIPTION               => "The pattern for 'Seller electronic address (BT-34 [EN 16931]).", //_("The pattern for 'Seller electronic address (BT-34 [EN 16931]).")
+                self::NULLABLE                  => true,
+                self::CONFIG                    => [
+                    self::APP_NAME                  => Sales_Config::APP_NAME,
+                    self::MODEL_NAME                => Sales_Model_EDocument_EAS::MODEL_NAME_PART,
+                ],
+            ],
+            self::FLD_ELECTRONIC_ADDRESS    => [
+                self::TYPE                      => self::TYPE_STRING,
+                self::LABEL                     => 'Electronic Address', // _('Electronic Address')
+                self::DESCRIPTION               => 'Specifies the electronic address of the vendor to which the application level response to an invoice can be sent (BT-34 [EN 16931]).', //_('Specifies the electronic address of the vendor to which the application level response to an invoice can be sent (BT-34 [EN 16931]).')
+                self::LENGTH                    => 255,
+                self::NULLABLE                  => true,
+            ],
         )
     );
     
@@ -297,7 +261,7 @@ class Sales_Model_Supplier extends Tinebase_Record_NewAbstract
         parent::setFromArray($_data);
         $this->fulltext = $this->number . ' - ' . $this->name;
     }
-    
+
     /**
      * @see Tinebase_Record_Abstract
      */
@@ -311,4 +275,54 @@ class Sales_Model_Supplier extends Tinebase_Record_NewAbstract
             'defaultType'  => 'SUPPLIER'
         )
     );
+
+    public function fromXRXml(SimpleXMLElement $xr): static
+    {
+        $this->name = (string)$xr->SELLER->Seller_name; // 1 (BT-27)
+//            'url' => ?
+        $this->vat_procedure = Sales_Config::getInstance()->{Sales_Config::VAT_PROCEDURES}->records
+            ->find(Sales_Model_EDocument_VATProcedure::FLD_UNTDID_5305, $xr->VAT_BREAKDOWN->VAT_category_code)?->id
+                ?? Sales_Config::VAT_PROCEDURE_STANDARD; // 1
+        $this->currency = (string)$xr->Invoice_currency_code; // 1
+        $this->{self::FLD_EAS_ID} = Sales_Controller_EDocument_EAS::getInstance()
+            ->getByCode((string)$xr->SELLER->Seller_electronic_address->attributes()->scheme_identifier); // 1
+        $this->{self::FLD_ELECTRONIC_ADDRESS} = (string)$xr->SELLER->Seller_electronic_address; // 1
+
+        if((string)$xr->PAYMENT_INSTRUCTIONS->Payment_means_type_code === "58") {
+            $this->iban = (string)$xr->PAYMENT_INSTRUCTIONS->CREDIT_TRANSFER[0]->Payment_account_identifier;
+            $this->bic = (string)$xr->PAYMENT_INSTRUCTIONS->CREDIT_TRANSFER[0]->Payment_service_provider_identifier;
+        }
+
+//        foreach ($xr->SELLER->Seller_identifier as $tmp) {}; // 0..*
+//        $xr->Seller_legal_registration_identifier; // 0..*
+        if ($vatId = (string)$xr->SELLER->Seller_VAT_identifier) { // 0..1
+            $this->vatid = $vatId;
+        }
+//        $xr->SELLER->Seller_tax_registration_identifier; // 0..1
+//        $xr->SELLER->Seller_additional_legal_information; // 0..1
+
+        // 1 SELLER_POSTAL_ADDRESS
+        $sellerPostalAdr = $xr->SELLER->SELLER_POSTAL_ADDRESS;
+        if (!$this->postal_id instanceof Sales_Model_Address) {
+            $this->postal_id = new Sales_Model_Address([], true);
+        }
+        $this->postal_id->prefix1 = (string)$sellerPostalAdr->Seller_address_line_1 /* 0..1 */ ?: null;
+        $this->postal_id->prefix2 = (string)$sellerPostalAdr->Seller_address_line_2 /* 0..1 */ ?: null;
+        $this->postal_id->name = (string)$xr->SELLER->Seller_trading_name /* 0..1 (BT-28) */ ?: (string)$xr->SELLER->Seller_name /* 1 (BT-27) */;
+        $this->postal_id->email = (string)$xr->SELLER->SELLER_CONTACT->Seller_contact_email_address ?: null;
+        $this->postal_id->street = (string)$sellerPostalAdr->Seller_address_line_3 /* 0..1 */ ?: null;
+        $this->postal_id->postalcode = (string)$sellerPostalAdr->Seller_post_code /* 1 */;
+        $this->postal_id->locality = (string)$sellerPostalAdr->Seller_city /* 1 */;
+        $this->postal_id->region = (string)$sellerPostalAdr->Seller_country_subdivision /* 0..1 */ ?: null;
+        $this->postal_id->countryname  = (string)$sellerPostalAdr->Seller_country_code /* 1 */;
+//        $this->postal_id->pobox;
+
+        // 1 SELLER_CONTACT
+//        $sellerContact = $xr->SELLER->SELLER_CONTACT;
+//        $sellerContact->Seller_contact_point; // 0..1
+//        $sellerContact->Seller_contact_telephone_number; // 0..1
+//        $sellerContact->Seller_contact_email_address; // 0..1
+
+        return $this;
+    }
 }

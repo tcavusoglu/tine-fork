@@ -3,9 +3,9 @@
  * Tine 2.0 - http://www.tine20.org
  *
  * @package     EventManagers
- * @license     http://www.gnu.org/licenses/agpl.html
+ * @license     https://www.gnu.org/licenses/agpl.html
  * @copyright   Copyright (c) 2025 Metaways Infosystems GmbH (http://www.metaways.de)
- * @author      Tonia Leuschel <t.leuschel@metaways.de>
+ * @author      Tonia Wulff <t.leuschel@metaways.de>
  *
  */
 
@@ -63,6 +63,50 @@ class EventManager_ControllerTest extends TestCase
         self::assertEquals(
             $registration->{EventManager_Model_Registration::FLD_EVENT_ID},
             $created_registration->{EventManager_Model_Registration::FLD_EVENT_ID}
+        );
+        $event = EventManager_Controller_Event::getInstance()->get($event->getId());
+        self::assertCount(1, $event->{EventManager_Model_Event::FLD_REGISTRATIONS});
+
+        $jsonEvent = (new EventManager_Frontend_Json)->getEvent($event->getId());
+        $this->assertArrayHasKey('adr_one', $jsonEvent[EventManager_Model_Event::FLD_REGISTRATIONS][0][EventManager_Model_Registration::FLD_PARTICIPANT] ?? [], print_r($jsonEvent, true));
+    }
+
+    /**
+     * try to add a registration to an event updating the event
+     */
+    public function testAddRegistrationToEventWithUpdate()
+    {
+        $event = $this->_getEvent();
+        EventManager_Controller_Event::getInstance()->create($event);
+        $registration = $this->_getRegistration($event->getId());
+        $event->{EventManager_Model_Event::FLD_REGISTRATIONS} =
+            new Tinebase_Record_RecordSet(EventManager_Model_Registration::class, [$registration]);
+        $event = EventManager_Controller_Event::getInstance()->update($event);
+        $updatedEvent = EventManager_Controller_Event::getInstance()->get($event->getId());
+        self::assertCount(1, $updatedEvent->{EventManager_Model_Event::FLD_REGISTRATIONS});
+        $registration = $updatedEvent->{EventManager_Model_Event::FLD_REGISTRATIONS}->getFirstRecord();
+        self::assertNotNull($registration->{EventManager_Model_Registration::FLD_REGISTRANT});
+    }
+
+    /**
+     * try to add a registrant to a registration different from participant
+     */
+    public function testAddRegistrantToRegistration()
+    {
+        $event = $this->_getEvent();
+        EventManager_Controller_Event::getInstance()->create($event);
+        $registration = $this->_getRegistration($event->getId(), null, true);
+        $event->{EventManager_Model_Event::FLD_REGISTRATIONS} =
+            new Tinebase_Record_RecordSet(EventManager_Model_Registration::class, [$registration]);
+        self::assertNotEquals(
+            $registration->{EventManager_Model_Registration::FLD_PARTICIPANT}->n_family,
+            $registration->{EventManager_Model_Registration::FLD_REGISTRANT}->n_family
+        );
+        $event = EventManager_Controller_Event::getInstance()->update($event);
+        $registration = $event->{EventManager_Model_Event::FLD_REGISTRATIONS}[0];
+        self::assertNotEquals(
+            $registration->{EventManager_Model_Registration::FLD_PARTICIPANT}->n_family,
+            $registration->{EventManager_Model_Registration::FLD_REGISTRANT}->n_family
         );
     }
 
@@ -284,6 +328,27 @@ class EventManager_ControllerTest extends TestCase
         EventManager_Controller_Event::getInstance()->delete($updated_event);
     }
 
+    /**
+     * try to update the address of a participant from a registration
+     */
+    public function testUpdateParticipantFromRegistration()
+    {
+        $event = $this->_getEvent();
+        EventManager_Controller_Event::getInstance()->create($event);
+        $registration = $this->_getRegistration($event->getId(), null, true);
+        $event->{EventManager_Model_Event::FLD_REGISTRATIONS} =
+            new Tinebase_Record_RecordSet(EventManager_Model_Registration::class, [$registration]);
+        $event = EventManager_Controller_Event::getInstance()->update($event);
+        $testAddress = $event->{EventManager_Model_Event::FLD_REGISTRATIONS}[0]->participant->adr_one_locality;
+
+        $event->{EventManager_Model_Event::FLD_REGISTRATIONS}[0]->participant->adr_one_locality = 'New Test Street';
+        $event = EventManager_Controller_Event::getInstance()->update($event);
+        $newTestAddress = $event->{EventManager_Model_Event::FLD_REGISTRATIONS}[0]->participant->adr_one_locality;
+
+        self::assertNotEquals($testAddress, $newTestAddress);
+        $this->assertSame('New Test Street', $newTestAddress);
+    }
+
 
     /************ protected helper funcs *************/
 
@@ -408,8 +473,25 @@ class EventManager_ControllerTest extends TestCase
      *
      * @return EventManager_Model_Registration
      */
-    protected function _getRegistration($event_id, $options = null): EventManager_Model_Registration
+    protected function _getRegistration($event_id, $options = null, $has_other_registrant = false): EventManager_Model_Registration
     {
+        $adb_controller = Addressbook_Controller_Contact::getInstance();
+        $participant = $adb_controller->create(new Addressbook_Model_Contact([
+            'n_family' => 'participant test',
+            'adr_one_street' => 'test Str. 1',
+            'adr_one_postalcode' => '1234',
+            'adr_one_locality' => 'Test City',
+        ]));
+        if ($has_other_registrant) {
+            $registrant = $adb_controller->create(new Addressbook_Model_Contact([
+                'n_family' => 'registrant test',
+                'adr_one_street' => 'test Str. 2',
+                'adr_one_postalcode' => '5678',
+                'adr_one_locality' => 'Test City',
+            ]));
+        } else {
+            $registrant = $participant;
+        }
         $default_values = EventManager_Controller_Registration::getInstance()->getDefaultRegistrationKeyFields();
 
         if (is_array($options)) {
@@ -419,18 +501,20 @@ class EventManager_ControllerTest extends TestCase
             }
             return new EventManager_Model_Registration([
                 'event_id'               => $event_id,
-                'participant'            => 'phpunit registration',
+                'participant'            => $participant,
+                'registrant'             => $registrant,
                 'function'               => $default_values['function'],
                 'source'                 => $default_values['source'],
                 'status'                 => $default_values['status'],
                 'booked_options'         => $booked_option,
                 'description'            => 'description test phpunit registration',
             ], true);
-        } else if ($options) {
+        } elseif ($options) {
             $booked_option = $this->_getBookedOption($event_id, $options);
             return new EventManager_Model_Registration([
                 'event_id'               => $event_id,
-                'participant'            => 'phpunit registration',
+                'participant'            => $participant,
+                'registrant'             => $registrant,
                 'function'               => $default_values['function'],
                 'source'                 => $default_values['source'],
                 'status'                 => $default_values['status'],
@@ -440,7 +524,8 @@ class EventManager_ControllerTest extends TestCase
         } else {
             return new EventManager_Model_Registration([
                 'event_id'               => $event_id,
-                'participant'            => 'phpunit registration',
+                'participant'            => $participant,
+                'registrant'             => $registrant,
                 'function'               => $default_values['function'],
                 'source'                 => $default_values['source'],
                 'status'                 => $default_values['status'],

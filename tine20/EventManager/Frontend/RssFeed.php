@@ -1,11 +1,13 @@
 <?php
 
+declare(strict_types=1);
+
 /**
- * Tine 2.0 - http://www.tine20.org
+ * Tine 2.0 - https://www.tine20.org
  *
  * @package     EventManager
- * @license     http://www.gnu.org/licenses/agpl.html
- * @copyright   Copyright (c) 2025 Metaways Infosystems GmbH (http://www.metaways.de)
+ * @license     https://www.gnu.org/licenses/agpl.html
+ * @copyright   Copyright (c) 2025 Metaways Infosystems GmbH (https://www.metaways.de)
  * @author      Tonia Wulff <t.leuschel@metaways.de>
  *
  */
@@ -14,6 +16,7 @@ use Aschmelyun\BasicFeeds\Feed;
 
 class EventManager_Frontend_RssFeed
 {
+    /** @use Tinebase_Controller_SingletonTrait<EventManager_Frontend_RssFeed> */
     use Tinebase_Controller_SingletonTrait;
 
     public function publicApiGetRssFeed()
@@ -97,6 +100,14 @@ class EventManager_Frontend_RssFeed
             $registration_possible_until = $event['registration_possible_until'];
             $last_modified_time = $event['last_modified_time'] ?? $event['creation_time'];
             $event_id = $event['id'];
+            $tags = $event['tags'];
+            $categories = [];
+            if (count($tags) > 0) {
+                foreach ($tags as $tag) {
+                    $categories[] = $tag['name'];
+                }
+            }
+
             $url = Tinebase_Core::getUrl() . '/EventManager/view/#/event/' . $event_id;
 
             $feed->entry([
@@ -114,6 +125,7 @@ class EventManager_Frontend_RssFeed
                 'registration_possible_until' => $registration_possible_until,
                 'pubDate' => $last_modified_time,
                 'link' => $url,
+                'categories' => $categories,
             ]);
         }
         return $feed;

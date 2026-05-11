@@ -851,6 +851,91 @@ class Filemanager_Frontend_WebDAVTest extends TestCase
     }
 
     /**
+     * test chunked upload from OwnCloud clients
+     *
+     * @backupGlobals enabled
+     * @group noupdate
+     * @return void
+     */
+    public function testOwnCloudChunkedUploadQuotaExceed()
+    {
+        $quotaConfig = Tinebase_Config::getInstance()->{Tinebase_Config::QUOTA};
+        $oldQuotaConfig = clone $quotaConfig;
+        $applicationController = Tinebase_Application::getInstance();
+
+        /** @var Tinebase_Model_Application $tinebaseApplication */
+        $tinebaseApplication = $applicationController->getApplicationByName('Tinebase');
+
+
+        $_SERVER['HTTP_CONTENT_LENGTH'] = 1000;
+        $deletePaths =  [];
+        $_SERVER['HTTP_OC_CHUNKED'] = 1;
+        $fileStream = fopen(dirname(__FILE__) . '/../../Tinebase/files/tine_logo.png', 'r');
+        $node = $this->_getWebDAVTree()->getNodeForPath('/webdav/Filemanager/shared');
+        $node->createDirectory('unittestdirectory');
+        $path = '/webdav/Filemanager/shared';
+        $parent = $this->_getWebDAVTree()->getNodeForPath($path . '/unittestdirectory');
+        $deletePaths[] = $parent->getPath();
+
+        // upload first chunk
+        $tempStream = fopen('php://temp', 'w');
+        $_SERVER['CONTENT_LENGTH'] = stream_copy_to_stream($fileStream, $tempStream, 1000);
+        $_SERVER['REQUEST_URI'] = 'webdav/shared/' . $parent->getName() . '/tine_logo.png-chunking-1000-3-0';
+        rewind($tempStream);
+        $parent->createFile('tine_logo.png-chunking-1000-3-0', $tempStream);
+        fclose($tempStream);
+
+        $chunkInfo = [];
+        Tinebase_Frontend_WebDAV_Directory::getOwnCloudChunkInfo(rawurldecode(basename(ltrim(parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH), '/'))), $chunkInfo);
+        $tempFileName = sha1(Tinebase_Core::getUser()->accountId . $chunkInfo['name'] . $chunkInfo['tempId']);
+        $filter = new Tinebase_Model_TempFileFilter(array(
+            array('field' => 'name', 'operator' => 'equals', 'value' => $tempFileName)
+        ));
+        $uploadedChunks = Tinebase_TempFile::getInstance()->search($filter)->count();
+        $this->assertEquals(1, $uploadedChunks, 'should have 2 tempfile in db');
+
+        $oldAppState = $applicationController->getApplicationState($tinebaseApplication,
+            Tinebase_Application::STATE_FILESYSTEM_ROOT_SIZE);
+        try {
+            // upload second chunk with exceeded quota
+            $pathRecord = Tinebase_Model_Tree_Node_Path::createFromStatPath($parent->getPath());
+            $node = $pathRecord->getNode();
+            $quotaConfig->{Tinebase_Config::QUOTA_FILESYSTEM_TOTALINMB} = 1;
+            Tinebase_Config::getInstance()->set(Tinebase_Config::QUOTA, $quotaConfig);
+            Tinebase_FileSystem_Quota::clearConfigCache();
+
+            $quotas = Tinebase_FileSystem::getInstance()->getEffectiveAndLocalQuota($node);
+            $applicationController->setApplicationState($tinebaseApplication,
+                Tinebase_Application::STATE_FILESYSTEM_ROOT_SIZE, $quotas['effectiveQuota'] + 10000);
+            $quotas = Tinebase_FileSystem::getInstance()->getEffectiveAndLocalQuota($node);
+
+            $this->assertGreaterThan(0, $quotas['effectiveQuota'], 'quota should be set ' . print_r($quotas, true));
+            $this->assertEquals(0, $quotas['effectiveFree'], 'should not have free space' . print_r($quotas, true));
+
+            // upload second chunk
+            $tempStream = fopen('php://temp', 'w');
+            $_SERVER['CONTENT_LENGTH'] = stream_copy_to_stream($fileStream, $tempStream, 1000);
+            $_SERVER['REQUEST_URI'] = 'webdav/shared/' . $parent->getName() . '/tine_logo.png-chunking-1000-3-1';
+            rewind($tempStream);
+            $parent->createFile('tine_logo.png-chunking-1000-3-1', $tempStream);
+            fclose($tempStream);
+
+            static::fail('should get InsufficientStorage exception');
+        } catch (Sabre\DAV\Exception\InsufficientStorage $sdei) {
+            $uploadedChunks = Tinebase_TempFile::getInstance()->search($filter)->count();
+            $this->assertEquals(0, $uploadedChunks, 'tempFiles should be removed');
+        } finally {
+            foreach ($deletePaths as $path) {
+                Tinebase_FileSystem::getInstance()->rmdir($path, true);
+            }
+            $applicationController->setApplicationState($tinebaseApplication,
+                Tinebase_Application::STATE_FILESYSTEM_ROOT_SIZE, $oldAppState);
+            Tinebase_Config::getInstance()->set(Tinebase_Config::QUOTA , $oldQuotaConfig);
+            Tinebase_FileSystem_Quota::clearConfigCache();
+        }
+    }
+
+    /**
      * @group ServerTests
      * @return void
      * @throws Tinebase_Exception_InvalidArgument

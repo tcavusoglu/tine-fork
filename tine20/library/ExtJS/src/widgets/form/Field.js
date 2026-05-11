@@ -50,6 +50,10 @@ Ext.form.Field = Ext.extend(Ext.BoxComponent,  {
      * @cfg {String} invalidClass The CSS class to use when marking a field invalid (defaults to 'x-form-invalid')
      */
     invalidClass : 'x-form-invalid',
+
+    dirtyClass: 'x-grid3-dirty-cell',
+    showDirtyUI: false,
+
     /**
      * @cfg {String} invalidText The error text to use when marking a field invalid and no message is provided
      * (defaults to 'The value in this field is invalid')
@@ -128,6 +132,13 @@ Ext.form.Field = Ext.extend(Ext.BoxComponent,  {
      * Defaults to <tt>true</tt>.
      */
     submitValue: true,
+
+        /**
+         * @cfg {Boolean} showOverflowTip
+         * True to show a tip on mouseover/tap when the field text is wider than the visible input.
+         * Defaults to true.
+         */
+        showOverflowTip : true,
 
     // private
     isFormField : true,
@@ -340,6 +351,95 @@ var form = new Ext.form.FormPanel({
         // standardise buffer across all browsers + OS-es for consistent event order.
         // (the 10ms buffer for Editors fixes a weird FF/Win editor issue when changing OS window focus)
         this.mon(this.el, 'blur', this.onBlur, this, this.inEditor ? {buffer:10} : null);
+
+        if (this.showOverflowTip) {
+            this.mon(this.el, 'mouseover', this.onOverflowMouseOver, this);
+            this.mon(this.el, 'mouseout', this.onOverflowMouseOut, this);
+            this.mon(this.el, 'click', this.onOverflowTap, this);
+        }
+    },
+
+    // private
+    onOverflowMouseOver : function(){
+        if (this.hasFocus || this.overflowTapVisible || !this.rendered) {
+            return;
+        }
+
+        var text = this.getRawValue();
+        if (Ext.isEmpty(text, true) || this.el.getTextWidth(text) <= this.el.getWidth(true)) {
+            this.hideOverflowTip();
+            return;
+        }
+
+        this.showOverflowTipForText(text);
+    },
+
+    // private
+    onOverflowMouseOut : function(){
+        this.hideOverflowTip();
+    },
+
+    // private
+    onOverflowTap : function(e){
+        if (!this.rendered) {
+            return;
+        }
+
+        var text = this.getRawValue();
+        if (Ext.isEmpty(text, true) || this.el.getTextWidth(text) <= this.el.getWidth(true)) {
+            this.hideOverflowTip();
+            return;
+        }
+
+        this.overflowTapVisible = !this.overflowTapVisible;
+
+        if (this.overflowTapVisible && !this.overflowTipShownInFocusCycle) {
+            this.showOverflowTipForText(text);
+            this.overflowTipShownInFocusCycle = true;
+        } else {
+            this.hideOverflowTip();
+
+        }
+
+        e?.stopEvent?.();
+    },
+
+    // private
+    showOverflowTipForText : function(text){
+        const html = Ext.util.Format.nl2br(Ext.util.Format.htmlEncode(String(text)));
+        if (!this.overflowTip) {
+            this.overflowTip = new Ext.Tip({
+                target: this.el,
+                autoRender: true,
+                hidden: true,
+                shadow: false,
+                closable: false,
+                minWidth: 40,
+                html: html
+            });
+        } else {
+            this.overflowTip.update(html);
+        }
+
+        this.overflowTip.showBy(this.el);
+    },
+
+    // private
+    hideOverflowTip : function(){
+        this.overflowTapVisible = false;
+
+        if (this.overflowTip) {
+            this.overflowTip.hide();
+        }
+    },
+
+    // private
+    onDestroy : function(){
+        this.hideOverflowTip();
+        Ext.destroy(this.overflowTip);
+        this.overflowTip = null;
+
+        Ext.form.Field.superclass.onDestroy.call(this);
     },
 
     // private
@@ -348,6 +448,8 @@ var form = new Ext.form.FormPanel({
     // private
     onFocus : function(){
         this.preFocus();
+        this.hideOverflowTip();
+        this.overflowTipShownInFocusCycle = false;
         if(this.focusClass){
             this.el.addClass(this.focusClass);
         }
@@ -378,6 +480,13 @@ var form = new Ext.form.FormPanel({
         if(this.validationEvent !== false && (this.validateOnBlur || this.validationEvent == 'blur')){
             this.validate();
         }
+
+        if (this.showDirtyUI && this.isDirty()) {
+            this.markDirty()
+        } else {
+            this.clearDirty()
+        }
+
         var v = this.getValue();
         if(String(v) !== String(this.startValue)){
             this.fireEvent('change', this, v, this.startValue);
@@ -445,6 +554,23 @@ var form = new Ext.form.FormPanel({
      */
     getActiveError : function(){
         return this.activeError || '';
+    },
+
+    markDirty: function() {
+        if(!this.rendered ) return;
+        if (this.wrap) {
+            this.wrap.addClass(this.dirtyClass);
+        } else {
+            this.el.addClass(this.dirtyClass);
+        }
+    },
+    clearDirty: function() {
+        if(!this.rendered ) return;
+        if (this.wrap) {
+            this.wrap.removeClass(this.dirtyClass);
+        } else {
+            this.el.removeClass(this.dirtyClass);
+        }
     },
 
     /**
@@ -607,16 +733,30 @@ var form = new Ext.form.FormPanel({
     /**
      * Sets a data value into the field and validates it.  To set the value directly without validation see {@link #setRawValue}.
      * @param {Mixed} value The value to set
+     * @param {Mixed} record The record if appropriate
+     * @param {Mixed} reset reset originalValue
      * @return {Ext.form.Field} this
      */
-    setValue : function(v, r){
+    setValue : function(v, record, reset){
         this.value = v;
         if(this.rendered && this.el.dom){
             this.el.dom.value = (Ext.isEmpty(v) ? '' : v);
             this.validate();
         }
-        if (r && this.fixedIf) {
-            this.setReadOnly(_.isFunction(this.fixedIf) ? this.fixedIf(v,r) : (this.fixedIf[0] === '!' ? -1 : 1) *_.get(r, this.fixedIf.replace(/^!/, '')))
+        if (record && this.fixedIf) {
+            this.setReadOnly(_.isFunction(this.fixedIf) ? this.fixedIf(v,record) : (this.fixedIf[0] === '!' ? -1 : 1) *_.get(record, this.fixedIf.replace(/^!/, '')))
+        }
+        if (reset) {
+            this.originalValue = v;
+        }
+
+        return this;
+    },
+
+    // set value only if field is unmodified
+    setValueIf(v,record, reset) {
+        if (! this.isDirty()) {
+            this.setValue(v, record, reset!==false);
         }
         return this;
     },

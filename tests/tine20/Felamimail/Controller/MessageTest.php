@@ -1,11 +1,11 @@
 <?php
 
 /**
- * Tine 2.0 - http://www.tine20.org
+ * tine Groupware
  *
  * @package     Felamimail
- * @license     http://www.gnu.org/licenses/agpl.html
- * @copyright   Copyright (c) 2009-2022 Metaways Infosystems GmbH (http://www.metaways.de)
+ * @license     https://www.gnu.org/licenses/agpl.html
+ * @copyright   Copyright (c) 2009-2026 Metaways Infosystems GmbH (https://www.metaways.de)
  * @author      Philipp Schüle <p.schuele@metaways.de>
  *
  */
@@ -1020,6 +1020,7 @@ class Felamimail_Controller_MessageTest extends Felamimail_TestCase
     public function testGDPRMassMailingMessage()
     {
         GDPR_Config::getInstance()->set(GDPR_Config::ENABLE_PUBLIC_PAGES, true);
+        GDPR_Config::getInstance()->set(GDPR_Config::JWT_SECRET, 'test');
         $oldTransport = Tinebase_Smtp::getDefaultTransport();
         $oldTestTransport = Felamimail_Transport::setTestTransport(null);
         static::resetMailer();
@@ -1057,7 +1058,7 @@ class Felamimail_Controller_MessageTest extends Felamimail_TestCase
                     ],
                     'gdpr@mail.test'
                 ],
-                'body' => 'Dear {{ recipient }} {{ manageconstentlink }} {{ sender }}',
+                'body' => 'Dear {{ recipient }} {{ sender }} {{ manageconsentlink }} Mein Abonnement verwalten</a>',
                 'headers' => ['X-Tine20TestMessage' => Felamimail_Model_Message::CONTENT_TYPE_MESSAGE_RFC822],
                 'massMailingFlag' => true,
             ]);
@@ -1068,12 +1069,11 @@ class Felamimail_Controller_MessageTest extends Felamimail_TestCase
             static::assertEquals(2, count($messages), 'expected 2 mails send');
             
             foreach($messages as $message) {
-                $body = $message->getBodytext()->getRawContent();
+                $body = $message->getBodyText()->getRawContent();
                 if (in_array($contact->email, $message->getRecipients())) {
-                    static::assertStringContainsString($contact->getId(), $body);
                     static::assertStringContainsString($contact->n_fileas, $body);
+                    static::assertStringContainsString('/GDPR/view/manageConsent', $body);
                 }
-                static::assertStringContainsString('/GDPR/view/manageConsent', $body);
                 static::assertStringNotContainsString('recipient', $body);
                 static::assertStringNotContainsString('sender', $body);
             }
@@ -2275,5 +2275,26 @@ class Felamimail_Controller_MessageTest extends Felamimail_TestCase
         $message = $this->_getController()->getCompleteMessage($cachedMessage);
 
         self::assertEquals('2022-10-06 10:27:13', $message->sent->get('Y-m-d h:i:s'));
+    }
+
+    public function testPetitionLink()
+    {
+        $cachedMessage = $this->messageTestHelper('petition_ltsh.eml');
+
+        $message = $this->_getController()->getCompleteMessage($cachedMessage);
+
+        self::assertStringContainsString(
+            '<a href="https://www.something.mail.de/oepetition/petitionMitzeichnungAktivierung',
+            $message->body);
+    }
+
+    public function testSendBootStrapEmail()
+    {
+        $locale = Tinebase_Core::getLocale();
+
+        $twig = new Tinebase_Twig($locale, Tinebase_Translation::getTranslation(GDPR_Config::APP_NAME));
+        $htmlTemplate = $twig->load(Tinebase_Config::APP_NAME . '/views/emails/base.html.twig', $locale);
+        $html = $htmlTemplate->render();
+        self::assertStringContainsString('ExternalClass',$html);
     }
 }

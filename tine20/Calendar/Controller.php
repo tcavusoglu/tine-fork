@@ -120,8 +120,12 @@ class Calendar_Controller extends Tinebase_Controller_Event implements
                 Tinebase_ActionQueue::getInstance()->queueAction('Calendar.onUpdateGroup', $_eventObject->groupId);
                 break;
                 
-            case 'Tinebase_Event_Container_BeforeCreate':
+            case Tinebase_Event_Container_BeforeCreate::class:
                 $this->_handleContainerBeforeCreateEvent($_eventObject);
+                break;
+
+            case Tinebase_Event_Container_AfterCreate::class:
+                $this->_handleContainerAfterCreateEvent($_eventObject);
                 break;
         }
     }
@@ -394,7 +398,18 @@ class Calendar_Controller extends Tinebase_Controller_Event implements
         $result->addRecord($container);
         return $result;
     }
-    
+
+    protected function _handleContainerAfterCreateEvent(Tinebase_Event_Container_AfterCreate $event): void
+    {
+        if (Tinebase_Core::isLogLevel(Zend_Log::INFO)) Tinebase_Core::getLogger()->INFO(__METHOD__ . ' ' . __LINE__
+            . ' about to handle Tinebase_Event_Container_AfterCreate' );
+
+        if ($syncConfig = $event->container->getRecordFromXProps([Calendar_Controller_Event::SYNC_CONTAINER], Calendar_Model_SyncContainerConfig::class)) {
+            $syncConfig->sync($event->container, skipReadCollectionMetaData: true);
+            $event->container->xprops()[Calendar_Controller_Event::SYNC_CONTAINER] = $syncConfig->dehydrate();
+        }
+    }
+
     /**
      * handler for Tinebase_Event_Container_BeforeCreate
      * - give owner of personal container all grants
@@ -404,8 +419,13 @@ class Calendar_Controller extends Tinebase_Controller_Event implements
      */
     protected function _handleContainerBeforeCreateEvent(Tinebase_Event_Container_BeforeCreate $_eventObject)
     {
-        if (Tinebase_Core::isLogLevel(Zend_Log::INFO)) Tinebase_Core::getLogger()->INFO(__METHOD__ . ' ' . __LINE__
+        if (Tinebase_Core::isLogLevel(Zend_Log::INFO)) Tinebase_Core::getLogger()->info(__METHOD__ . ' ' . __LINE__
             . ' about to handle Tinebase_Event_Container_BeforeCreate' );
+
+        if ($syncConfig = $_eventObject->container->getRecordFromXProps([Calendar_Controller_Event::SYNC_CONTAINER], Calendar_Model_SyncContainerConfig::class)) {
+            $syncConfig->sync();
+            $_eventObject->container->xprops()[Calendar_Controller_Event::SYNC_CONTAINER] = $syncConfig->dehydrate();
+        }
 
         $this->_addDefaultPersonalGrantsToContainer(
             $_eventObject->container,
@@ -490,10 +510,10 @@ class Calendar_Controller extends Tinebase_Controller_Event implements
      * @param Felamimail_Model_Message $_message
      * @return null
      */
-    public function prepareMassMailingMessage(Felamimail_Model_Message $_message, Tinebase_Twig $_twig)
+    public function prepareMassMailingMessage(Felamimail_Model_Message $_message, Tinebase_Twig $_twig, &$context)
     {
         if (Calendar_Config::getInstance()->featureEnabled(Calendar_Config::FEATURE_POLLS)) {
-            Calendar_Controller_Poll::getInstance()->prepareMassMailingMessage($_message, $_twig);
+            Calendar_Controller_Poll::getInstance()->prepareMassMailingMessage($_message, $_twig, $context);
         }
         return;
     }

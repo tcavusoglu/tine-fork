@@ -19,6 +19,7 @@
  */
 class Admin_Controller_EmailAccount extends Tinebase_Controller_Record_Abstract
 {
+    /** @use Tinebase_Controller_SingletonTrait<Admin_Controller_EmailAccount> */
     use Tinebase_Controller_SingletonTrait;
 
     /**
@@ -222,6 +223,7 @@ class Admin_Controller_EmailAccount extends Tinebase_Controller_Record_Abstract
         $this->_checkRight('create');
 
         try {
+            $this->_inspectBeforeCreate($_record);
             $account = $this->_backend->create($_record);
         } catch (Zend_Db_Statement_Exception $zdse) {
             if (Tinebase_Exception::isDbDuplicate($zdse)) {
@@ -267,6 +269,24 @@ class Admin_Controller_EmailAccount extends Tinebase_Controller_Record_Abstract
 
         return $account;
     }
+
+    /**
+     * inspect creation of one record (after create)
+     *
+     * @param Felamimail_Model_Account $_record
+     * @return  void
+     * @throws Tinebase_Exception_EmailInAdditionalDomains
+     * @throws Tinebase_Exception_SystemGeneric
+     */
+    protected function _inspectBeforeCreate(Tinebase_Record_Interface $_record)
+    {
+        if (!empty($_record->email)) {
+            $internalDomainOnly = !$_record->isExternalAccount();
+            Tinebase_EmailUser::checkAllowedDomain($_record->email, true, _internalDomainOnly: $internalDomainOnly);
+        }
+        parent::_inspectBeforeCreate($_record);
+    }
+
 
     /**
      * inspect creation of one record (after create)
@@ -383,8 +403,6 @@ class Admin_Controller_EmailAccount extends Tinebase_Controller_Record_Abstract
             case 'delete':
                 $this->checkRight(Admin_Acl_Rights::MANAGE_EMAILACCOUNTS);
                 break;
-            default;
-               break;
         }
 
         parent::_checkRight($_action);

@@ -217,7 +217,7 @@ class Tinebase_Convert_Json implements Tinebase_Convert_Interface
      * @param Tinebase_Record_RecordSet $_records the records
      * @param Tinebase_ModelConfiguration $modelConfig
      */
-    protected function _resolveSingleRecordFields(Tinebase_Record_RecordSet $_records, $modelConfig = NULL)
+    protected function _resolveSingleRecordFields(Tinebase_Record_RecordSet $_records, $modelConfig = null)
     {
         if (! $modelConfig) {
             return;
@@ -238,9 +238,9 @@ class Tinebase_Convert_Json implements Tinebase_Convert_Interface
                 $fields = (array) $fields;
                 foreach ($fields as $field) {
                     $idsForField = $_records->{$field};
-                    foreach ($idsForField as $key => $value) {
+                    foreach ($idsForField as $value) {
                         if ($value instanceof Tinebase_Record_Interface) {
-                            $foreignRecordsArray[$value->getId()] = $value;
+                            $foreignRecordsArray[$value->getId() ?? ''] = $value;
                         } else {
                             if ($value && is_scalar($value) && ! isset($foreignRecordsArray[$value])) {
                                 $foreignIds[$value] = $value;
@@ -491,7 +491,7 @@ class Tinebase_Convert_Json implements Tinebase_Convert_Interface
                 }
 
                 // recursion protection
-                $id = $_records->getByIndex($idx)->getId();
+                $id = $_records->getByIndex($idx)->getId() ?? '';
                 if (isset($recursions[$id]) || ($first && isset($this->_recursiveResolvingProtection[$id]))) {
                     $recursions[$id] = true;
                     continue;
@@ -517,6 +517,14 @@ class Tinebase_Convert_Json implements Tinebase_Convert_Interface
                         $this->_resolveMultipleRecordFields($records, $mc, $multiple);
 
                         $this->_resolveRecursive($records, $mc, $multiple);
+
+                        foreach ($mc->getJsonFacadeFields() as $fieldKey => $def) {
+                            foreach ($records as $record) {
+                                /** @var Tinebase_Record_JsonFacadeInterface $model */
+                                $model = $def[Tinebase_ModelConfiguration_Const::CONFIG][Tinebase_ModelConfiguration_Const::RECORD_CLASS_NAME];
+                                $model::jsonFacadeToJson($record, $fieldKey, $def);
+                            }
+                        }
                     }
                 }
             }

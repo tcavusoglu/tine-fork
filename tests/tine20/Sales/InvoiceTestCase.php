@@ -241,13 +241,13 @@ class Sales_InvoiceTestCase extends TestCase
         
         $i = 0;
         
-        $indexes = fgetcsv($fhcsv);
+        $indexes = fgetcsv($fhcsv, escape: '\\');
         
         $this->_contactController = Addressbook_Controller_Contact::getInstance();
         
         $addresses = array();
         
-        while ($row = fgetcsv($fhcsv)) {
+        while ($row = fgetcsv($fhcsv, escape: '\\')) {
             if ($i >= $count) {
                 break;
             }
@@ -609,6 +609,7 @@ class Sales_InvoiceTestCase extends TestCase
             }
             
             $i++;
+            if (empty($cd)) continue;
             $contract = new Sales_Model_Contract($cd);
             $contract->setTimezone('UTC');
             $contract->eval_dim_cost_center = $costcenter->getId();

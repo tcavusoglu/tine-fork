@@ -6,7 +6,9 @@
  * @copyright   Copyright (c) 2019 Metaways Infosystems GmbH (http://www.metaways.de)
  */
 
-require('./Application');
-require('./Addressbook/Model');
-require('./Addressbook/ContactEditDialogPlugin');
-require('./Felamimail/MessageEditDialogPlugin');
+import './Application';
+import './Addressbook/Model';
+import './Addressbook/ContactEditDialogPlugin';
+import './Felamimail/MessageEditDialogPlugin';
+import './Addressbook/SendRequestConsentAction';
+import './DataIntendedPurposeEditDialog';

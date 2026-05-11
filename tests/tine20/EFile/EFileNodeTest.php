@@ -134,6 +134,26 @@ class EFile_EFileNodeTest extends TestCase
         $this->assertSame('dtype', $savedNode[EFile_Config::TREE_NODE_FLD_FILE_METADATA][EFile_Model_FileMetadata::FLD_PAPER_LOCATION]);
     }
 
+    public function testNoRenameConfig(): void
+    {
+        $newConfig = $oldConfig = EFile_Config::getInstance()->{EFile_Config::TIER_TOKEN_RENAME};
+        $raii = new Tinebase_RAII(fn() => EFile_Config::getInstance()->{EFile_Config::TIER_TOKEN_RENAME} = $oldConfig);
+
+        $newConfig[EFile_Model_EFileTierType::TIER_TYPE_FILE] = false;
+        EFile_Config::getInstance()->{EFile_Config::TIER_TOKEN_RENAME} = $newConfig;
+
+        $this->_createEFileTree();
+
+        $filePath = Filemanager_Controller_Node::getInstance()->addBasePath('/shared/01 - A/01 - B/C');
+        $childPath = $filePath . '/001 - D1/#000003 - E2/000001 - a.doc';
+
+        $this->assertTrue(Tinebase_FileSystem::getInstance()->isDir($filePath));
+        $this->assertTrue(Tinebase_FileSystem::getInstance()->isDir($filePath . '1'));
+        $this->assertTrue(Tinebase_FileSystem::getInstance()->isFile($childPath));
+
+        unset($raii);
+    }
+
     /**
      * asserts are done in testCreateEFileTree()
      *
@@ -370,6 +390,22 @@ class EFile_EFileNodeTest extends TestCase
         static::assertSame(Tinebase_Model_Tree_FileObject::TYPE_LINK, $linkNode->type);
         static::assertSame($oldDocxFile->contenttype, $linkNode->contenttype);
         static::assertSame(null, $linkNode->size);
+
+
+        $fs->rename($newFilePath . '/E1/000003 - a.doc' , $newFilePath . '/E11/000003 - a.doc');
+        $fs->rename($newFilePath . '/E1/000004 - a1.doc' , $newFilePath . '/E11/000004 - bbb.doc');
+        $fs->clearStatCache();
+
+        $this->_assertEFile($newFilePath . '/E11/000003 - a.doc', EFile_Model_EFileTierType::TIER_TYPE_DOCUMENT, '000003 - a.doc', '//01.01/000003-000003', '000003');
+        $this->_assertEFile($newFilePath . '/E11/000004 - bbb.doc', EFile_Model_EFileTierType::TIER_TYPE_DOCUMENT, '000004 - bbb.doc', '//01.01/000003-000004', '000004');
+        $this->assertFalse($fs->fileExists($newFilePath . '/E1/000003 - a.doc'));
+        $this->assertFalse($fs->fileExists($newFilePath . '/E1/000004 - a1.doc'));
+
+        $fs->rename($newFilePath . '/E11/000004 - bbb.doc' , $newFilePath . '/E11/000004 - ccc.doc');
+        $fs->clearStatCache();
+
+        $this->_assertEFile($newFilePath . '/E11/000004 - ccc.doc', EFile_Model_EFileTierType::TIER_TYPE_DOCUMENT, '000004 - ccc.doc', '//01.01/000003-000004', '000004');
+        $this->assertFalse($fs->fileExists($newFilePath . '/E11/000004 - bbb.doc'));
     }
 
     public function testFMJsonFEUpdateMetadata()

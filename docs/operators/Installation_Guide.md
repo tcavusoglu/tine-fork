@@ -3,7 +3,7 @@ Installation Guide
 
 Docker Installation Guide
 ---
-[www.tine-groupware.de](https://www.tine-groupware.de/) | [docker-compose.yml](https://tine-docu.s3web.rz1.metaways.net/de/operators/docker/docker-compose.yml) | [Dockerfile](https://github.com/tine-groupware/tine/blob/main/ci/dockerimage/built.Dockerfile)
+[www.tine-groupware.de](https://www.tine-groupware.de/) | [docker-compose.yml](https://tine-docu.s3web.rz1.metaways.net/operators/docker/docker-compose.yml) | [Dockerfile](https://github.com/tine-groupware/tine/blob/main/ci/dockerimage/built.Dockerfile)
 
 ## Quickstart
 
@@ -15,9 +15,9 @@ First, create a folder. Docker Compose uses the folder names as an identifier.
 mkdir tine
 cd tine
 ```
-Then you need to download the current docker-compose.yml. And save it in the folder just created.
+Then you need to download the current docker-compose.yml (see below). And save it in the folder just created.
 ```
-wget https://tine-docu.s3web.rz1.metaways.net/de/operators/docker/docker-compose.yml
+wget https://tine-docu.s3web.rz1.metaways.net/operators/docker/docker-compose.yml
 ```
 Now you can start the docker-compose.
 
@@ -36,7 +36,7 @@ docker compose up
 Wait for the database to become available. If it is, the web container will log `web_1    | DB available`. Now open another terminal and start the tine installer. There you need to accept the tine-license and Privacy policy and you will be able to set the initial admin password.
 
 ```
-docker compose exec web tine20_install
+docker compose exec web su tine20 bash -c "php /usr/share/tine20/setup.php --config /etc/tine20/config.inc.php --install"
 ```
 
 Your tine-groupware is now reachable at http://127.0.0.1:4000.

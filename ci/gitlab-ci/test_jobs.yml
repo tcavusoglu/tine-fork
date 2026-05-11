@@ -204,7 +204,7 @@ release-update-tests:
       log "determining starting version"
       export starting_version=$(test_release_update_test_determine_start_version)
       if [ -z "${starting_version}" ]; then
-        log "could not determine staring version. RELEASE_UPDATE_TEST_START_REF needs to be set for not next(main)/beta/lts branches."
+        log "could not determine starting version. RELEASE_UPDATE_TEST_START_REF needs to be set for not next(main)/beta/lts branches."
         exit 1
       fi
       log "installing ${starting_version}"
@@ -215,6 +215,8 @@ release-update-tests:
     - |
       log "updating to current version"
       git checkout ${CI_COMMIT_SHA}
+      log "remove vendor - fixing composer bug 2025.11 -> main"
+      rm -rf ${TINE20ROOT}/tine20/vendor
       test_composer_install
       test_update_tine
   rules:
@@ -246,12 +248,16 @@ release-update-tests:
           - tine20/*/Model/**/*
 
 prevent-upstream-changes:
-  extends: .php-unit-update-tests
+  image: ${TEST_IMAGE}
+  stage: test
+  needs: []
+  before_script: []
   script:
     - !reference [.lib, script]
     - git fetch --unshallow || true
     - prevent_upstream_change
   rules:
+    # only run fot customer branches
     - if: $CUSTOMER_MAJOR_COMMIT_REF_NAME == ""
       when: never
     - if: $PREVENT_UPSTREAM_CHANGES == "false"
@@ -259,10 +265,27 @@ prevent-upstream-changes:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_LABELS =~ /allow-failure-prevent-upstream-changes/
       allow_failure: true
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-  artifacts: null
+
+prevent-wrong-update-script-changes:
+  image: ${TEST_IMAGE}
+  stage: test
+  needs: []
+  before_script: []
+  script:
+    - !reference [.lib, script]
+    - git fetch origin
+    - prevent_wrong_update_script_changes
+  rules:
+    - if: $PREVENT_WRONG_UPDATE_SCRIPT_CHANGES != "true"
+      when: never
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_LABELS =~ /allow-failure-prevent-wrong-update-script-changes/
+      allow_failure: true
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
 
 prevent-wrong-branch:
   image: alpine
+  stage: test
+  needs: []
   script:
     - |
       if [[ "$MAJOR_COMMIT_REF_NAME" != "$CI_MERGE_REQUEST_TARGET_BRANCH_NAME" ]]; then
