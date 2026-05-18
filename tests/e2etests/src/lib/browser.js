@@ -34,6 +34,15 @@ const priorities = {
 
 
 module.exports = {
+    /**
+     * Downloads a file by clicking the specified selector and returns the path to the downloaded file.
+     * The file will be downloaded to a temporary directory created for each download.
+     *
+     * @param {puppeteer.Page} page - The page object to perform the download on.
+     * @param {string} selector - The selector of the element to click for initiating the download.
+     * @param {Object} [option] - Optional options for the click action.
+     * @returns {Promise<string>} A promise that resolves to the path of the downloaded file.
+     */
     download: async function (page, selector, option = {}) {
         const downloadPath = path.resolve(__dirname, 'download', uuid.v1());
         mkdirp(downloadPath);
@@ -45,6 +54,13 @@ module.exports = {
         return path.resolve(downloadPath, filename);
     },
 
+    /**
+     * Waits for a file to be downloaded in the specified directory and returns the filename.
+     * It checks for the presence of a file that does not have the '.crdownload' extension, which indicates an ongoing download in Chrome.
+     *
+     * @param {string} downloadPath - The path to the directory where the file is being downloaded.
+     * @returns {Promise<string>} A promise that resolves to the filename of the downloaded file.
+     */
     waitForFileToDownload: async function (downloadPath) {
         console.log('Waiting to download file...');
         let filename;
@@ -56,6 +72,13 @@ module.exports = {
         return filename;
     },
 
+    /**
+     * Uploads a file by finding an input element of type "file" on the page and using its uploadFile method.
+     *
+     * @param {puppeteer.Page} page - The page object to perform the file upload on.
+     * @param {string} file - The path to the file that should be uploaded.
+     * @returns {Promise<void>} A promise that resolves when the file has been set for upload.
+     */
     uploadFile: async function (page, file) {
         let inputUploadHandle;
 
@@ -135,14 +158,34 @@ module.exports = {
         return popupWindow;
     },
 
+    /**
+     * Retrieves an element from the page based on the specified type and text content.
+     *
+     * @param type
+     * @param page
+     * @param text
+     * @returns {Promise<*>}
+     */
     getElement: async function (type, page, text) {
         return page.$x("//" + type + "[contains(., '" + text + "')]");
     },
 
+    /**
+     * Retrieves the current user information from the registry on the given page.
+     *
+     * @param page
+     * @returns {Promise<*>}
+     */
     getCurrentUser: async function (page) {
         return page.evaluate(() => Tine.Tinebase.registry.get('currentAccount'));
     },
 
+    /**
+     * Reloads the registry on the given page by calling the reload method with clearCache option set to true.
+     *
+     * @param page
+     * @returns {Promise<void>}
+     */
     reloadRegistry: async function (page) {
         page.evaluate(() => Tine.Tinebase.common.reload({
             clearCache: true
@@ -173,9 +216,12 @@ module.exports = {
     },
 
     /**
+     * TODO: Is this method still needed?
+     *
      * set tine20 preference and reload registry afterwards
      *
-     * @param appName
+     * @param page - the page object to perform the actions on
+     * @param appName - the name of the app for which the preference should be set (e.g. 'Calendar')
      * @param preference
      * @param value
      * @returns {Promise<void>}
@@ -257,8 +303,13 @@ module.exports = {
         }
     },
 
+    /**
+     * Proxies console messages from the given page to the main console, filtering by log level and ignoring messages related to 'sockjs-node'.
+     *
+     * @param page
+     * @returns {Promise<void>}
+     */
     proxyConsole: async function (page) {
-
         page
             .on('console', message => {
                 const type = message.type().substr(0, 3).toUpperCase()
@@ -321,7 +372,14 @@ module.exports = {
         }
     },
 
-    clickSlitButton: async function (page, text) {
+    /**
+     * Clicks a button with the specified text that is part of a split button and handles the click event to open the associated menu.
+     *
+     * @param page
+     * @param text
+     * @returns {Promise<void>}
+     */
+    clickSplitButton: async function (page, text) {
         return await page.evaluate((text) => {
             const btn = document.evaluate('//em[button[text()="' + text + '"]]', document).iterateNext();
             const box = btn.getBoundingClientRect();
@@ -337,11 +395,12 @@ module.exports = {
     },
 
     /**
+     * Takes a screenshot of the given page with the specified options.
+     * The env variable TEST_ALL_SCREENSHOT set to 'true' will take screenshots in both light and dark modes.
      *
      * @param page
-     * @param path
-     * @param options
-     * @returns {Promise<void>}
+     * @param options - The options for taking the screenshot, including the path where the screenshot should be saved.
+     * @returns {Promise<void>} A promise that resolves when the screenshot(s) have been taken and saved.
      */
     makeScreenshot: async function (page, options) {
         if (process.env.TEST_ALL_SCREENSHOT === 'true') {
