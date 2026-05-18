@@ -50,6 +50,7 @@ module.exports = {
         let filename;
         while (!filename || filename.endsWith('.crdownload')) {
             filename = fs.readdirSync(downloadPath)[0];
+            // TODO: Replace setTimeout()
             await new Promise(r => setTimeout(r, 500));
         }
         return filename;
@@ -62,23 +63,75 @@ module.exports = {
         await inputUploadHandle.uploadFile(file);
     },
 
+    /**
+     * Waits for a new window to be opened and returns the corresponding page object.
+     * Rejects if no new window is opened within 10 seconds or if the target is not a page.
+     *
+     * @returns {Promise<puppeteer.Page>} A promise that resolves to the new page object.
+     */
     getNewWindow: function () {
-        return new Promise((fulfill) => browser.once('targetcreated', (target) => fulfill(target.page())));
+        return new Promise((resolve, reject) => {
+            if (!browser) {
+                reject(new Error('getNewWindow: browser is not initialized'));
+                return;
+            }
+
+            const timer = setTimeout(() => {
+                reject(new Error('getNewWindow: waiting for new window reached timeout'));
+            }, 10000);
+
+            browser.once('targetcreated', async (target) => {
+                try {
+                    const newPage = await target.page();
+                    if (!newPage) {
+                        clearTimeout(timer);
+                        reject(new Error('getNewWindow: target is not a page'));
+                        return;
+                    }
+                    clearTimeout(timer);
+                    resolve(newPage);
+                } catch (err) {
+                    clearTimeout(timer);
+                    reject(err);
+                }
+            });
+        });
     },
 
+    /**
+     * Clicks a button with the specified text and waits for a new window to open.
+     * Also waits for any loading mask to disappear and for the new window to be fully loaded.
+     *
+     * @param {string} btnText - The text of the button to click.
+     * @param {puppeteer.Page} [win] - The page object to search for the button. Defaults to the main page.
+     * @returns {Promise<puppeteer.Page>} A promise that resolves to the new page object of the opened window.
+     */
     getEditDialog: async function (btnText, win) {
-        await expectPuppeteer(win || page).toMatchElement('.x-btn-text', {text: btnText, visible: true});
-        await new Promise(r => setTimeout(r, 1000)); // wait for btn to get active
-        let popupWindow = this.getNewWindow();
-        await expectPuppeteer(win || page).toClick('.x-btn-text', {text: btnText});
-        popupWindow = await popupWindow;
-        this.proxyConsole(popupWindow);
-        try {
-            await popupWindow.waitForSelector('.ext-el-mask', {timeout: 10000});
-        } catch {
+        const ctx = win || page;
+        await expectPuppeteer(ctx).toMatchElement('.x-btn-text', {text: btnText, visible: true});
+
+        const popupPromise = this.getNewWindow();
+        await expectPuppeteer(ctx).toClick('.x-btn-text', {text: btnText});
+
+        const popupWindow = await popupPromise;
+        await this.proxyConsole(popupWindow);
+
+        const maskSelector = '.ext-el-mask';
+        const maskAppeared = await popupWindow.$(maskSelector);
+        if (maskAppeared) {
+            await popupWindow.waitForFunction(
+                (sel) => {
+                    const el = document.querySelector(sel);
+                    return !el || el.offsetParent === null || getComputedStyle(el).display === 'none';
+                },
+                {timeout: 10000},
+                maskSelector
+            );
         }
-        await popupWindow.waitForFunction(() => !document.querySelector('.ext-el-mask'));
-        await new Promise(r => setTimeout(r, 2000));
+        await popupWindow.waitForSelector(
+            '.x-window, .x-window-body, .x-form-item, .x-grid3-viewport',
+            {visible: true, timeout: 10000}
+        );
         return popupWindow;
     },
 
@@ -94,6 +147,7 @@ module.exports = {
         page.evaluate(() => Tine.Tinebase.common.reload({
             clearCache: true
         }));
+        // TODO: Replace setTimeout()
         await new Promise(r => setTimeout(r, 1000));
         await page.waitForSelector('.x-btn-text.tine-grid-row-action-icon.renderer_accountUserIcon', 20000);
     },
@@ -140,6 +194,8 @@ module.exports = {
         await expectPuppeteer(preferencePopup).toMatchElement('input[name=timezone]');
         await expectPuppeteer(preferencePopup).toClick('span', {text: appName});
 
+        // TODO: Replace setTimeout() calls
+
         // change setting to YES
         await expectPuppeteer(preferencePopup).toMatchElement('input[name=' + preference + ']');
         await expectPuppeteer(preferencePopup).toFill('input[name=' + preference + ']', value);
@@ -153,63 +209,29 @@ module.exports = {
         await page.waitForSelector('.x-tab-strip-closable.x-tab-with-icon.tine-mainscreen-apptabspanel-menu-tabel', {timeout: 0});
     },
 
+    /**
+     * Opens the browser, navigates to tine website, switches the browser language to German,
+     * logs in and optionally opens the specified app and module.
+     *
+     * @param app optional app to open after login
+     * @param module optional module to open after login (requires app)
+     * @returns {Promise<void>}
+     */
     getBrowser: async function (app, module) {
+        this.initJasmineAndExpect();
+        await this.launchBrowser();
+        const page = await this.createConfiguredPage();
 
-        jasmine.getEnv().addReporter({
-            specStarted: result => jasmine.currentTest = result
+        await page.goto(process.env.TEST_URL, { waitUntil: 'domcontentloaded', timeout: 30000 });
+        await expectPuppeteer(page).toMatchElement('title', { text: process.env.TEST_BRANDING_TITLE });
+
+        await this.switchToGermanIfNeeded(page);
+        await this.login(page, {
+            user: process.env.TEST_USERNAME,
+            pass: process.env.TEST_PASSWORD
         });
 
-        setDefaultOptions({timeout: 5000});
-
-        let args = ['--lang=de-DE,de', '--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--ignore-certificate-errors', '--start-maximized'];
-
-        try {
-            const opts = {
-                headless: process.env.TEST_MODE != 'debug', //ignoreDefaultArgs: ['--enable-automation'],
-                //slowMo: 250,
-                defaultViewport: resolution,
-                args: args
-            };
-
-            if (process.platform === "darwin") {
-                opts.executablePath = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
-            }
-
-            browser = await puppeteer.launch(opts);
-        } catch (e) {
-            console.log(e);
-        }
-        page = await browser.newPage();
-
-        this.proxyConsole(page);
-
-        await page.setExtraHTTPHeaders({
-            'Accept-Language': 'de'
-        });
-        await page.setViewport(resolution);
-
-        await page.goto(process.env.TEST_URL, {waitUntil: 'domcontentloaded', timeout: 30000});
-        await expectPuppeteer(page).toMatchElement('title', {text: process.env.TEST_BRANDING_TITLE});
-
-        if (process.env.TEST_MODE !== 'headless' && process.env.TEST_BROWSER_LANGUAGE !== 'de') {
-            console.log('switching to german');
-            await page.waitForSelector('input[name=locale]');
-            await page.click('input[name=locale]');
-            await expectPuppeteer(page).toClick('.x-combo-list-item', {text: 'Deutsch [de]'});
-            // wait for reload
-            await new Promise(r => setTimeout(r, 500));
-            await page.waitForSelector('input[name=locale]');
-        }
-
-        await page.waitForSelector('input[name=username]', {timeout: 30000});
-        await expectPuppeteer(page).toMatchElement('title', {text: process.env.TEST_BRANDING_TITLE});
-        await expectPuppeteer(page).toMatchElement('input[name=username]');
-        await page.waitForFunction('document.activeElement === document.querySelector("input[name=username]")');
-        await page.focus('input[name=username]');
-        await new Promise(r => setTimeout(r, 1000)); //wait for input field completely loaded
-        await expectPuppeteer(page).toFill('input[name=username]', process.env.TEST_USERNAME, {delay: 50});
-        await expectPuppeteer(page).toFill('input[name=password]', process.env.TEST_PASSWORD, {delay: 50});
-        await expectPuppeteer(page).toClick('button', {text: 'Anmelden'});
+        // TODO: MFA still working?
         try {
             await page.waitForSelector('.tine-dock', {timeout: 0});
             if (!!+process.env.MFA) {
@@ -218,6 +240,7 @@ module.exports = {
                 await expectPuppeteer(mfaDialog).toClick('button', {text: "Abbrechen"});
             }
         } catch (e) {
+            // TODO: Fail properly
             console.log('login failed!');
             console.log(app);
             console.error(e);
@@ -226,11 +249,11 @@ module.exports = {
         if (app) {
             await expectPuppeteer(page).toClick('.action_menu.application-menu-btn');
             await page.waitForSelector('.application-menu-item');
-            await expectPuppeteer(page).toClick('.application-menu-item__text', {text: app});
+            await expectPuppeteer(page).toClick('.application-menu-item__text', { text: app });
         }
         if (module) {
-            await page.waitForSelector('span', {text: 'Module'});
-            await expectPuppeteer(page).toClick('.tine-mainscreen-centerpanel-west span', {text: module});
+            await page.waitForSelector('span', { text: 'Module' });
+            await expectPuppeteer(page).toClick('.tine-mainscreen-centerpanel-west .x-tree-node a span', {text: module});
         }
     },
 
@@ -263,66 +286,33 @@ module.exports = {
             })
     },
 
-
+    /**
+     * Opens the browser, navigates to the setup page, and logs in with setup credentials.
+     * Also switches the browser language to German if not already set.
+     *
+     * @returns {Promise<void>} A promise that resolves when the setup process is complete.
+     */
     getSetup: async function () {
-
-        jasmine.getEnv().addReporter({
-            specStarted: result => jasmine.currentTest = result
-        });
-
-        setDefaultOptions({timeout: 5000});
-
-        let args = ['--lang=de-DE,de', '--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--start-maximized'];
-
-        try {
-            const opts = {
-                headless: process.env.TEST_MODE != 'debug', //ignoreDefaultArgs: ['--enable-automation'],
-                //slowMo: 250,
-                defaultViewport: resolution,
-                args: args
-            };
-
-            if (process.platform === "darwin") {
-                opts.executablePath = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+        this.initJasmineAndExpect();
+        await this.launchBrowser();
+        const page = await this.createConfiguredPage({
+            auth: {
+                username: process.env.HTACCESS_USERNAME,
+                password: process.env.HTACCESS_PASSWORD
             }
-
-            browser = await puppeteer.launch(opts);
-        } catch (e) {
-            console.log(e);
-        }
-
-        page = await browser.newPage();
-
-        this.proxyConsole(page);
-
-        await page.setExtraHTTPHeaders({
-            'Accept-Language': 'de'
         });
-        await page.setDefaultTimeout(15000);
-        await page.setViewport(resolution);
-        await page.authenticate({'username': process.env.HTACCESS_USERNAME, 'password': process.env.HTACCESS_PASSWORD});
-        await page.goto(process.env.TEST_URL + '/setup.php', {waitUntil: 'domcontentloaded', timeout: '30000'});
+
+        page.setDefaultTimeout(15000);
+        await page.goto(process.env.TEST_URL + '/setup.php', {waitUntil: 'domcontentloaded', timeout: 30000});
         await expectPuppeteer(page).toMatchElement('title', {text: process.env.TEST_BRANDING_TITLE});
 
-        if (process.env.TEST_MODE !== 'headless' && process.env.TEST_BROWSER_LANGUAGE !== 'de') {
-            console.log('switching to german');
-            await page.waitForSelector('input[name=locale]');
-            await page.click('input[name=locale]');
-            await expectPuppeteer(page).toClick('.x-combo-list-item', {text: 'Deutsch [de]'});
-            // wait for reload
-            await new Promise(r => setTimeout(r, 500));
-            await page.waitForSelector('input[name=locale]');
-        }
+        await this.switchToGermanIfNeeded(page);
+        await this.login(page, {
+            user: process.env.SETUP_USERNAME,
+            pass: process.env.SETUP_PASSWORD
+        });
 
-        await page.waitForSelector('input[name=username]');
-        await expectPuppeteer(page).toMatchElement('title', {text: process.env.TEST_BRANDING_TITLE});
-        await expectPuppeteer(page).toMatchElement('input[name=username]');
-        await page.waitForFunction('document.activeElement === document.querySelector("input[name=username]")');
-        await page.focus('input[name=username]');
-        await new Promise(r => setTimeout(r, 1000)); //wait for input field completely loaded
-        await expectPuppeteer(page).toFill('input[name=username]', process.env.SETUP_USERNAME, {delay: 50});
-        await expectPuppeteer(page).toFill('input[name=password]', process.env.SETUP_PASSWORD, {delay: 50});
-        await expectPuppeteer(page).toClick('button', {text: 'Anmelden'});
+        // TODO: try catch necessary?
         try {
             await page.waitForSelector('.account-user-avatar', {timeout: 0});
         } catch (e) {
@@ -376,6 +366,7 @@ module.exports = {
                 }, mode);
 
                 await page.setViewport(resolution);
+                // TODO: Replace setTimeout()
                 await new Promise(r => setTimeout(r, 500));
 
                 await page.screenshot({ ...options, path: filePath });
@@ -383,5 +374,109 @@ module.exports = {
         } else {
             await page.screenshot(options);
         }
+    },
+
+    /**
+     * Initializes Jasmine and expect-puppeteer with default options.
+     * Sets a default timeout of 5000ms for all expect-puppeteer actions.
+     *
+     * @returns void
+     */
+    initJasmineAndExpect: function () {
+        jasmine.getEnv().addReporter({
+            specStarted: result => jasmine.currentTest = result
+        });
+        setDefaultOptions({timeout: 5000});
+    },
+
+    /**
+     * Launches the Puppeteer browser with specified options.
+     *
+     * @returns {Promise<puppeteer.Browser>} A promise that resolves to the launched browser instance.
+     */
+    launchBrowser: async function () {
+        const args = ['--lang=de-DE,de', '--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--ignore-certificate-errors', '--start-maximized'];
+        const opts = {
+            headless: process.env.TEST_MODE !== 'debug',
+            //ignoreDefaultArgs: ['--enable-automation'],
+            //slowMo: 250,
+            defaultViewport: resolution,
+            args: args
+        };
+
+        // TODO: Make error handling more robust and fail properly
+        try {
+            if (process.platform === 'darwin') {
+                opts.executablePath = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+            }
+            browser = await puppeteer.launch(opts);
+        } catch (e) {
+            console.log(e);
+        }
+
+        return browser;
+    },
+
+    /**
+     * Creates a new page in the browser and configures it with necessary settings.
+     * Sets up console logging, HTTP headers, viewport size, and optional authentication.
+     *
+     * @param {Object} [options] - Optional configuration options for the page.
+     * @param {Object} [options.auth] - Optional authentication credentials for HTTP authentication.
+     * @param {string} options.auth.username - The username for HTTP authentication.
+     * @param {string} options.auth.password - The password for HTTP authentication.
+     * @returns {Promise<puppeteer.Page>} A promise that resolves to the configured page object.
+     */
+    createConfiguredPage: async function ({auth} = {}) {
+        page = await browser.newPage();
+        await this.proxyConsole(page);
+        await page.setExtraHTTPHeaders({
+            'Accept-Language': 'de'
+        });
+        await page.setViewport(resolution);
+        if (auth) {
+            await page.authenticate(auth);
+        }
+        return page;
+    },
+
+    /**
+     * Switches the browser language to German if not already set and if not running in headless mode.
+     *
+     * @param {puppeteer.Page} page - The page object to perform the language switch on.
+     * @returns {Promise<void>} A promise that resolves when the language switch is complete.
+     */
+    switchToGermanIfNeeded: async function (page) {
+        if (process.env.TEST_MODE !== 'headless' && process.env.TEST_BROWSER_LANGUAGE !== 'de') {
+            console.log('switching to German');
+            const langSelector = '#langChooser input[type=text]';
+            await page.waitForSelector(langSelector, {visible: true});
+            await page.click(langSelector);
+            await expectPuppeteer(page).toClick('.x-combo-list-item', {text: 'Deutsch [de]'});
+            await page.waitForFunction(() => !document.querySelector('.x-combo-list'), {timeout: 5000}).catch(() => {});
+            await page.waitForSelector(langSelector, {visible: true, timeout: 10000});
+        }
+    },
+
+    /**
+     * Performs the login action on the given page using the provided user credentials.
+     *
+     * @param {puppeteer.Page} page - The page object to perform the login on.
+     * @param {Object} credentials - An object containing the username and password for login.
+     * @param {string} credentials.user - The username for login.
+     * @param {string} credentials.pass - The password for login.
+     * @returns {Promise<void>} A promise that resolves when the login process is complete.
+     */
+    login: async function (page, { user, pass }) {
+        await page.waitForSelector('input[name=username]', { timeout: 30000 });
+        await page.focus('input[name=username]');
+        await page.waitForFunction(() => {
+            const el = document.querySelector('input[name=username]');
+            return !!el && document.activeElement === el && !el.disabled && !el.readOnly;
+        }, { timeout: 10000 });
+
+        await expectPuppeteer(page).toFill('input[name=username]', user, { delay: 50 });
+        await expectPuppeteer(page).toFill('input[name=password]', pass, { delay: 50 });
+        await expectPuppeteer(page).toClick('button', { text: 'Anmelden' });
     }
 };
