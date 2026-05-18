@@ -9,6 +9,7 @@ beforeAll(async () => {
 
 describe('Create and delete time sheet', () => {
     const testDescription = 'test description ' + Math.round(Math.random() * 10000000);
+    const basePage = global.page;
     let popupWindow = null;
 
     test('Open dialog', async () => {
@@ -48,29 +49,29 @@ describe('Create and delete time sheet', () => {
     });
 
     test('Check values in the grid', async() => {
-        await page.waitForSelector('.t-app-timetracker .x-btn-image.x-tbar-loading');
-        await page.click('.t-app-timetracker .x-btn-image.x-tbar-loading');
+        await basePage.waitForSelector('.t-app-timetracker .x-btn-image.x-tbar-loading');
+        await basePage.click('.t-app-timetracker .x-btn-image.x-tbar-loading');
         await new Promise(r => setTimeout(r, 2000));
-        await expectPuppeteer(page).toMatchElement('div.x-grid3-col-timeaccount_id', {text: '1 - Test Timeaccount 1', visible: true});
-        await expectPuppeteer(page).toMatchElement('div.x-grid3-col-description', {text: testDescription, visible: true});
-        //await expectPuppeteer(page).toMatchElement('div.x-grid3-col-duration', {text: '3 Stunden, 30 Minuten'});
+        await expectPuppeteer(basePage).toMatchElement('div.x-grid3-col-timeaccount_id', {text: '1 - Test Timeaccount 1', visible: true});
+        await expectPuppeteer(basePage).toMatchElement('div.x-grid3-col-description', {text: testDescription, visible: true});
+        //await expectPuppeteer(basePage).toMatchElement('div.x-grid3-col-duration', {text: '3 Stunden, 30 Minuten'});
     });
 
     test('Delete and confirm', async() => {
-        await expectPuppeteer(page).toClick('div.x-grid3-col-description', {text: testDescription, visible: true});
+        await expectPuppeteer(basePage).toClick('div.x-grid3-col-description', {text: testDescription, visible: true});
         await new Promise(r => setTimeout(r, 500));
-        await page.waitForSelector('.x-grid3-row-selected');
-        await page.keyboard.press('Delete');
-        await page.waitForSelector('.btn.btn-md.vue-button.yes-button', {visible: true});
-        await expectPuppeteer(page).toClick('.btn.btn-md.vue-button.yes-button', {text: 'Ja', visible: true});
+        await basePage.waitForSelector('.x-grid3-row-selected');
+        await basePage.keyboard.press('Delete');
+        await basePage.waitForSelector('.btn.btn-md.vue-button.yes-button', {visible: true});
+        await expectPuppeteer(basePage).toClick('.btn.btn-md.vue-button.yes-button', {text: 'Ja', visible: true});
         await new Promise(r => setTimeout(r, 1000));
-        await page.waitForSelector('.t-app-timetracker .x-btn-image.x-tbar-loading');
-        await page.click('.t-app-timetracker .x-btn-image.x-tbar-loading');
+        await basePage.waitForSelector('.t-app-timetracker .x-btn-image.x-tbar-loading');
+        await basePage.click('.t-app-timetracker .x-btn-image.x-tbar-loading');
         await new Promise(r => setTimeout(r, 2000));
-        await expectPuppeteer(page).not.toMatchElement('div.x-grid3-col-description', {text: testDescription});
+        await expectPuppeteer(basePage).not.toMatchElement('div.x-grid3-col-description', {text: testDescription});
     });
 });
 
 afterAll(async () => {
-    browser.close();
+    global.browser.close();
 });

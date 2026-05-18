@@ -1,10 +1,11 @@
 const helpers = require('./browser.helpers');
 
 const puppeteer = require('puppeteer');
-const { expect: expectPuppeteer } = require('expect-puppeteer');
+const { expect: expectPuppeteer, setDefaultOptions } = require('expect-puppeteer');
 require('dotenv').config();
 
 const mkdirp = require('mkdirp');
+const fs = require('fs');
 const path = require('path');
 const uuid = require('uuid');
 
@@ -12,6 +13,85 @@ const modes = ['light', 'dark'];
 const resolution = JSON.parse(process.env.TEST_RESOLUTION);
 
 module.exports = {
+    /**
+     * Opens the browser, navigates to tine website, switches the browser language to German,
+     * logs in and optionally opens the specified app and module.
+     *
+     * @param {string} app optional app to open after login
+     * @param {string} module optional module to open after login (requires app)
+     * @returns {Promise<void>}
+     */
+    getBrowser: async function (app, module) {
+        helpers.initJasmineAndExpect(setDefaultOptions);
+
+        // Assign the global variables.
+        global.browser = await helpers.launchBrowser();
+        global.page = await helpers.createConfiguredPage(global.browser);
+        const page = global.page;
+
+        await page.goto(process.env.TEST_URL, { waitUntil: 'domcontentloaded', timeout: 30000 });
+        await expectPuppeteer(page).toMatchElement('title', { text: process.env.TEST_BRANDING_TITLE });
+
+        await helpers.switchToGermanIfNeeded(expectPuppeteer, page);
+        await helpers.login(expectPuppeteer, page, {
+            user: process.env.TEST_USERNAME,
+            pass: process.env.TEST_PASSWORD
+        });
+
+        await page.waitForSelector('.tine-dock', {timeout: 0});
+
+        if (!!+process.env.MFA) {
+            // TODO: second parameter might not work
+            await page.waitForSelector('.x-window-header-text', {text: 'Multi Faktor Authentifikation'});
+            const mfaDialog = await this.getEditDialog('OK');
+            await expectPuppeteer(mfaDialog).toClick('button', {text: "Abbrechen"});
+        }
+
+        if (app) {
+            await expectPuppeteer(page).toClick('.action_menu.application-menu-btn');
+            await page.waitForSelector('.application-menu-item');
+            await expectPuppeteer(page).toClick('.application-menu-item__text', { text: app });
+        }
+        if (module) {
+            // TODO: second parameter might not work
+            await page.waitForSelector('span', { text: 'Module' });
+            await expectPuppeteer(page).toClick('.tine-mainscreen-centerpanel-west .x-tree-node a span', {text: module});
+        }
+    },
+
+    /**
+     * Opens the browser, navigates to the setup page, and logs in with setup credentials.
+     * Also switches the browser language to German if not already set.
+     *
+     * @returns {Promise<void>} A promise that resolves when the setup process is complete.
+     */
+    getSetup: async function () {
+        helpers.initJasmineAndExpect(setDefaultOptions);
+
+        // Assign the global variables.
+        global.browser = await helpers.launchBrowser();
+        global.page = await helpers.createConfiguredPage(global.browser,{
+            auth: {
+                username: process.env.HTACCESS_USERNAME,
+                password: process.env.HTACCESS_PASSWORD
+            }
+        });
+        const page = global.page;
+
+        page.setDefaultTimeout(15000);
+
+        await page.goto(process.env.TEST_URL + '/setup.php', {waitUntil: 'domcontentloaded', timeout: 30000});
+        await expectPuppeteer(page).toMatchElement('title', {text: process.env.TEST_BRANDING_TITLE});
+
+        await helpers.switchToGermanIfNeeded(expectPuppeteer, page);
+        await helpers.login(expectPuppeteer, page, {
+            user: process.env.SETUP_USERNAME,
+            pass: process.env.SETUP_PASSWORD
+        });
+
+        await page.waitForSelector('.account-user-avatar', {timeout: 0});
+    },
+
     /**
      * Downloads a file by clicking the specified selector and returns the path to the downloaded file.
      * The file will be downloaded to a temporary directory created for each download.
@@ -29,7 +109,7 @@ module.exports = {
         const cdpSession = await page.createCDPSession();
         await cdpSession.send('Page.setDownloadBehavior', {behavior: 'allow', downloadPath: downloadPath});
         await expectPuppeteer(page).toClick(selector, option);
-        let filename = await helpers.waitForFileToDownload(downloadPath);
+        let filename = await helpers.waitForFileToDownload(fs, downloadPath);
         return path.resolve(downloadPath, filename);
     },
 
@@ -55,8 +135,8 @@ module.exports = {
      */
     getNewWindow: function () {
         return new Promise((resolve, reject) => {
-            if (!browser) {
-                reject(new Error('getNewWindow: browser is not initialized'));
+            if (!global.browser) {
+                reject(new Error('getNewWindow: global browser is not initialized'));
                 return;
             }
 
@@ -64,7 +144,7 @@ module.exports = {
                 reject(new Error('getNewWindow: waiting for new window reached timeout'));
             }, 10000);
 
-            browser.once('targetcreated', async (target) => {
+            global.browser.once('targetcreated', async (target) => {
                 try {
                     const newPage = await target.page();
                     if (!newPage) {
@@ -87,11 +167,13 @@ module.exports = {
      * Also waits for any loading mask to disappear and for the new window to be fully loaded.
      *
      * @param {string} btnText - The text of the button to click.
-     * @param {puppeteer.Page} win - The page object to search for the button. Defaults to the main page.
+     * @param {puppeteer.Page} [page] - The page object to search for the button. Defaults to the main page.
      * @returns {Promise<puppeteer.Page>} A promise that resolves to the new page object of the opened window.
      */
-    getEditDialog: async function (btnText, win) {
-        const ctx = win || page;
+    getEditDialog: async function (btnText, page = null) {
+        const ctx = page || (typeof global.page !== 'undefined' ? global.page : null);
+        if (!ctx) throw new Error('getEditDialog: no page/context available');
+
         await expectPuppeteer(ctx).toMatchElement('.x-btn-text', {text: btnText, visible: true});
 
         const popupPromise = this.getNewWindow();
@@ -214,91 +296,6 @@ module.exports = {
 
         await this.reloadRegistry(page);
         await page.waitForSelector('.x-tab-strip-closable.x-tab-with-icon.tine-mainscreen-apptabspanel-menu-tabel', {timeout: 0});
-    },
-
-    /**
-     * Opens the browser, navigates to tine website, switches the browser language to German,
-     * logs in and optionally opens the specified app and module.
-     *
-     * @param app optional app to open after login
-     * @param module optional module to open after login (requires app)
-     * @returns {Promise<void>}
-     */
-    getBrowser: async function (app, module) {
-        helpers.initJasmineAndExpect();
-        await helpers.launchBrowser();
-        const page = await helpers.createConfiguredPage();
-
-        await page.goto(process.env.TEST_URL, { waitUntil: 'domcontentloaded', timeout: 30000 });
-        await expectPuppeteer(page).toMatchElement('title', { text: process.env.TEST_BRANDING_TITLE });
-
-        await helpers.switchToGermanIfNeeded(page);
-        await helpers.login(page, {
-            user: process.env.TEST_USERNAME,
-            pass: process.env.TEST_PASSWORD
-        });
-
-        // TODO: MFA still working?
-        try {
-            await page.waitForSelector('.tine-dock', {timeout: 0});
-            if (!!+process.env.MFA) {
-                // TODO: second parameter might not work
-                await page.waitForSelector('.x-window-header-text', {text: 'Multi Faktor Authentifikation'});
-                const mfaDialog = await this.getEditDialog('OK');
-                await expectPuppeteer(mfaDialog).toClick('button', {text: "Abbrechen"});
-            }
-        } catch (e) {
-            // TODO: Fail properly
-            console.log('login failed!');
-            console.log(app);
-            console.error(e);
-        }
-
-        if (app) {
-            await expectPuppeteer(page).toClick('.action_menu.application-menu-btn');
-            await page.waitForSelector('.application-menu-item');
-            await expectPuppeteer(page).toClick('.application-menu-item__text', { text: app });
-        }
-        if (module) {
-            // TODO: second parameter might not work
-            await page.waitForSelector('span', { text: 'Module' });
-            await expectPuppeteer(page).toClick('.tine-mainscreen-centerpanel-west .x-tree-node a span', {text: module});
-        }
-    },
-
-    /**
-     * Opens the browser, navigates to the setup page, and logs in with setup credentials.
-     * Also switches the browser language to German if not already set.
-     *
-     * @returns {Promise<void>} A promise that resolves when the setup process is complete.
-     */
-    getSetup: async function () {
-        helpers.initJasmineAndExpect();
-        await helpers.launchBrowser();
-        const page = await helpers.createConfiguredPage({
-            auth: {
-                username: process.env.HTACCESS_USERNAME,
-                password: process.env.HTACCESS_PASSWORD
-            }
-        });
-
-        page.setDefaultTimeout(15000);
-        await page.goto(process.env.TEST_URL + '/setup.php', {waitUntil: 'domcontentloaded', timeout: 30000});
-        await expectPuppeteer(page).toMatchElement('title', {text: process.env.TEST_BRANDING_TITLE});
-
-        await helpers.switchToGermanIfNeeded(page);
-        await helpers.login(page, {
-            user: process.env.SETUP_USERNAME,
-            pass: process.env.SETUP_PASSWORD
-        });
-
-        // TODO: try catch necessary?
-        try {
-            await page.waitForSelector('.account-user-avatar', {timeout: 0});
-        } catch (e) {
-            console.log('login failed!');
-            console.error(e);
-        }
     },
 
     /**
