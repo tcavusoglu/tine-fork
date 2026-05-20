@@ -24,38 +24,38 @@ module.exports = {
     getBrowser: async function (app, module) {
         helpers.initJasmineAndExpect(setDefaultOptions);
 
-        // Set the global variables.
-        browser = await helpers.launchBrowser();
-        page = await helpers.createConfiguredPage(browser);
-        const localPage = page;
+        // Assign the global variables.
+        global.browser = await helpers.launchBrowser();
+        global.page = await helpers.createConfiguredPage(global.browser);
+        const page = global.page;
 
-        await localPage.goto(process.env.TEST_URL, { waitUntil: 'domcontentloaded', timeout: 30000 });
-        await expectPuppeteer(localPage).toMatchElement('title', { text: process.env.TEST_BRANDING_TITLE });
+        await page.goto(process.env.TEST_URL, { waitUntil: 'domcontentloaded', timeout: 30000 });
+        await expectPuppeteer(page).toMatchElement('title', { text: process.env.TEST_BRANDING_TITLE });
 
-        await helpers.switchToGermanIfNeeded(expectPuppeteer, localPage);
-        await helpers.login(expectPuppeteer, localPage, {
+        await helpers.switchToGermanIfNeeded(expectPuppeteer, page);
+        await helpers.login(expectPuppeteer, page, {
             user: process.env.TEST_USERNAME,
             pass: process.env.TEST_PASSWORD
         });
 
-        await localPage.waitForSelector('.tine-dock', {timeout: 0});
+        await page.waitForSelector('.tine-dock', {timeout: 0});
 
         if (!!+process.env.MFA) {
             // TODO: second parameter might not work
-            await localPage.waitForSelector('.x-window-header-text', {text: 'Multi Faktor Authentifikation'});
+            await page.waitForSelector('.x-window-header-text', {text: 'Multi Faktor Authentifikation'});
             const mfaDialog = await this.getEditDialog('OK');
             await expectPuppeteer(mfaDialog).toClick('button', {text: "Abbrechen"});
         }
 
         if (app) {
-            await expectPuppeteer(localPage).toClick('.action_menu.application-menu-btn');
-            await localPage.waitForSelector('.application-menu-item');
-            await expectPuppeteer(localPage).toClick('.application-menu-item__text', { text: app });
+            await expectPuppeteer(page).toClick('.action_menu.application-menu-btn');
+            await page.waitForSelector('.application-menu-item');
+            await expectPuppeteer(page).toClick('.application-menu-item__text', { text: app });
         }
         if (module) {
             // TODO: second parameter might not work
-            await localPage.waitForSelector('span', { text: 'Module' });
-            await expectPuppeteer(localPage).toClick('.tine-mainscreen-centerpanel-west .x-tree-node a span', {text: module});
+            await page.waitForSelector('span', { text: 'Module' });
+            await expectPuppeteer(page).toClick('.tine-mainscreen-centerpanel-west .x-tree-node a span', {text: module});
         }
     },
 
@@ -68,47 +68,47 @@ module.exports = {
     getSetup: async function () {
         helpers.initJasmineAndExpect(setDefaultOptions);
 
-        // Set the global variables.
-        browser = await helpers.launchBrowser();
-        page = await helpers.createConfiguredPage(browser,{
+        // Assign the global variables.
+        global.browser = await helpers.launchBrowser();
+        global.page = await helpers.createConfiguredPage(global.browser,{
             auth: {
                 username: process.env.HTACCESS_USERNAME,
                 password: process.env.HTACCESS_PASSWORD
             }
         });
-        const localPage = page;
+        const page = global.page;
 
-        localPage.setDefaultTimeout(15000);
+        page.setDefaultTimeout(15000);
 
-        await localPage.goto(process.env.TEST_URL + '/setup.php', {waitUntil: 'domcontentloaded', timeout: 30000});
-        await expectPuppeteer(localPage).toMatchElement('title', {text: process.env.TEST_BRANDING_TITLE});
+        await page.goto(process.env.TEST_URL + '/setup.php', {waitUntil: 'domcontentloaded', timeout: 30000});
+        await expectPuppeteer(page).toMatchElement('title', {text: process.env.TEST_BRANDING_TITLE});
 
-        await helpers.switchToGermanIfNeeded(expectPuppeteer, localPage);
-        await helpers.login(expectPuppeteer, localPage, {
+        await helpers.switchToGermanIfNeeded(expectPuppeteer, page);
+        await helpers.login(expectPuppeteer, page, {
             user: process.env.SETUP_USERNAME,
             pass: process.env.SETUP_PASSWORD
         });
 
-        await localPage.waitForSelector('.account-user-avatar', {timeout: 0});
+        await page.waitForSelector('.account-user-avatar', {timeout: 0});
     },
 
     /**
      * Downloads a file by clicking the specified selector and returns the path to the downloaded file.
      * The file will be downloaded to a temporary directory created for each download.
      *
-     * @param {puppeteer.Page} localPage - The page object to perform the download on.
+     * @param {puppeteer.Page} page - The page object to perform the download on.
      * @param {string} selector - The selector of the element to click for initiating the download.
      * @param {Object} [option] - Optional options for the click action.
      * @returns {Promise<string>} A promise that resolves to the path of the downloaded file.
      */
-    download: async function (localPage, selector, option = {}) {
+    download: async function (page, selector, option = {}) {
         const downloadPath = path.resolve(__dirname, 'download', uuid.v1());
         // TODO: Check if this is working at all
         mkdirp(downloadPath);
         console.log('Downloading file to:', downloadPath);
-        const cdpSession = await localPage.createCDPSession();
+        const cdpSession = await page.createCDPSession();
         await cdpSession.send('Page.setDownloadBehavior', {behavior: 'allow', downloadPath: downloadPath});
-        await expectPuppeteer(localPage).toClick(selector, option);
+        await expectPuppeteer(page).toClick(selector, option);
         let filename = await helpers.waitForFileToDownload(fs, downloadPath);
         return path.resolve(downloadPath, filename);
     },
@@ -116,14 +116,14 @@ module.exports = {
     /**
      * Uploads a file by finding an input element of type "file" on the page and using its uploadFile method.
      *
-     * @param {puppeteer.Page} localPage - The page object to perform the file upload on.
+     * @param {puppeteer.Page} page - The page object to perform the file upload on.
      * @param {string} file - The path to the file that should be uploaded.
      * @returns {Promise<void>} A promise that resolves when the file has been set for upload.
      */
-    uploadFile: async function (localPage, file) {
+    uploadFile: async function (page, file) {
         let inputUploadHandle;
 
-        inputUploadHandle = await localPage.$('input[type=file]');
+        inputUploadHandle = await page.$('input[type=file]');
         await inputUploadHandle.uploadFile(file);
     },
 
@@ -135,7 +135,7 @@ module.exports = {
      */
     getNewWindow: function () {
         return new Promise((resolve, reject) => {
-            if (!browser) {
+            if (!global.browser) {
                 reject(new Error('getNewWindow: global browser is not initialized'));
                 return;
             }
@@ -144,7 +144,7 @@ module.exports = {
                 reject(new Error('getNewWindow: waiting for new window reached timeout'));
             }, 10000);
 
-            browser.once('targetcreated', async (target) => {
+            global.browser.once('targetcreated', async (target) => {
                 try {
                     const newPage = await target.page();
                     if (!newPage) {
@@ -167,11 +167,13 @@ module.exports = {
      * Also waits for any loading mask to disappear and for the new window to be fully loaded.
      *
      * @param {string} btnText - The text of the button to click.
-     * @param {puppeteer.Page} [window] - The page object to search for the button. Defaults to the main page.
+     * @param {puppeteer.Page} [page] - The page object to search for the button. Defaults to the main page.
      * @returns {Promise<puppeteer.Page>} A promise that resolves to the new page object of the opened window.
      */
-    getEditDialog: async function (btnText, window = null) {
-        const ctx = window || page;
+    getEditDialog: async function (btnText, page = null) {
+        const ctx = page || (typeof global.page !== 'undefined' ? global.page : null);
+        if (!ctx) throw new Error('getEditDialog: no page/context available');
+
         await expectPuppeteer(ctx).toMatchElement('.x-btn-text', {text: btnText, visible: true});
 
         const popupPromise = this.getNewWindow();
@@ -203,50 +205,50 @@ module.exports = {
      * Retrieves an element from the page based on the specified type and text content.
      *
      * @param type
-     * @param {puppeteer.Page} localPage
+     * @param {puppeteer.Page} page
      * @param text
      * @returns {Promise<*>}
      */
-    getElement: async function (type, localPage, text) {
-        return localPage.$x("//" + type + "[contains(., '" + text + "')]");
+    getElement: async function (type, page, text) {
+        return page.$x("//" + type + "[contains(., '" + text + "')]");
     },
 
     /**
      * Retrieves the current user information from the registry on the given page.
      *
-     * @param {puppeteer.Page} localPage
+     * @param {puppeteer.Page} page
      * @returns {Promise<*>}
      */
-    getCurrentUser: async function (localPage) {
-        return localPage.evaluate(() => Tine.Tinebase.registry.get('currentAccount'));
+    getCurrentUser: async function (page) {
+        return page.evaluate(() => Tine.Tinebase.registry.get('currentAccount'));
     },
 
     /**
      * Reloads the registry on the given page by calling the reload method with clearCache option set to true.
      *
-     * @param {puppeteer.Page} localPage
+     * @param {puppeteer.Page} page
      * @returns {Promise<void>}
      */
-    reloadRegistry: async function (localPage) {
-        await localPage.evaluate(() => Tine.Tinebase.common.reload({
+    reloadRegistry: async function (page) {
+        await page.evaluate(() => Tine.Tinebase.common.reload({
             clearCache: true
         }));
         // TODO: Replace setTimeout()
         await new Promise(r => setTimeout(r, 1000));
-        await localPage.waitForSelector('.x-btn-text.tine-grid-row-action-icon.renderer_accountUserIcon', {timeout: 20000});
+        await page.waitForSelector('.x-btn-text.tine-grid-row-action-icon.renderer_accountUserIcon', {timeout: 20000});
     },
 
     /**
      * TODO make this work / see tests/e2etests/src/test/Felamimail/grid.test.js:9 ('grid adopts to folder selected')
      *
-     * @param {puppeteer.Page} localPage
+     * @param {puppeteer.Page} page
      * @param selector
      * @param visible
      * @returns {Promise<unknown>}
      */
-    checkDisplayOfElement: async function (localPage, selector, visible) {
+    checkDisplayOfElement: async function (page, selector, visible) {
         // TODO allow to pass selector to querySelector
-        const el_display = await localPage.evaluate((selector) => document.querySelector(selector).style.display);
+        const el_display = await page.evaluate((selector) => document.querySelector(selector).style.display);
         if (visible && el_display === 'none') {
             return Promise.reject('Error: ' + selector + ' still visible');
         } else if (!visible && el_display !== 'none') {
@@ -261,19 +263,19 @@ module.exports = {
      *
      * set tine20 preference and reload registry afterwards
      *
-     * @param {puppeteer.Page} localPage - the page object to perform the actions on
+     * @param {puppeteer.Page} page - the page object to perform the actions on
      * @param appName - the name of the app for which the preference should be set (e.g. 'Calendar')
      * @param preference
      * @param value
      * @returns {Promise<void>}
      */
-    setPreference: async function (localPage, appName, preference, value) {
+    setPreference: async function (page, appName, preference, value) {
         console.log('setting preference ' + preference + ' of app '
             + appName + ' to "' + value + '"');
 
-        await localPage.waitForSelector('.x-btn-text.tine-grid-row-action-icon.renderer_accountUserIcon');
-        await localPage.click('.x-btn-text.tine-grid-row-action-icon.renderer_accountUserIcon');
-        const frame = await expectPuppeteer(localPage).toMatchElement('.x-menu.x-menu-floating.x-layer', {visible: true});
+        await page.waitForSelector('.x-btn-text.tine-grid-row-action-icon.renderer_accountUserIcon');
+        await page.click('.x-btn-text.tine-grid-row-action-icon.renderer_accountUserIcon');
+        const frame = await expectPuppeteer(page).toMatchElement('.x-menu.x-menu-floating.x-layer', {visible: true});
         await expectPuppeteer(frame).toClick('.x-menu-item-icon.action_adminMode');
         const preferencePopup = await this.getNewWindow();
         await preferencePopup.waitForSelector('.x-tree-node');
@@ -292,19 +294,19 @@ module.exports = {
         await expectPuppeteer(preferencePopup).toClick('button', {text: 'Ok'});
         await new Promise(r => setTimeout(r, 1000));
 
-        await this.reloadRegistry(localPage);
-        await localPage.waitForSelector('.x-tab-strip-closable.x-tab-with-icon.tine-mainscreen-apptabspanel-menu-tabel', {timeout: 0});
+        await this.reloadRegistry(page);
+        await page.waitForSelector('.x-tab-strip-closable.x-tab-with-icon.tine-mainscreen-apptabspanel-menu-tabel', {timeout: 0});
     },
 
     /**
      * Clicks a button with the specified text that is part of a split button and handles the click event to open the associated menu.
      *
-     * @param {puppeteer.Page} localPage
+     * @param {puppeteer.Page} page
      * @param text
      * @returns {Promise<void>}
      */
-    clickSplitButton: async function (localPage, text) {
-        return await localPage.evaluate((text) => {
+    clickSplitButton: async function (page, text) {
+        return await page.evaluate((text) => {
             const btn = document.evaluate('//em[button[text()="' + text + '"]]', document).iterateNext();
             const box = btn.getBoundingClientRect();
 
@@ -322,11 +324,11 @@ module.exports = {
      * Takes a screenshot of the given page with the specified options.
      * The env variable TEST_ALL_SCREENSHOT set to 'true' will take screenshots in both light and dark modes.
      *
-     * @param {puppeteer.Page} localPage
+     * @param {puppeteer.Page} page
      * @param options - The options for taking the screenshot, including the path where the screenshot should be saved.
      * @returns {Promise<void>} A promise that resolves when the screenshot(s) have been taken and saved.
      */
-    makeScreenshot: async function (localPage, options) {
+    makeScreenshot: async function (page, options) {
         if (process.env.TEST_ALL_SCREENSHOT === 'true') {
             const basePath = options.path;
             console.log(options);
@@ -341,21 +343,21 @@ module.exports = {
                     `_${mode}$1`
                 );
 
-                await localPage.evaluate((m) => {
+                await page.evaluate((m) => {
                     document.body.className = document.body.className.replace(
                         /(light|dark)-mode/,
                         `${m}-mode`
                     );
                 }, mode);
 
-                await localPage.setViewport(resolution);
+                await page.setViewport(resolution);
                 // TODO: Replace setTimeout()
                 await new Promise(r => setTimeout(r, 500));
 
-                await localPage.screenshot({ ...options, path: filePath });
+                await page.screenshot({ ...options, path: filePath });
             }
         } else {
-            await localPage.screenshot(options);
+            await page.screenshot(options);
         }
     },
 };

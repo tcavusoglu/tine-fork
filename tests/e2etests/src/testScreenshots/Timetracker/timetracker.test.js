@@ -8,7 +8,7 @@ require('dotenv').config();
 beforeAll(async () => {
     await lib.getBrowser('Zeiterfassung');
     await lib.makeScreenshot(
-        page, {path: 'screenshots/Zeiterfassung/1_zeiterfassung_module.png',
+        global.page, {path: 'screenshots/Zeiterfassung/1_zeiterfassung_module.png',
         clip: {x: 0, y: 0, width: 150, height: 300}}
     )
 });
@@ -17,7 +17,7 @@ describe('timeaccount', () => {
     describe('Edit Timeaccount', () => {
         let editDialog;
         test('mainpage', async () => {
-            await expectPuppeteer(page).toClick('.tine-mainscreen-centerpanel-west span', {text: 'Zeitkonten'});
+            await expectPuppeteer(global.page).toClick('.tine-mainscreen-centerpanel-west span', {text: 'Zeitkonten'});
         });
         test('open EditDialog', async () => {
             await new Promise(r => setTimeout(r, 1000));
@@ -38,7 +38,7 @@ describe.skip('timetracker', () => {
     describe('Edit Timesheet', () => {
         let editDialog;
         test('mainpage', async () => {
-            await expectPuppeteer(page).toClick('.tine-mainscreen-centerpanel-west span', {text: 'Stundenzettel'});
+            await expectPuppeteer(global.page).toClick('.tine-mainscreen-centerpanel-west span', {text: 'Stundenzettel'});
         });
 
         test('open EditDialog', async () => {
@@ -51,5 +51,5 @@ describe.skip('timetracker', () => {
 });
 
 afterAll(async () => {
-    browser.close();
+    global.browser.close();
 });
