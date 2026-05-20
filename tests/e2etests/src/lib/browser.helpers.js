@@ -42,6 +42,39 @@ module.exports = {
     },
 
     /**
+     * Wait until a button-like element with given visible text is actionable/clickable.
+     *
+     * @param {puppeteer.Page} page - Page or frame context
+     * @param {string} text - Visible button text to match
+     * @param {number} [timeout=7000] - Timeout in ms
+     * @param {string} [labelSelector='.x-btn-text'] - Selector to find the text element (optional)
+     * @returns {Promise<void>}
+     */
+    waitForActionableButton: async function (page, text, timeout = 7000, labelSelector = '.x-btn-text') {
+        if (!page) throw new Error('waitForActionableButton: page is required');
+
+        // Runs in page context: uses window.getComputedStyle and DOM checks
+        await page.waitForFunction(
+            (labelSelectorInner, textInner) => {
+                const nodes = Array.from(document.querySelectorAll(labelSelectorInner || '.x-btn-text'));
+                const el = nodes.find(e => e.textContent && e.textContent.trim() === textInner);
+                if (!el) return false;
+                const btn = el.closest('button') || el.parentElement;
+                if (!btn) return false;
+                const style = window.getComputedStyle(btn);
+                // offsetParent !== null -> element is laid out; ensure not hidden or disabled
+                return btn.offsetParent !== null &&
+                    style.display !== 'none' &&
+                    !btn.disabled &&
+                    !btn.classList.contains('x-item-disabled');
+            },
+            {timeout},
+            labelSelector,
+            text
+        );
+    },
+
+    /**
      * Proxies console messages from the given page to the main console, filtering by log level and ignoring messages related to 'sockjs-node'.
      *
      * @param {puppeteer.Page} page
@@ -156,7 +189,7 @@ module.exports = {
      * @returns {Promise<void>} A promise that resolves when the language switch is complete.
      */
     switchToGermanIfNeeded: async function (expectPuppeteer, page) {
-        if (process.env.TEST_MODE !== 'headless' && process.env.TEST_BROWSER_LANGUAGE !== 'de') {
+        if (process.env.TEST_MODE === 'debug' && process.env.TEST_BROWSER_LANGUAGE !== 'de') {
             console.log('switching to German');
             const langSelector = '#langChooser input[type=text]';
             await page.waitForSelector(langSelector, {visible: true});
