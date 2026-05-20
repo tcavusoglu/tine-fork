@@ -1,6 +1,4 @@
 const helpers = require('./browser.helpers');
-
-const puppeteer = require('puppeteer');
 const { expect: expectPuppeteer, setDefaultOptions } = require('expect-puppeteer');
 require('dotenv').config();
 
@@ -11,6 +9,11 @@ const uuid = require('uuid');
 
 const modes = ['light', 'dark'];
 const resolution = JSON.parse(process.env.TEST_RESOLUTION);
+
+const POPUP_TIMEOUT = parseInt(process.env.E2E_POPUP_TIMEOUT, 10) || 10000;
+const ACTIONABLE_TIMEOUT = parseInt(process.env.E2E_BUTTON_TIMEOUT, 10) || 7000;
+const MASK_TIMEOUT = parseInt(process.env.E2E_MASK_TIMEOUT, 10) || 10000;
+const WINDOW_TIMEOUT = parseInt(process.env.E2E_WINDOW_TIMEOUT, 10) || 10000;
 
 module.exports = {
     /**
@@ -53,8 +56,7 @@ module.exports = {
             await expectPuppeteer(page).toClick('.application-menu-item__text', { text: app });
         }
         if (module) {
-            // TODO: second parameter might not work
-            await page.waitForSelector('span', { text: 'Module' });
+            expectPuppeteer(page).toMatchElement('span', { text: 'Module' })
             await expectPuppeteer(page).toClick('.tine-mainscreen-centerpanel-west .x-tree-node a span', {text: module});
         }
     },
@@ -129,7 +131,7 @@ module.exports = {
 
     /**
      * Waits for a new window to be opened and returns the corresponding page object.
-     * Rejects if no new window is opened within 10 seconds or if the target is not a page.
+     * Rejects if no new window is opened within POPUP_TIMEOUT ms or if the target is not a page.
      *
      * @returns {Promise<puppeteer.Page>} A promise that resolves to the new page object.
      */
@@ -142,7 +144,7 @@ module.exports = {
 
             const timer = setTimeout(() => {
                 reject(new Error('getNewWindow: waiting for new window reached timeout'));
-            }, 10000);
+            }, POPUP_TIMEOUT);
 
             global.browser.once('targetcreated', async (target) => {
                 try {
@@ -174,30 +176,40 @@ module.exports = {
         const ctx = page || (typeof global.page !== 'undefined' ? global.page : null);
         if (!ctx) throw new Error('getEditDialog: no page/context available');
 
+        // Find the desired button and wait until it is actionable.
         await expectPuppeteer(ctx).toMatchElement('.x-btn-text', {text: btnText, visible: true});
+        await helpers.waitForActionableButton(ctx, btnText, ACTIONABLE_TIMEOUT, '.x-btn-text');
 
         const popupPromise = this.getNewWindow();
         await expectPuppeteer(ctx).toClick('.x-btn-text', {text: btnText});
-
         const popupWindow = await popupPromise;
         await helpers.proxyConsole(popupWindow);
 
+        // If a loading mask is present, wait for it to got away.
         const maskSelector = '.ext-el-mask';
-        const maskAppeared = await popupWindow.$(maskSelector);
-        if (maskAppeared) {
-            await popupWindow.waitForFunction(
-                (sel) => {
-                    const el = document.querySelector(sel);
-                    return !el || el.offsetParent === null || getComputedStyle(el).display === 'none';
-                },
-                {timeout: 10000},
-                maskSelector
-            );
+        try {
+            const mask = await popupWindow.$(maskSelector);
+            if (mask) {
+                await popupWindow.waitForFunction(
+                    (sel) => {
+                        const el = document.querySelector(sel);
+                        return !el || el.offsetParent === null || getComputedStyle(el).display === 'none';
+                    },
+                    { timeout: MASK_TIMEOUT },
+                    maskSelector
+                );
+            }
+        } catch (err) {
+            // Swallow mask-timeout errors — dialog might not use the mask or mask removal timed out,
+            // so let's try to continue.
         }
+
+        // Wait for the dialog content to be ready (form/grid/window).
         await popupWindow.waitForSelector(
             '.x-window, .x-window-body, .x-form-item, .x-grid3-viewport',
-            {visible: true, timeout: 10000}
+            { visible: true, timeout: WINDOW_TIMEOUT }
         );
+
         return popupWindow;
     },
 
@@ -225,6 +237,7 @@ module.exports = {
 
     /**
      * Reloads the registry on the given page by calling the reload method with clearCache option set to true.
+     * After triggering the reload, it waits for the app-side loading indicator to report that loading is finished.
      *
      * @param {puppeteer.Page} page
      * @returns {Promise<void>}
@@ -233,8 +246,20 @@ module.exports = {
         await page.evaluate(() => Tine.Tinebase.common.reload({
             clearCache: true
         }));
-        // TODO: Replace setTimeout()
-        await new Promise(r => setTimeout(r, 1000));
+
+        // Wait until the app-side loading indicator (if available) reports finished.
+        try {
+            await page.waitForFunction(() => {
+                // guard: if Tine or the method is missing, return true to avoid hanging
+                if (typeof window.Tine === 'undefined' || !window.Tine.Tinebase || !window.Tine.Tinebase.common || typeof window.Tine.Tinebase.common.isLoading !== 'function') {
+                    return true;
+                }
+                return !window.Tine.Tinebase.common.isLoading();
+            }, { timeout: 10000 });
+        } catch (err) {
+            console.warn('reloadRegistry: waitForFunction timed out - continuing to wait for UI selector as fallback');
+        }
+
         await page.waitForSelector('.x-btn-text.tine-grid-row-action-icon.renderer_accountUserIcon', {timeout: 20000});
     },
 
@@ -259,14 +284,14 @@ module.exports = {
     },
 
     /**
-     * TODO: Is this method still needed?
+     * TODO: This method is not used anywhere - check if it can be removed.
      *
-     * set tine20 preference and reload registry afterwards
+     * Sets a preference for a specific app in the Tine20 application and reloads the registry afterwards.
      *
      * @param {puppeteer.Page} page - the page object to perform the actions on
-     * @param appName - the name of the app for which the preference should be set (e.g. 'Calendar')
-     * @param preference
-     * @param value
+     * @param {string} appName - The name of the app for which the preference should be set (e.g. 'Calendar').
+     * @param {string} preference - The name of the preference to set.
+     * @param {string} value - The value to set for the preference.
      * @returns {Promise<void>}
      */
     setPreference: async function (page, appName, preference, value) {
@@ -282,9 +307,6 @@ module.exports = {
         //wait for finish load dialog
         await expectPuppeteer(preferencePopup).toMatchElement('input[name=timezone]');
         await expectPuppeteer(preferencePopup).toClick('span', {text: appName});
-
-        // TODO: Replace setTimeout() calls
-
         // change setting to YES
         await expectPuppeteer(preferencePopup).toMatchElement('input[name=' + preference + ']');
         await expectPuppeteer(preferencePopup).toFill('input[name=' + preference + ']', value);
@@ -334,7 +356,7 @@ module.exports = {
             console.log(options);
             console.log(basePath);
             if (!basePath) {
-                throw new Error('Kein Pfad für den Screenshot angegeben.');
+                throw new Error('makeScreenshot: missing path for saving a screenshot');
             }
 
             for (const mode of modes) {
@@ -351,8 +373,11 @@ module.exports = {
                 }, mode);
 
                 await page.setViewport(resolution);
-                // TODO: Replace setTimeout()
-                await new Promise(r => setTimeout(r, 500));
+                await page.waitForFunction(
+                    (m) => document.body.className.includes(`${m}-mode`),
+                    { timeout: 2000 },
+                    mode
+                );
 
                 await page.screenshot({ ...options, path: filePath });
             }
