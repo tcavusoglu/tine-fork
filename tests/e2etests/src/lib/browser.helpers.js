@@ -179,6 +179,9 @@ module.exports = {
             await page.authenticate(auth);
         }
 
+        // Simulate slow network and CPU throttling.
+        await this.applyThrottling(page, process.env.TEST_NETWORK_CONDITIONS_MAIN, parseInt(process.env.TEST_CPU_THROTTLING_RATE_MAIN));
+
         return page;
     },
 
@@ -223,4 +226,43 @@ module.exports = {
         await expectPuppeteer(page).toFill('input[name=password]', pass, { delay: 50 });
         await expectPuppeteer(page).toClick('button', { text: 'Anmelden' });
     },
+
+    /**
+     * Applies network and CPU throttling to the given page based on the provided environment variables.
+     *
+     * @param {puppeteer.Page} page - The page to apply throttling to.
+     * @param {string|null} env_network - A JSON string representing the network conditions to apply (see TEST_NETWORK_CONDITIONS_*), or null to skip network throttling.
+     * @param {number|null} env_cpu_throttling - A number representing the CPU throttling rate to apply (see TEST_CPU_THROTTLING_RATE_*), or null to skip CPU throttling.
+     * @returns {Promise<void>} A promise that resolves when the throttling has been applied.
+     */
+    applyThrottling: async function (page, env_network = null, env_cpu_throttling = null) {
+        if (env_network || env_cpu_throttling) {
+            // Connect to the DevTools Protocol (CDP) for this page / popup.
+            const client = await page.createCDPSession();
+
+            if (env_network) {
+                const network = JSON.parse(env_network) || {};
+                if (network.offline) {
+                    console.log('Applying offline network conditions');
+                } else {
+                    const down = `${network.downloadThroughput} B/s (${Math.round(parseInt(network.downloadThroughput) / 1024)} kB/s) down`;
+                    const up = `${network.uploadThroughput} B/s (${Math.round(parseInt(network.uploadThroughput) / 1024)} kB/s) up`;
+                    console.log(`Applying network throttling: ${down}, ${up}, ${network.latency} ms latency`);
+                }
+
+                await client.send('Network.enable');
+                await client.send('Network.emulateNetworkConditions', {
+                    offline: network.offline,
+                    downloadThroughput: network.downloadThroughput,
+                    uploadThroughput: network.uploadThroughput,
+                    latency: network.latency,
+                });
+            }
+
+            if (env_cpu_throttling) {
+                console.log(`Applying CPU throttling: ${env_cpu_throttling}x slowdown`);
+                await client.send('Emulation.setCPUThrottlingRate', {rate: parseFloat(env_cpu_throttling)});
+            }
+        }
+    }
 };

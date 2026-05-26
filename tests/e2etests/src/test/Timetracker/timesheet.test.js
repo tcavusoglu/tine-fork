@@ -3,6 +3,8 @@ const lib = require('../../lib/browser');
 
 require('dotenv').config();
 
+// TODO: Use process.env.TEST_TIMEOUT_* instead of magic numbers.
+
 beforeAll(async () => {
     await lib.getBrowser('Zeiterfassung', 'Stundenzettel');
 });
@@ -17,7 +19,7 @@ describe('Create and delete time sheet', () => {
     });
 
     test('Select time account', async() => {
-        // TODO: Create (and delete again) a demo time account in the test setup, and use it for testing instead of relying on existing data.
+        // TODO: Create a dummy time account in the test setup, use it for testing instead of relying on existing data, and delete it again.
         await popupWindow.waitForSelector('[name="timeaccount_id"]');
         await expectPuppeteer(popupWindow).toFill('[name="timeaccount_id"]', 'test');
         await popupWindow.waitForSelector('.x-combo-list-item');
