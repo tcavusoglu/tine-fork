@@ -16,33 +16,32 @@ beforeAll(async () => {
 describe('timeaccount', () => {
     describe('Edit Timeaccount', () => {
         let editDialog;
-        test('mainpage', async () => {
+        test('mainpage Zeitkonten', async () => {
             await expectPuppeteer(global.page).toClick('.tine-mainscreen-centerpanel-west span', {text: 'Zeitkonten'});
         });
-        test('open EditDialog', async () => {
-            await new Promise(r => setTimeout(r, 1000));
+        test('open Zeitkonto hinzufügen popup dialog', async () => {
             editDialog = await lib.getEditDialog('Zeitkonto hinzufügen');
             await lib.makeScreenshot(editDialog,{path: 'screenshots/Zeiterfassung/2_zeiterfassung_zeitkonto_neu.png'});
         });
 
-        test('permissions', async () => {
-            await expectPuppeteer(editDialog).toClick('span', {text: 'Zugriffsrechte'});
-            await editDialog.waitForSelector('.x-grid3-viewport');
+        test('permissions tab', async () => {
+            await expectPuppeteer(editDialog).toClick('.x-tab-panel-header .x-tab-strip-text', {text: 'Zugriffsrechte'});
+            await editDialog.waitForSelector('.x-grid3-viewport', { visible: true, timeout: 10000 });
             await lib.makeScreenshot(editDialog,{path: 'screenshots/Zeiterfassung/3_zeiterfassung_zeitkonto_rechte.png'});
             await expectPuppeteer(editDialog).toClick('button', {text: 'Abbrechen'});
         })
     });
 });
 
-describe.skip('timetracker', () => {
+describe('timetracker', () => {
     describe('Edit Timesheet', () => {
         let editDialog;
-        test('mainpage', async () => {
-            await expectPuppeteer(global.page).toClick('.tine-mainscreen-centerpanel-west span', {text: 'Stundenzettel'});
+        test('mainpage Stundenzettel', async () => {
+            // Very precise CSS selector due to two "Stundenzettel" Module menu items with the exact same name.
+            await expectPuppeteer(global.page).toClick('.tine-mainscreen-centerpanel-west-modules .x-tree-node-el img.TimetrackerTimesheet + a.x-tree-node-anchor span', {text: 'Stundenzettel'});
         });
 
-        test('open EditDialog', async () => {
-            await new Promise(r => setTimeout(r, 1000));
+        test('open Stundenzettel hinzufügen popup dialog', async () => {
             editDialog = await lib.getEditDialog('Stundenzettel hinzufügen');
             await lib.makeScreenshot(editDialog,{path: 'screenshots/Zeiterfassung/4_zeiterfassung_stundenzettel_neu.png'});
             await expectPuppeteer(editDialog).toClick('button', {text: 'Abbrechen'});
