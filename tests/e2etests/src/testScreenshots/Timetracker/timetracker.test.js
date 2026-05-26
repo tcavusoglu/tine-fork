@@ -4,6 +4,7 @@ const lib = require('../../lib/browser');
 require('dotenv').config();
 
 //@todo some demodata in editDialog?
+// TODO: Use process.env.TEST_TIMEOUT_* instead of magic numbers.
 
 beforeAll(async () => {
     await lib.getBrowser('Zeiterfassung');

@@ -10,11 +10,11 @@ const uuid = require('uuid');
 const modes = ['light', 'dark'];
 const resolution = JSON.parse(process.env.TEST_RESOLUTION);
 
-const TIMEOUT_BROWSER = parseInt(process.env.TEST_TIMEOUT_BROWSER, 10) || 30000;
-const TIMEOUT_CONTENT_READY = parseInt(process.env.TEST_TIMEOUT_CONTENT_READY, 10) || 10000;
-const TIMEOUT_POPUP = parseInt(process.env.TEST_TIMEOUT_POPUP, 10) || 10000;
-const TIMEOUT_ACTIONABLE = parseInt(process.env.TEST_TIMEOUT_ACTIONABLE, 10) || 7000;
-const TIMEOUT_MASK = parseInt(process.env.TEST_TIMEOUT_MASK, 10) || 10000;
+const TIMEOUT_BROWSER = Number.isFinite(Number(process.env.TEST_TIMEOUT_BROWSER)) ? Number(process.env.TEST_TIMEOUT_BROWSER) : 30000;
+const TIMEOUT_CONTENT_READY = Number.isFinite(Number(process.env.TEST_TIMEOUT_CONTENT_READY)) ? Number(process.env.TEST_TIMEOUT_CONTENT_READY) : 10000;
+const TIMEOUT_POPUP = Number.isFinite(Number(process.env.TEST_TIMEOUT_POPUP)) ? Number(process.env.TEST_TIMEOUT_POPUP) : 10000;
+const TIMEOUT_ACTIONABLE = Number.isFinite(Number(process.env.TEST_TIMEOUT_ACTIONABLE)) ? Number(process.env.TEST_TIMEOUT_ACTIONABLE) : 7000;
+const TIMEOUT_MASK = Number.isFinite(Number(process.env.TEST_TIMEOUT_MASK)) ? Number(process.env.TEST_TIMEOUT_MASK) : 10000;
 
 module.exports = {
     /**
@@ -59,7 +59,7 @@ module.exports = {
             await expectPuppeteer(page).toClick('.application-menu-item__text', { text: app });
         }
         if (module) {
-            expectPuppeteer(page).toMatchElement('span', { text: 'Module' })
+            await expectPuppeteer(page).toMatchElement('span', { text: 'Module' });
             await expectPuppeteer(page).toClick('.tine-mainscreen-centerpanel-west .x-tree-node a span', {text: module});
         }
     },
@@ -145,9 +145,12 @@ module.exports = {
                 return;
             }
 
-            const timer = setTimeout(() => {
-                reject(new Error('getNewWindow: waiting for new window reached timeout'));
-            }, TIMEOUT_POPUP);
+            let timer = null;
+            if (TIMEOUT_POPUP > 0) {
+                timer = setTimeout(() => {
+                    reject(new Error('getNewWindow: waiting for new window reached timeout'));
+                }, TIMEOUT_POPUP);
+            }
 
             global.browser.once('targetcreated', async (target) => {
                 try {
@@ -158,6 +161,10 @@ module.exports = {
                         return;
                     }
                     clearTimeout(timer);
+
+                    // Simulate slow network and CPU throttling.
+                    await helpers.applyThrottling(newPage, process.env.TEST_NETWORK_CONDITIONS_POPUP, process.env.TEST_CPU_THROTTLING_RATE_POPUP);
+
                     resolve(newPage);
                 } catch (err) {
                     clearTimeout(timer);

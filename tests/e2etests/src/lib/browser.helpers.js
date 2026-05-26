@@ -179,6 +179,9 @@ module.exports = {
             await page.authenticate(auth);
         }
 
+        // Simulate slow network and CPU throttling.
+        await this.applyThrottling(page, process.env.TEST_NETWORK_CONDITIONS_MAIN, process.env.TEST_CPU_THROTTLING_RATE_MAIN);
+
         return page;
     },
 
@@ -223,4 +226,80 @@ module.exports = {
         await expectPuppeteer(page).toFill('input[name=password]', pass, { delay: 50 });
         await expectPuppeteer(page).toClick('button', { text: 'Anmelden' });
     },
+
+    /**
+     * Applies network and CPU throttling to the given page based on the provided environment variables.
+     *
+     * @param {puppeteer.Page} page - The page to apply throttling to.
+     * @param {string|null} envNetwork - A JSON string representing the network conditions to apply (see TEST_NETWORK_CONDITIONS_*), or null to skip network throttling.
+     * @param {string|number|null} envCpuThrottling - A number representing the CPU throttling rate to apply (see TEST_CPU_THROTTLING_RATE_*), or null to skip CPU throttling.
+     * @returns {Promise<void>} A promise that resolves when the throttling has been applied.
+     */
+    applyThrottling: async function (page, envNetwork = null, envCpuThrottling = null) {
+        if (!envNetwork && !envCpuThrottling) return;
+
+        let client;
+        try {
+            client = await page.createCDPSession();
+        } catch (err) {
+            console.warn('applyThrottling: could not create CDP session — skipping throttling', err);
+            return;
+        }
+
+        if (envNetwork) {
+            let network;
+            try {
+                network = JSON.parse(envNetwork);
+            } catch (err) {
+                console.warn('applyThrottling: TEST_NETWORK_CONDITIONS JSON parse failed - skipping network throttling', err);
+                network = null;
+            }
+
+            if (network) {
+                try {
+                    // If offline, set values to 0; otherwise use parsed numbers.
+                    const offline = !!network.offline;
+                    const download = offline ? 0 : Number(network.downloadThroughput) || 100;
+                    const upload = offline ? 0 : Number(network.uploadThroughput) || 100;
+                    const latency = offline ? 0 : Number(network.latency) || 20;
+
+                    if (offline || (!Number.isNaN(download) && !Number.isNaN(upload))) {
+                        if (offline) {
+                            console.log('applyThrottling: offline network conditions');
+                        } else {
+                            const downStr = `${network.downloadThroughput} B/s (${Math.round(parseInt(network.downloadThroughput) / 1024)} kB/s) down`;
+                            const upStr = `${network.uploadThroughput} B/s (${Math.round(parseInt(network.uploadThroughput) / 1024)} kB/s) up`;
+                            console.log(`applyThrottling: network throttling: ${downStr}, ${upStr}, ${network.latency} ms latency`);
+                        }
+
+                        await client.send('Network.enable');
+                        await client.send('Network.emulateNetworkConditions', {
+                            offline: offline,
+                            downloadThroughput: download,
+                            uploadThroughput: upload,
+                            latency: latency
+                        });
+                    } else {
+                        console.warn('applyThrottling: network config missing numeric download/upload and not offline - skipping network emulation', network);
+                    }
+                } catch (err) {
+                    console.warn('applyThrottling: error applying network emulation - continuing', err);
+                }
+            }
+        }
+
+        if (envCpuThrottling && parseFloat(envCpuThrottling) >= 1) {
+            const rate = parseFloat(envCpuThrottling);
+            if (!Number.isNaN(rate) && rate >= 1) {
+                try {
+                    await client.send('Emulation.setCPUThrottlingRate', {rate: rate});
+                    console.log(`applyThrottling: CPU throttling: ${rate}x slowdown`);
+                } catch (err) {
+                    console.warn('applyThrottling: error applying CPU throttling', err);
+                }
+            } else {
+                console.warn('applyThrottling: env CPU throttling value invalid or <1 - skipping', envCpuThrottling);
+            }
+        }
+    }
 };
