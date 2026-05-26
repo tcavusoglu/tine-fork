@@ -31,6 +31,7 @@ module.exports = {
      * @returns {Promise<string>} A promise that resolves to the filename of the downloaded file.
      */
     waitForFileToDownload: async function (fs, downloadPath) {
+        // TODO: This method loops indefinitely, consider adding a timeout.
         console.log('Waiting to download file...');
         let filename;
         while (!filename || filename.endsWith('.crdownload')) {
