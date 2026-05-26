@@ -10,10 +10,11 @@ const uuid = require('uuid');
 const modes = ['light', 'dark'];
 const resolution = JSON.parse(process.env.TEST_RESOLUTION);
 
-const POPUP_TIMEOUT = parseInt(process.env.E2E_POPUP_TIMEOUT, 10) || 10000;
-const ACTIONABLE_TIMEOUT = parseInt(process.env.E2E_BUTTON_TIMEOUT, 10) || 7000;
-const MASK_TIMEOUT = parseInt(process.env.E2E_MASK_TIMEOUT, 10) || 10000;
-const WINDOW_TIMEOUT = parseInt(process.env.E2E_WINDOW_TIMEOUT, 10) || 10000;
+const TIMEOUT_BROWSER = parseInt(process.env.TEST_TIMEOUT_BROWSER, 10) || 30000;
+const TIMEOUT_CONTENT_READY = parseInt(process.env.TEST_TIMEOUT_CONTENT_READY, 10) || 10000;
+const TIMEOUT_POPUP = parseInt(process.env.TEST_TIMEOUT_POPUP, 10) || 10000;
+const TIMEOUT_ACTIONABLE = parseInt(process.env.TEST_TIMEOUT_ACTIONABLE, 10) || 7000;
+const TIMEOUT_MASK = parseInt(process.env.TEST_TIMEOUT_MASK, 10) || 10000;
 
 module.exports = {
     /**
@@ -27,12 +28,14 @@ module.exports = {
     getBrowser: async function (app, module) {
         helpers.initJasmineAndExpect(setDefaultOptions);
 
+        // TODO: Cleanup the created content from every test when it fails, maybe using the database?
+
         // Assign the global variables.
         global.browser = await helpers.launchBrowser();
         global.page = await helpers.createConfiguredPage(global.browser);
         const page = global.page;
 
-        await page.goto(process.env.TEST_URL, { waitUntil: 'domcontentloaded', timeout: 30000 });
+        await page.goto(process.env.TEST_URL, { waitUntil: 'domcontentloaded', timeout: TIMEOUT_BROWSER });
         await expectPuppeteer(page).toMatchElement('title', { text: process.env.TEST_BRANDING_TITLE });
 
         await helpers.switchToGermanIfNeeded(expectPuppeteer, page);
@@ -41,7 +44,7 @@ module.exports = {
             pass: process.env.TEST_PASSWORD
         });
 
-        await page.waitForSelector('.tine-dock', {timeout: 0});
+        await page.waitForSelector('.tine-dock', {timeout: TIMEOUT_CONTENT_READY});
 
         if (!!+process.env.MFA) {
             // TODO: second parameter might not work
@@ -82,7 +85,7 @@ module.exports = {
 
         page.setDefaultTimeout(15000);
 
-        await page.goto(process.env.TEST_URL + '/setup.php', {waitUntil: 'domcontentloaded', timeout: 30000});
+        await page.goto(process.env.TEST_URL + '/setup.php', {waitUntil: 'domcontentloaded', timeout: TIMEOUT_BROWSER});
         await expectPuppeteer(page).toMatchElement('title', {text: process.env.TEST_BRANDING_TITLE});
 
         await helpers.switchToGermanIfNeeded(expectPuppeteer, page);
@@ -91,7 +94,7 @@ module.exports = {
             pass: process.env.SETUP_PASSWORD
         });
 
-        await page.waitForSelector('.account-user-avatar', {timeout: 0});
+        await page.waitForSelector('.account-user-avatar', {timeout: TIMEOUT_CONTENT_READY});
     },
 
     /**
@@ -131,7 +134,7 @@ module.exports = {
 
     /**
      * Waits for a new window to be opened and returns the corresponding page object.
-     * Rejects if no new window is opened within POPUP_TIMEOUT ms or if the target is not a page.
+     * Rejects if no new window is opened within TIMEOUT_POPUP ms or if the target is not a page.
      *
      * @returns {Promise<puppeteer.Page>} A promise that resolves to the new page object.
      */
@@ -144,7 +147,7 @@ module.exports = {
 
             const timer = setTimeout(() => {
                 reject(new Error('getNewWindow: waiting for new window reached timeout'));
-            }, POPUP_TIMEOUT);
+            }, TIMEOUT_POPUP);
 
             global.browser.once('targetcreated', async (target) => {
                 try {
@@ -178,36 +181,26 @@ module.exports = {
 
         // Find the desired button and wait until it is actionable.
         await expectPuppeteer(ctx).toMatchElement('.x-btn-text', {text: btnText, visible: true});
-        await helpers.waitForActionableButton(ctx, btnText, ACTIONABLE_TIMEOUT, '.x-btn-text');
+        await helpers.waitForActionableButton(ctx, btnText, TIMEOUT_ACTIONABLE, '.x-btn-text');
 
         const popupPromise = this.getNewWindow();
         await expectPuppeteer(ctx).toClick('.x-btn-text', {text: btnText});
         const popupWindow = await popupPromise;
         await helpers.proxyConsole(popupWindow);
 
-        // If a loading mask is present, wait for it to got away.
-        const maskSelector = '.ext-el-mask';
+        // Wait until up to two loading masks have disappeared.
         try {
-            const mask = await popupWindow.$(maskSelector);
-            if (mask) {
-                await popupWindow.waitForFunction(
-                    (sel) => {
-                        const el = document.querySelector(sel);
-                        return !el || el.offsetParent === null || getComputedStyle(el).display === 'none';
-                    },
-                    { timeout: MASK_TIMEOUT },
-                    maskSelector
-                );
-            }
+            await popupWindow.waitForSelector('.tine-viewport-waitcycle', {hidden: true, timeout: TIMEOUT_MASK});
+            await popupWindow.waitForSelector('.ext-el-mask', {hidden: true, timeout: TIMEOUT_MASK});
         } catch (err) {
-            // Swallow mask-timeout errors — dialog might not use the mask or mask removal timed out,
-            // so let's try to continue.
+            // If waiting for mask removal times out, we log and continue; subsequent waits will fail clearly.
+            console.warn('getEditDialog: waiting for loading masks timed out - continuing', err);
         }
 
         // Wait for the dialog content to be ready (form/grid/window).
         await popupWindow.waitForSelector(
             '.x-window, .x-window-body, .x-form-item, .x-grid3-viewport',
-            { visible: true, timeout: WINDOW_TIMEOUT }
+            {visible: true, timeout: TIMEOUT_CONTENT_READY}
         );
 
         return popupWindow;
@@ -353,8 +346,6 @@ module.exports = {
     makeScreenshot: async function (page, options) {
         if (process.env.TEST_ALL_SCREENSHOT === 'true') {
             const basePath = options.path;
-            console.log(options);
-            console.log(basePath);
             if (!basePath) {
                 throw new Error('makeScreenshot: missing path for saving a screenshot');
             }
