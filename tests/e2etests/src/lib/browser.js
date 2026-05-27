@@ -145,9 +145,12 @@ module.exports = {
                 return;
             }
 
-            const timer = setTimeout(() => {
-                reject(new Error('getNewWindow: waiting for new window reached timeout'));
-            }, TIMEOUT_POPUP);
+            let timer = null;
+            if (TIMEOUT_POPUP > 0) {
+                timer = setTimeout(() => {
+                    reject(new Error('getNewWindow: waiting for new window reached timeout'));
+                }, TIMEOUT_POPUP);
+            }
 
             global.browser.once('targetcreated', async (target) => {
                 try {
