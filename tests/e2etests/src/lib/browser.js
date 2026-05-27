@@ -59,7 +59,7 @@ module.exports = {
             await expectPuppeteer(page).toClick('.application-menu-item__text', { text: app });
         }
         if (module) {
-            expectPuppeteer(page).toMatchElement('span', { text: 'Module' })
+            await expectPuppeteer(page).toMatchElement('span', { text: 'Module' });
             await expectPuppeteer(page).toClick('.tine-mainscreen-centerpanel-west .x-tree-node a span', {text: module});
         }
     },
