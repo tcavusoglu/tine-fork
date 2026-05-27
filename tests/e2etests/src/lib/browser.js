@@ -163,7 +163,7 @@ module.exports = {
                     clearTimeout(timer);
 
                     // Simulate slow network and CPU throttling.
-                    await helpers.applyThrottling(newPage, process.env.TEST_NETWORK_CONDITIONS_POPUP, parseInt(process.env.TEST_CPU_THROTTLING_RATE_POPUP));
+                    await helpers.applyThrottling(newPage, process.env.TEST_NETWORK_CONDITIONS_POPUP, process.env.TEST_CPU_THROTTLING_RATE_POPUP);
 
                     resolve(newPage);
                 } catch (err) {
