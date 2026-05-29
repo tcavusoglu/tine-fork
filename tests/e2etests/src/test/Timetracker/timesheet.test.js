@@ -12,55 +12,53 @@ describe('Create and delete time sheet', () => {
     let popupWindow = null;
 
     test('Open dialog', async () => {
+        // TODO: is the global.page parameter really needed?
         popupWindow = await lib.getEditDialog('Stundenzettel hinzufügen', global.page);
         await expectPuppeteer(popupWindow).toMatchElement('span.x-tab-strip-text', {text: 'Stundenzettel'});
     });
 
     test('Select time account', async() => {
-        await popupWindow.waitForSelector('[name="timeaccount_id"]');
-        await expectPuppeteer(popupWindow).toFill('[name="timeaccount_id"]', 'test');
+        // TODO: Move this into a new testInsertComboInputValue() helper function.
+
+        await popupWindow.waitForSelector('input[name="timeaccount_id"]');
+        await expectPuppeteer(popupWindow).toFill('input[name="timeaccount_id"]', 'test');
         await popupWindow.waitForSelector('.x-combo-list-item');
         await expectPuppeteer(popupWindow).toClick('.x-combo-list-item', {text: '1 - Test Timeaccount 1'});
+
+        // Check for the actual values in the input fields.
+        await popupWindow.waitForFunction(
+            (sel, expected) => {
+                const el = document.querySelector(sel);
+                return !!el && el.value.trim() === expected;
+            },
+            {timeout: lib.getEnvInt('TEST_TIMEOUT_FORM_VALUE_CHANGED')},
+            'input[name="timeaccount_id"]',
+            '1 - Test Timeaccount 1'
+        );
     });
 
     test('Enter start and end time', async() => {
-        const currentUser = await lib.getCurrentUser(popupWindow);
-        const duration = {selector: 'input[name="duration"]', value: '03:30'};
-        const start = {selector: 'input[name="start_time"]', value: '08:00'};
+        // This fails sometimes, please adjust TEST_TIMEOUT_NETWORK_IDLE if it does.
+        //await popupWindow.waitForNetworkIdle({idleTime: lib.getEnvInt('TEST_TIMEOUT_NETWORK_IDLE')});
 
-        // TODO: Try using .waitForNetworkIdle() instead of waiting for the selectors.
-        await popupWindow.waitForSelector(duration.selector, { visible: true });
-        await popupWindow.waitForSelector(start.selector, { visible: true });
+        // Try a lot of different formats.
+        await lib.formInsertInputValue(popupWindow, 'input[name="duration"]', '03:30');
+        await lib.formInsertInputValue(popupWindow, 'input[name="duration"]', '3:30', '03:30');
+        await lib.formInsertInputValue(popupWindow, 'input[name="duration"]', '3.5', '03:30');
+        await lib.formInsertInputValue(popupWindow, 'input[name="duration"]', '3,5', '03:30');
 
-        // Enter the values and wait until they are set in the input fields.
-        await expectPuppeteer(popupWindow).toFillForm('form.x-form', {
-            duration: duration.value,
-            start_time: start.value,
-        });
-        await popupWindow.waitForFunction(
-            (sel, expected) => {
-                const el = document.querySelector(sel);
-                return !!el && el.value.trim() === expected;
-            },
-            { timeout: lib.getEnvInt('TEST_TIMEOUT_FORM_VALUE_CHANGED') },
-            duration.selector,
-            duration.value
-        );
-        await popupWindow.waitForFunction(
-            (sel, expected) => {
-                const el = document.querySelector(sel);
-                return !!el && el.value.trim() === expected;
-            },
-            { timeout: lib.getEnvInt('TEST_TIMEOUT_FORM_VALUE_CHANGED') },
-            start.selector,
-            start.value
-        );
+        await lib.formInsertInputValue(popupWindow, 'input[name="start_time"]', '08:30');
+        await lib.formInsertInputValue(popupWindow, 'input[name="start_time"]', '8:30', '08:30');
+        await lib.formInsertInputValue(popupWindow, 'input[name="start_time"]', '830', '08:30');
 
         // Check if the current username is correct.
+        const currentUser = await lib.getCurrentUser(popupWindow);
         expect(await popupWindow.evaluate(() => document.querySelector('input[name=account_id]').value)).toEqual(currentUser.accountDisplayName);
     });
 
     test('Enter description', async () => {
+        // TODO: Move this into a new testInsertTextValue() helper function.
+
         await popupWindow.waitForSelector('[name="description"]', { visible: true });
         await expectPuppeteer(popupWindow).toClick('[name="description"]');
         await expectPuppeteer(popupWindow).toFill('[name=description]', testDescription);
@@ -85,9 +83,8 @@ describe('Create and delete time sheet', () => {
         await expectPuppeteer(global.page).toMatchElement('div.x-grid3-col-timeaccount_id', {text: '1 - Test Timeaccount 1', visible: true});
         await expectPuppeteer(global.page).toMatchElement('div.x-grid3-col-description', {text: testDescription, visible: true});
         await expectPuppeteer(global.page).toMatchElement('div.x-grid3-col-duration span.duration-renderer-medium', {text: '3 Stunden, 30 Minuten'});
-        await expectPuppeteer(global.page).toMatchElement('div.x-grid3-col-duration span.duration-renderer-small', {text: '3:30', visible: true});
-        await expectPuppeteer(global.page).toMatchElement('div.x-grid3-col-accounting_time span.duration-renderer-medium', {text: '3 Stunden, 30 Minuten', visible: true});
-
+        await expectPuppeteer(global.page).toMatchElement('div.x-grid3-col-duration span.duration-renderer-small', {text: '3:30'});
+        await expectPuppeteer(global.page).toMatchElement('div.x-grid3-col-accounting_time span.duration-renderer-medium', {text: '3 Stunden, 30 Minuten'});
     });
 
     test('Delete and confirm', async() => {

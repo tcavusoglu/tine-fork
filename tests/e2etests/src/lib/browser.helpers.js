@@ -1,4 +1,5 @@
 const puppeteer = require('puppeteer');
+const { expect: expectPuppeteer } = require('expect-puppeteer');
 require('dotenv').config();
 const simpleConsole = require('console');
 const {blue, cyan, green, magenta, red, yellow} = require('colorette')
@@ -190,11 +191,10 @@ module.exports = {
     /**
      * Switches the browser language to German if not already set and if not running in headless mode.
      *
-     * @param {function} expectPuppeteer - The expect-puppeteer function to perform actions on the page.
      * @param {puppeteer.Page} page - The page object to perform the language switch on.
      * @returns {Promise<void>} A promise that resolves when the language switch is complete.
      */
-    switchToGermanIfNeeded: async function (expectPuppeteer, page) {
+    switchToGermanIfNeeded: async function (page) {
         if (this.baseGetEnv('TEST_MODE', {type: 'string'}) === 'debug' && this.baseGetEnv('TEST_BROWSER_LANGUAGE', {type: 'string'}) !== 'de') {
             console.log('switching to German');
             const langSelector = '#langChooser input[type=text]';
@@ -209,14 +209,13 @@ module.exports = {
     /**
      * Performs the login action on the given page using the provided user credentials.
      *
-     * @param {function} expectPuppeteer - The expect-puppeteer function to perform actions on the page.
      * @param {puppeteer.Page} page - The page object to perform the login on.
      * @param {Object} credentials - An object containing the username and password for login.
      * @param {string} credentials.user - The username for login.
      * @param {string} credentials.pass - The password for login.
      * @returns {Promise<void>} A promise that resolves when the login process is complete.
      */
-    login: async function (expectPuppeteer, page, { user, pass }) {
+    login: async function (page, { user, pass }) {
         await page.waitForSelector('input[name=username]', { timeout: 30000 });
         await page.focus('input[name=username]');
         await page.waitForFunction(() => {
@@ -376,4 +375,5 @@ module.exports = {
         }
         return fallback;
     }
+
 };
