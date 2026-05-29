@@ -1,9 +1,7 @@
 const { expect: expectPuppeteer } = require('expect-puppeteer');
 const lib = require('../../lib/browser');
 
-require('dotenv').config();
-
-// TODO: Use process.env.TEST_TIMEOUT_* instead of magic numbers.
+// TODO: Create a dummy time account in the test setup, use it for testing instead of relying on existing data, and delete it again.
 
 beforeAll(async () => {
     await lib.getBrowser('Zeiterfassung', 'Stundenzettel');
@@ -19,7 +17,6 @@ describe('Create and delete time sheet', () => {
     });
 
     test('Select time account', async() => {
-        // TODO: Create a dummy time account in the test setup, use it for testing instead of relying on existing data, and delete it again.
         await popupWindow.waitForSelector('[name="timeaccount_id"]');
         await expectPuppeteer(popupWindow).toFill('[name="timeaccount_id"]', 'test');
         await popupWindow.waitForSelector('.x-combo-list-item');
@@ -45,7 +42,7 @@ describe('Create and delete time sheet', () => {
                 const el = document.querySelector(sel);
                 return !!el && el.value.trim() === expected;
             },
-            { timeout: 2000 },
+            { timeout: lib.getEnvInt('TEST_TIMEOUT_FORM_VALUE_CHANGED') },
             duration.selector,
             duration.value
         );
@@ -54,7 +51,7 @@ describe('Create and delete time sheet', () => {
                 const el = document.querySelector(sel);
                 return !!el && el.value.trim() === expected;
             },
-            { timeout: 2000 },
+            { timeout: lib.getEnvInt('TEST_TIMEOUT_FORM_VALUE_CHANGED') },
             start.selector,
             start.value
         );
@@ -82,7 +79,7 @@ describe('Create and delete time sheet', () => {
                 const nodes = Array.from(document.querySelectorAll('div.x-grid3-col-description'));
                 return nodes.some(n => n.textContent && n.textContent.includes(text));
             },
-            { timeout: 10000 },
+            {timeout: lib.getEnvInt('TEST_TIMEOUT_GRID_UPDATED')},
             testDescription
         );
         await expectPuppeteer(global.page).toMatchElement('div.x-grid3-col-timeaccount_id', {text: '1 - Test Timeaccount 1', visible: true});
@@ -96,14 +93,14 @@ describe('Create and delete time sheet', () => {
     test('Delete and confirm', async() => {
         // Click on entry and press Delete key.
         await expectPuppeteer(global.page).toClick('div.x-grid3-col-description', {text: testDescription, visible: true});
-        await global.page.waitForSelector('.x-grid3-row-selected', { visible: true, timeout: 5000 });
+        await global.page.waitForSelector('.x-grid3-row-selected', { visible: true, timeout: lib.getEnvInt('TEST_TIMEOUT_ACTIONABLE') });
         await global.page.keyboard.press('Delete');
 
         // Wait for modal confirmation dialog to appear, click on "Ja" and wait until the dialog disappears.
         await global.page.waitForSelector('.btn.btn-md.vue-button.yes-button', {visible: true});
         await expectPuppeteer(global.page).toClick('.btn.btn-md.vue-button.yes-button', {text: 'Ja', visible: true});
         try {
-            await global.page.waitForSelector('.btn.btn-md.vue-button.yes-button', { hidden: true, timeout: 5000 });
+            await global.page.waitForSelector('.btn.btn-md.vue-button.yes-button', {hidden: true, timeout: lib.getEnvInt('TEST_TIMEOUT_POPUP_CLOSE')});
         } catch (e) {
             // If the selector is still visible after the timeout, we can assume that the confirmation dialog did not close properly.
             throw new Error('Confirmation dialog did not close after confirming deletion');
@@ -117,7 +114,7 @@ describe('Create and delete time sheet', () => {
                 const nodes = Array.from(document.querySelectorAll('div.x-grid3-col-description'));
                 return !nodes.some(n => n.textContent && n.textContent.includes(text));
             },
-            { timeout: 10000 },
+            { timeout: lib.getEnvInt('TEST_TIMEOUT_GRID_UPDATED') },
             testDescription
         );
         await expectPuppeteer(global.page).not.toMatchElement('div.x-grid3-col-description', {text: testDescription});

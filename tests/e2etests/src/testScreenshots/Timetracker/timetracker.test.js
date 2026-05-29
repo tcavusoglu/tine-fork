@@ -1,10 +1,7 @@
 const { expect: expectPuppeteer } = require('expect-puppeteer');
 const lib = require('../../lib/browser');
 
-require('dotenv').config();
-
 //@todo some demodata in editDialog?
-// TODO: Use process.env.TEST_TIMEOUT_* instead of magic numbers.
 
 beforeAll(async () => {
     await lib.getBrowser('Zeiterfassung');
@@ -27,7 +24,7 @@ describe('timeaccount', () => {
 
         test('permissions tab', async () => {
             await expectPuppeteer(editDialog).toClick('.x-tab-panel-header .x-tab-strip-text', {text: 'Zugriffsrechte'});
-            await editDialog.waitForSelector('.x-grid3-viewport', { visible: true, timeout: 10000 });
+            await editDialog.waitForSelector('.x-grid3-viewport', { visible: true, timeout: lib.getEnvInt('TEST_TIMEOUT_CONTENT_READY') });
             await lib.makeScreenshot(editDialog,{path: 'screenshots/Zeiterfassung/3_zeiterfassung_zeitkonto_rechte.png'});
             await expectPuppeteer(editDialog).toClick('button', {text: 'Abbrechen'});
         })
