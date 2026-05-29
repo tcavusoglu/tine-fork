@@ -435,4 +435,48 @@ module.exports = {
             await page.screenshot(options);
         }
     },
+
+    /**
+     * Inserts a value into an input field specified by the selector and waits for the value to be updated in the input field.
+     *
+     * TODO: Move this to browser.helpers.js or a new helpers class.
+     *
+     * @param {puppeteer.Page} page - The page object to perform the actions on.
+     * @param {string} selector - The selector of the input field to insert the value into.
+     * @param {string} value - The value to be inserted into the input field.
+     * @param {string|null} expectedValue - The expected value in the input field after insertion. If null, it defaults to the inserted value.
+     * @returns {Promise<void>} A promise that resolves when the value has been inserted and updated in the input field.
+     */
+    testInsertInputValue: async function (page, selector, value, expectedValue = null) {
+        if (expectedValue === null) expectedValue = value;
+
+        // Wait, click/focus, fill, unfocus.
+        await page.waitForSelector(selector, {visible: true});
+        await expectPuppeteer(page).toClick(selector);
+        await expectPuppeteer(page).toFill(selector, value);
+        await page.keyboard.press('Tab');
+
+        try {
+            // Wait for the value to be updated in the input field.
+            await page.waitForFunction(
+                (sel, expected) => {
+                    const el = document.querySelector(sel);
+                    return !!el && el.value.trim() === expected;
+                },
+                // {timeout: this.getEnvInt('TEST_TIMEOUT_FORM_VALUE_CHANGED'), polling: 'mutation'},
+                {timeout: this.getEnvInt('TEST_TIMEOUT_FORM_VALUE_CHANGED')},
+                selector,
+                expectedValue
+            );
+        } catch (error) {
+            // Debug output to help identify the issue.
+            const actualValue = await page.evaluate((sel) => {
+                const el = document.querySelector(sel);
+                return !!el ? el.value.trim() : null;
+            }, selector);
+            const debug = `insertInputValue: unexpected result: selector=${selector} | value=${value} | expected=${expectedValue} | actual=${actualValue}`;
+            console.error(debug);
+            throw error;
+        }
+    },
 };
