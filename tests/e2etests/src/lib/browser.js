@@ -8,13 +8,8 @@ const path = require('path');
 const uuid = require('uuid');
 
 const modes = ['light', 'dark'];
-const resolution = JSON.parse(process.env.TEST_RESOLUTION);
 
-const TIMEOUT_BROWSER = Number.isFinite(Number(process.env.TEST_TIMEOUT_BROWSER)) ? Number(process.env.TEST_TIMEOUT_BROWSER) : 30000;
-const TIMEOUT_CONTENT_READY = Number.isFinite(Number(process.env.TEST_TIMEOUT_CONTENT_READY)) ? Number(process.env.TEST_TIMEOUT_CONTENT_READY) : 10000;
-const TIMEOUT_POPUP = Number.isFinite(Number(process.env.TEST_TIMEOUT_POPUP)) ? Number(process.env.TEST_TIMEOUT_POPUP) : 10000;
-const TIMEOUT_ACTIONABLE = Number.isFinite(Number(process.env.TEST_TIMEOUT_ACTIONABLE)) ? Number(process.env.TEST_TIMEOUT_ACTIONABLE) : 7000;
-const TIMEOUT_MASK = Number.isFinite(Number(process.env.TEST_TIMEOUT_MASK)) ? Number(process.env.TEST_TIMEOUT_MASK) : 10000;
+// TODO: Import browser.helpers.js functions here and export them as part of this module, so they can be used everywhere without importing browser.helpers.js separately.
 
 module.exports = {
     /**
@@ -35,18 +30,22 @@ module.exports = {
         global.page = await helpers.createConfiguredPage(global.browser);
         const page = global.page;
 
-        await page.goto(process.env.TEST_URL, { waitUntil: 'domcontentloaded', timeout: TIMEOUT_BROWSER });
-        await expectPuppeteer(page).toMatchElement('title', { text: process.env.TEST_BRANDING_TITLE });
+        await page.goto(this.getEnvStr('TEST_URL'), { waitUntil: 'domcontentloaded', timeout: this.getEnvInt('TEST_TIMEOUT_BROWSER') });
+        await expectPuppeteer(page).toMatchElement('title', { text: this.getEnvStr('TEST_BRANDING_TITLE') });
 
-        await helpers.switchToGermanIfNeeded(expectPuppeteer, page);
-        await helpers.login(expectPuppeteer, page, {
-            user: process.env.TEST_USERNAME,
-            pass: process.env.TEST_PASSWORD
+        await helpers.switchToGermanIfNeeded(page);
+        await helpers.login(page, {
+            user: this.getEnvStr('TEST_USERNAME'),
+            pass: this.getEnvStr('TEST_PASSWORD')
         });
 
-        await page.waitForSelector('.tine-dock', {timeout: TIMEOUT_CONTENT_READY});
+        await page.waitForNetworkIdle({
+            timeout: this.getEnvInt('TEST_TIMEOUT_NETWORK_TIMEOUT'),
+            idleTime: this.getEnvInt('TEST_TIMEOUT_NETWORK_IDLE')
+        });
+        await page.waitForSelector('.tine-dock', {timeout: this.getEnvInt('TEST_TIMEOUT_CONTENT_READY')});
 
-        if (!!+process.env.MFA) {
+        if (this.getEnvBool('MFA')) {
             // TODO: second parameter might not work
             await page.waitForSelector('.x-window-header-text', {text: 'Multi Faktor Authentifikation'});
             const mfaDialog = await this.getEditDialog('OK');
@@ -77,24 +76,24 @@ module.exports = {
         global.browser = await helpers.launchBrowser();
         global.page = await helpers.createConfiguredPage(global.browser,{
             auth: {
-                username: process.env.HTACCESS_USERNAME,
-                password: process.env.HTACCESS_PASSWORD
+                username: this.getEnvStr('HTACCESS_USERNAME'),
+                password: this.getEnvStr('HTACCESS_PASSWORD')
             }
         });
         const page = global.page;
 
         page.setDefaultTimeout(15000);
 
-        await page.goto(process.env.TEST_URL + '/setup.php', {waitUntil: 'domcontentloaded', timeout: TIMEOUT_BROWSER});
-        await expectPuppeteer(page).toMatchElement('title', {text: process.env.TEST_BRANDING_TITLE});
+        await page.goto(this.getEnvStr('TEST_URL') + '/setup.php', {waitUntil: 'domcontentloaded', timeout: this.getEnvInt('TEST_TIMEOUT_BROWSER')});
+        await expectPuppeteer(page).toMatchElement('title', {text: this.getEnvStr('TEST_BRANDING_TITLE')});
 
-        await helpers.switchToGermanIfNeeded(expectPuppeteer, page);
-        await helpers.login(expectPuppeteer, page, {
-            user: process.env.SETUP_USERNAME,
-            pass: process.env.SETUP_PASSWORD
+        await helpers.switchToGermanIfNeeded(page);
+        await helpers.login(page, {
+            user: this.getEnvStr('SETUP_USERNAME'),
+            pass: this.getEnvStr('SETUP_PASSWORD')
         });
 
-        await page.waitForSelector('.account-user-avatar', {timeout: TIMEOUT_CONTENT_READY});
+        await page.waitForSelector('.account-user-avatar', {timeout: this.getEnvInt('TEST_TIMEOUT_CONTENT_READY')});
     },
 
     /**
@@ -134,7 +133,7 @@ module.exports = {
 
     /**
      * Waits for a new window to be opened and returns the corresponding page object.
-     * Rejects if no new window is opened within TIMEOUT_POPUP ms or if the target is not a page.
+     * Rejects if no new window is opened within TIMEOUT_POPUP_OPEN ms or if the target is not a page.
      *
      * @returns {Promise<puppeteer.Page>} A promise that resolves to the new page object.
      */
@@ -146,10 +145,10 @@ module.exports = {
             }
 
             let timer = null;
-            if (TIMEOUT_POPUP > 0) {
+            if (this.getEnvInt('TIMEOUT_POPUP_OPEN') > 0) {
                 timer = setTimeout(() => {
                     reject(new Error('getNewWindow: waiting for new window reached timeout'));
-                }, TIMEOUT_POPUP);
+                }, this.getEnvInt('TIMEOUT_POPUP_OPEN'));
             }
 
             global.browser.once('targetcreated', async (target) => {
@@ -163,7 +162,8 @@ module.exports = {
                     clearTimeout(timer);
 
                     // Simulate slow network and CPU throttling.
-                    await helpers.applyThrottling(newPage, process.env.TEST_NETWORK_CONDITIONS_POPUP, process.env.TEST_CPU_THROTTLING_RATE_POPUP);
+                    // TODO: Simplify
+                    await helpers.applyThrottling(newPage, this.getEnvJson('TEST_NETWORK_CONDITIONS_POPUP', null), this.getEnvInt('TEST_CPU_THROTTLING_RATE_POPUP'), 'New Window');
 
                     resolve(newPage);
                 } catch (err) {
@@ -188,7 +188,7 @@ module.exports = {
 
         // Find the desired button and wait until it is actionable.
         await expectPuppeteer(ctx).toMatchElement('.x-btn-text', {text: btnText, visible: true});
-        await helpers.waitForActionableButton(ctx, btnText, TIMEOUT_ACTIONABLE, '.x-btn-text');
+        await helpers.waitForActionableButton(ctx, btnText, this.getEnvInt('TEST_TIMEOUT_ACTIONABLE'), '.x-btn-text');
 
         const popupPromise = this.getNewWindow();
         await expectPuppeteer(ctx).toClick('.x-btn-text', {text: btnText});
@@ -197,17 +197,21 @@ module.exports = {
 
         // Wait until up to two loading masks have disappeared.
         try {
-            await popupWindow.waitForSelector('.tine-viewport-waitcycle', {hidden: true, timeout: TIMEOUT_MASK});
-            await popupWindow.waitForSelector('.ext-el-mask', {hidden: true, timeout: TIMEOUT_MASK});
+            await popupWindow.waitForSelector('.tine-viewport-waitcycle', {hidden: true, timeout: this.getEnvInt('TEST_TIMEOUT_MASK')});
+            await popupWindow.waitForSelector('.ext-el-mask', {hidden: true, timeout: this.getEnvInt('TEST_TIMEOUT_MASK')});
         } catch (err) {
             // If waiting for mask removal times out, we log and continue; subsequent waits will fail clearly.
             console.warn('getEditDialog: waiting for loading masks timed out - continuing', err);
         }
+        await popupWindow.waitForNetworkIdle({
+            timeout: this.getEnvInt('TEST_TIMEOUT_NETWORK_TIMEOUT'),
+            idleTime: this.getEnvInt('TEST_TIMEOUT_NETWORK_IDLE')
+        });
 
         // Wait for the dialog content to be ready (form/grid/window).
         await popupWindow.waitForSelector(
             '.x-window, .x-window-body, .x-form-item, .x-grid3-viewport',
-            {visible: true, timeout: TIMEOUT_CONTENT_READY}
+            {visible: true, timeout: this.getEnvInt('TEST_TIMEOUT_CONTENT_READY')}
         );
 
         return popupWindow;
@@ -233,6 +237,53 @@ module.exports = {
      */
     getCurrentUser: async function (page) {
         return page.evaluate(() => Tine.Tinebase.registry.get('currentAccount'));
+    },
+
+    /**
+     * Retrieves an environment variable and parses it as an integer.
+     * Undefined environment variables or parsing failures will return the default value.
+     *
+     * @param {string} envName - The name of the environment variable to retrieve.
+     * @param {number} [defaultValue=0] - The default value to return if the environment variable is not set or cannot be parsed as an integer.
+     * @returns {number} The integer value of the environment variable, or the default value if not set or invalid.
+     */
+    getEnvInt: function (envName, defaultValue = 0) {
+        return helpers.baseGetEnv(envName, {type: 'int', defaultValue});
+    },
+
+    /**
+     * Retrieves an environment variable and parses it as a string.
+     * Undefined environment variables or parsing failures will return the default value.
+     *
+     * @param {string} envName - The name of the environment variable to retrieve.
+     * @param {string} [defaultValue=''] - The default value to return if the environment variable is not set.
+     * @returns {string} The string value of the environment variable, or the default value if not set.
+     */
+    getEnvStr: function (envName, defaultValue = '') {
+        return helpers.baseGetEnv(envName, {type: 'string', defaultValue});
+    },
+
+    /**
+     * Retrieves an environment variable and parses it as a boolean.
+     * Undefined environment variables or parsing failures will return the default value.
+     *
+     * @param {string} envName - The name of the environment variable to retrieve.
+     * @param {boolean} [defaultValue=false] - The default value to return if the environment variable is not set or cannot be parsed as a boolean.
+     * @returns {boolean} The boolean value of the environment variable, or the default value if not set or invalid.
+     */
+    getEnvBool: function (envName, defaultValue = false) {
+        return helpers.baseGetEnv(envName, {type: 'bool', defaultValue});
+    },
+
+    /**
+     * Retrieves an environment variable and parses it as JSON.
+     *
+     * @param {string} envName - The name of the environment variable to retrieve.
+     * @param {Object} [defaultValue={}] - The default value to return if the environment variable is not set or cannot be parsed as JSON.
+     * @returns {Object} The parsed JSON object from the environment variable, or the default value if not set or invalid.
+     */
+    getEnvJson: function (envName, defaultValue = {}) {
+        return helpers.baseGetEnv(envName, {type: 'json', defaultValue});
     },
 
     /**
@@ -351,7 +402,7 @@ module.exports = {
      * @returns {Promise<void>} A promise that resolves when the screenshot(s) have been taken and saved.
      */
     makeScreenshot: async function (page, options) {
-        if (process.env.TEST_ALL_SCREENSHOT === 'true') {
+        if (this.getEnvBool('TEST_ALL_SCREENSHOT')) {
             const basePath = options.path;
             if (!basePath) {
                 throw new Error('makeScreenshot: missing path for saving a screenshot');
@@ -370,6 +421,7 @@ module.exports = {
                     );
                 }, mode);
 
+                const resolution = this.getEnvJson('TEST_RESOLUTION');
                 await page.setViewport(resolution);
                 await page.waitForFunction(
                     (m) => document.body.className.includes(`${m}-mode`),
