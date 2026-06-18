@@ -12,6 +12,7 @@ describe('Create and delete time sheet', () => {
     let popupWindow = null;
 
     test('Open dialog', async () => {
+        // TODO: is the global.page parameter really needed?
         popupWindow = await lib.getEditDialog('Stundenzettel hinzufügen', global.page);
         await expectPuppeteer(popupWindow).toMatchElement('span.x-tab-strip-text', {text: 'Stundenzettel'});
     });
@@ -41,14 +42,14 @@ describe('Create and delete time sheet', () => {
         //await popupWindow.waitForNetworkIdle({idleTime: lib.getEnvInt('TEST_TIMEOUT_NETWORK_IDLE')});
 
         // Try a lot of different formats.
-        await lib.testInsertInputValue(popupWindow, 'input[name="duration"]', '03:30');
-        await lib.testInsertInputValue(popupWindow, 'input[name="duration"]', '3:30', '03:30');
-        await lib.testInsertInputValue(popupWindow, 'input[name="duration"]', '3.5', '03:30');
-        await lib.testInsertInputValue(popupWindow, 'input[name="duration"]', '3,5', '03:30');
+        await lib.formInsertInputValue(popupWindow, 'input[name="duration"]', '03:30');
+        await lib.formInsertInputValue(popupWindow, 'input[name="duration"]', '3:30', '03:30');
+        await lib.formInsertInputValue(popupWindow, 'input[name="duration"]', '3.5', '03:30');
+        await lib.formInsertInputValue(popupWindow, 'input[name="duration"]', '3,5', '03:30');
 
-        await lib.testInsertInputValue(popupWindow, 'input[name="start_time"]', '08:30');
-        await lib.testInsertInputValue(popupWindow, 'input[name="start_time"]', '8:30', '08:30');
-        await lib.testInsertInputValue(popupWindow, 'input[name="start_time"]', '830', '08:30');
+        await lib.formInsertInputValue(popupWindow, 'input[name="start_time"]', '08:30');
+        await lib.formInsertInputValue(popupWindow, 'input[name="start_time"]', '8:30', '08:30');
+        await lib.formInsertInputValue(popupWindow, 'input[name="start_time"]', '830', '08:30');
 
         // Check if the current username is correct.
         const currentUser = await lib.getCurrentUser(popupWindow);
