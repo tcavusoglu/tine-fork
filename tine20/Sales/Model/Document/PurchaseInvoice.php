@@ -51,7 +51,8 @@ class Sales_Model_Document_PurchaseInvoice extends Sales_Model_Document_Abstract
         $_definition[self::CREATE_MODULE] = true;
         $_definition[self::RECORD_NAME] = 'Purchase Invoice'; // gettext('GENDER_Purchase Invoice')
         $_definition[self::RECORDS_NAME] = 'Purchase Invoices'; // ngettext('Purchase Invoice', 'Purchase Invoices', n)
-        $_definition[self::TITLE_PROPERTY] = '{{ supplier_id.getTitle() }} {{ dateFormat(date, "date") }}';
+        $_definition[self::TITLE_PROPERTY] = '{{'. self::FLD_DOCUMENT_NUMBER . '}} [{{ renderTitle('.self::FLD_SUPPLIER_ID.', "'.Sales_Model_Document_Customer::class.'") }}]{% if '. self::FLD_DOCUMENT_TITLE . '%} {{' . self::FLD_DOCUMENT_TITLE .'}}{% endif %}{% if '. self::FLD_DOCUMENT_DATE . '%} ({{'. self::FLD_DOCUMENT_DATE .'|localizeddate("short", "none", app.user.locale )}}){% endif %}';
+
         $_definition[self::DEFAULT_SORT_INFO] = [self::FIELD => self::FLD_DOCUMENT_NUMBER];
         $_definition[self::HAS_XPROPS] = true;
 
@@ -112,11 +113,17 @@ class Sales_Model_Document_PurchaseInvoice extends Sales_Model_Document_Abstract
                 self::LABEL             => 'Paid at', // _('Paid at')
                 self::TYPE              => self::TYPE_DATE,
                 self::NULLABLE          => true,
+                self::CONFIG                        => [
+                    self::NO_AUTO_TRANSITION            => true,
+                ],
             ],
             self::FLD_PAID_AMOUNT => [
                 self::LABEL             => 'Paid amount', //_('Paid amount')
                 self::TYPE              => self::TYPE_MONEY,
                 self::NULLABLE          => true,
+                self::CONFIG                        => [
+                    self::NO_AUTO_TRANSITION            => true,
+                ],
             ],
         ]);
 
@@ -136,6 +143,7 @@ class Sales_Model_Document_PurchaseInvoice extends Sales_Model_Document_Abstract
                 self::NAME              => Sales_Config::DOCUMENT_PURCHASE_INVOICE_STATUS,
                 self::CONFIG            => [
                     self::OWNING_APP    => Sales_Config::APP_NAME,
+                    self::NO_AUTO_TRANSITION => true,
                 ],
                 self::LENGTH            => 255,
                 self::NULLABLE          => true,
@@ -152,6 +160,9 @@ class Sales_Model_Document_PurchaseInvoice extends Sales_Model_Document_Abstract
                 self::LABEL             => 'Approver', // _('Approver')
                 self::TYPE              => self::TYPE_USER,
                 self::NULLABLE          => true,
+                self::CONFIG                        => [
+                    self::NO_AUTO_TRANSITION            => true,
+                ],
             ],
         ]);
         $_definition[self::JSON_EXPANDER][Tinebase_Record_Expander::EXPANDER_PROPERTIES][self::FLD_APPROVER] = [];
@@ -178,6 +189,7 @@ class Sales_Model_Document_PurchaseInvoice extends Sales_Model_Document_Abstract
             self::LABEL             => 'Payment Reminders', // _('Payment Reminders')
             self::TYPE              => self::TYPE_RECORDS,
             self::CONFIG            => [
+                self::NO_AUTO_TRANSITION => true,
                 self::APP_NAME          => Sales_Config::APP_NAME,
                 self::MODEL_NAME        => Sales_Model_Document_PaymentReminder::MODEL_NAME_PART,
                 self::DEPENDENT_RECORDS => true,
@@ -204,6 +216,7 @@ class Sales_Model_Document_PurchaseInvoice extends Sales_Model_Document_Abstract
             self::CONFIG            => [
                 self::OWNING_APP        => Sales_Config::APP_NAME,
                 self::NO_DEFAULT_VALIDATOR => true,
+                self::NO_AUTO_TRANSITION => true,
             ],
             self::INPUT_FILTERS     => [
                 Zend_Filter_Empty::class => null,
@@ -215,6 +228,9 @@ class Sales_Model_Document_PurchaseInvoice extends Sales_Model_Document_Abstract
             self::TYPE                  => self::TYPE_DATETIME,
             self::NULLABLE              => true,
             self::SHY                   => true,
+            self::CONFIG                        => [
+                self::NO_AUTO_TRANSITION            => true,
+            ],
         ];
 
         unset($_definition[self::FIELDS][self::FLD_DOCUMENT_LANGUAGE]);

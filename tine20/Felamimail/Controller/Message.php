@@ -999,12 +999,12 @@ class Felamimail_Controller_Message extends Tinebase_Controller_Record_Abstract
         } else {
             $message = $_messageId;
         }
-
+        $messageId = $message->getId();
         $cache = Tinebase_Core::getCache();
         $cacheId = Tinebase_Helper::convertCacheId(
-            'getMessageHeaders' . $message->getId() . str_replace('.', '', (string)$_partId)
+            'getMessageHeaders' . $messageId . str_replace('.', '', (string)$_partId)
         );
-        if ($cache->test($cacheId)) {
+        if ($messageId && $cache->test($cacheId)) {
             return $cache->load($cacheId);
         }
 
@@ -1641,6 +1641,7 @@ class Felamimail_Controller_Message extends Tinebase_Controller_Record_Abstract
                 }
             } catch (Felamimail_Exception_IMAPServiceUnavailable
                 | Felamimail_Exception_IMAPInvalidCredentials
+                | Tinebase_Exception_NotFound
                 | Tinebase_Exception_AccessDenied $e
             ) {
                 if (Tinebase_Core::isLogLevel(Zend_Log::INFO)) {

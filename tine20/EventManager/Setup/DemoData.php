@@ -124,7 +124,7 @@ class EventManager_Setup_DemoData extends Tinebase_Setup_DemoData_Abstract
             $definition = Tinebase_ImportExportDefinition::getInstance()->getByName('tinebase_import_editem_csv');
 
             $importer = call_user_func_array($definition->plugin . '::createFromDefinition', array($definition, []));
-            $importer->importFile(__DIR__ . '/DemoData/files/kostenstellen_ebhh.csv');
+            $importer->importFile(__DIR__ . '/DemoData/files/costcenter.csv');
         }
 
         EventManager_Config::getInstance()
@@ -156,7 +156,7 @@ class EventManager_Setup_DemoData extends Tinebase_Setup_DemoData_Abstract
         $fileoption_upload = $this->setOptionConfigFileDemoData(false);
 
         //text input
-        $allergien = $this->setOptionConfigTextInputDemoData(null, true, 50);
+        $allergien = $this->setOptionConfigTextInputDemoData( true, 50);
 
         //text output
         $unterscheriben = $this->setOptionConfigTextDemoData('Bitte laden Sie das unterschriebene Dokument hoch');
@@ -645,7 +645,7 @@ Interessierte, Suchende, Ausgetretene, Wieder-Eintretende und alle, die einfach 
 
     protected function setOptionConfigFileDemoData($file_acknowledgement = true): EventManager_Model_FileOption
     {
-        $path = dirname(__FILE__, 4) .'/tests/tine20/Filemanager/files/test.txt';
+        $path = dirname(__FILE__) .'/DemoData/files/test.txt';
         $tempfile = $this->_getTempFile($path);
         return new EventManager_Model_FileOption([
             'node_id' => $tempfile->getId(),
@@ -660,16 +660,22 @@ Interessierte, Suchende, Ausgetretene, Wieder-Eintretende und alle, die einfach 
     protected function _getTempFile($path = null, $filename = 'test.txt', $type = 'text/plain'): Tinebase_Model_TempFile
     {
         $tempFileBackend = new Tinebase_TempFile();
-        $handle = fopen($path ?: dirname(__FILE__) . '/Filemanager/files/test.txt', 'r');
+        $handle = fopen($path ?: dirname(__FILE__) . '/DemoData/files/test.txt', 'r');
+
+        if ($handle === false) {
+            throw new Tinebase_Exception_InvalidArgument(
+                'Could not open file for temp file creation: ' . ($path ?? 'default path')
+            );
+        }
+
         $tempfile = $tempFileBackend->createTempFileFromStream($handle, $filename, $type);
         fclose($handle);
         return $tempfile;
     }
 
-    protected function setOptionConfigTextInputDemoData($text, $multiple_lines = true, $max_characters = 0): EventManager_Model_TextInputOption
+    protected function setOptionConfigTextInputDemoData($multiple_lines = true, $max_characters = 0): EventManager_Model_TextInputOption
     {
         return new EventManager_Model_TextInputOption([
-            'text' => $text,
             'multiple_lines' => $multiple_lines,
             'max_characters' => $max_characters,
             'only_numbers' => !$multiple_lines,

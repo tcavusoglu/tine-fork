@@ -16,10 +16,11 @@ use Tinebase_Model_Filter_Abstract as TMFA;
 /**
  * Abstract Document controller class for Sales application
  *
+ * @template T of Sales_Model_Document_Abstract
  * @package     Sales
  * @subpackage  Controller
  *
- * @extends Tinebase_Controller_Record_Abstract<Sales_Model_Document_Abstract>
+ * @extends Tinebase_Controller_Record_Abstract<T>
  */
 abstract class Sales_Controller_Document_Abstract extends Tinebase_Controller_Record_Abstract
 {
@@ -34,18 +35,28 @@ abstract class Sales_Controller_Document_Abstract extends Tinebase_Controller_Re
 
     protected function __construct()
     {
-        $cfc = new Tinebase_CustomField_Config();
-        $cfc->setAllCFs();
-        $this->_oldRecordBookWriteableFields = array_merge($this->_oldRecordBookWriteableFields, array_unique($cfc->search(new Tinebase_Model_CustomField_ConfigFilter([
-            ['field' => 'model', 'operator' => 'startswith', 'value' => 'Sales_Model_Document_'],
-            ['field' => 'name', 'operator' => 'startswith', 'value' => 'eval_dim_'],
-        ], '', ['ignoreAcl' => true]))->name));
-
         if (!$this->_documentStatusConfig || !$this->_documentStatusTransitionConfig || !$this->_documentStatusField ||
-                empty($this->_oldRecordBookWriteableFields) || empty($this->_bookRecordRequiredFields) ||
-                null === static::$_readGrant || null === static::$_adminGrant) {
+            empty($this->_oldRecordBookWriteableFields) || empty($this->_bookRecordRequiredFields) ||
+            null === static::$_readGrant || null === static::$_adminGrant) {
             throw new Tinebase_Exception(static::class . ' not initialized properly');
         }
+
+        $cfc = new Tinebase_CustomField_Config();
+        $cfc->setOnlySystemCFs();
+        $this->_oldRecordBookWriteableFields = array_unique(array_merge($this->_oldRecordBookWriteableFields, $cfc->search(new Tinebase_Model_CustomField_ConfigFilter([
+            ['field' => 'model', 'operator' => 'startswith', 'value' => $this->_modelName],
+            ['field' => 'name', 'operator' => 'startswith', 'value' => 'eval_dim_'],
+        ], '', ['ignoreAcl' => true]))->name));
+    }
+
+    public function getOldRecordBookWriteableFields(): array
+    {
+        return $this->_oldRecordBookWriteableFields;
+    }
+
+    public function getBookRecordRequiredFields(): array
+    {
+        return $this->_bookRecordRequiredFields;
     }
 
     protected function _checkGrant($_record, $_action, $_throw = TRUE, $_errorMessage = 'No Permission.', $_oldRecord = null)
@@ -67,6 +78,7 @@ abstract class Sales_Controller_Document_Abstract extends Tinebase_Controller_Re
      */
     protected function _inspectBeforeCreate(Tinebase_Record_Interface $_record)
     {
+        $this->_inspectReversal($_record);
         if (!$_record->isBooked() && $_record->{Sales_Model_Document_Abstract::FLD_POSITIONS} instanceof Tinebase_Record_RecordSet) {
             /** @var Sales_Model_DocumentPosition_Abstract $position */
             foreach($_record->{Sales_Model_Document_Abstract::FLD_POSITIONS} as $position) {
@@ -102,6 +114,18 @@ abstract class Sales_Controller_Document_Abstract extends Tinebase_Controller_Re
         $this->_inspectCustomerDebitor($_record);
 
         $this->_inspectServicePeriod($_record);
+    }
+
+    protected function _inspectReversal(Sales_Model_Document_Abstract $record): void
+    {
+        if (!$record->{Sales_Model_Document_Abstract::FLD_REVERSAL} && $record->{Sales_Model_Document_Abstract::FLD_POSITIONS} instanceof Tinebase_Record_RecordSet) {
+            /** @var Sales_Model_DocumentPosition_Abstract $position */
+            foreach ($record->{Sales_Model_Document_Abstract::FLD_POSITIONS} as $position) {
+                if ($position->{Sales_Model_DocumentPosition_Abstract::FLD_REVERSAL}) {
+                    throw new Tinebase_Exception_Record_Validation('if a position is a reversal, the whole document needs to be a reversal');
+                }
+            }
+        }
     }
 
     protected function _inspectVAT(Sales_Model_Document_Abstract $_record): void
@@ -327,6 +351,8 @@ abstract class Sales_Controller_Document_Abstract extends Tinebase_Controller_Re
      */
     protected function _inspectBeforeUpdate($_record, $_oldRecord)
     {
+        $this->_inspectReversal($_record);
+
         $_record->{Sales_Model_Document_Abstract::FLD_PRECURSOR_DOCUMENTS} = $_oldRecord
             ->{Sales_Model_Document_Abstract::FLD_PRECURSOR_DOCUMENTS};
 
@@ -524,8 +550,8 @@ abstract class Sales_Controller_Document_Abstract extends Tinebase_Controller_Re
     protected function _inspectFollowUpStati(Sales_Model_Document_Abstract $_record, ?Sales_Model_Document_Abstract $_oldRecord = null): void
     {
         if ($_oldRecord && $_oldRecord->isBooked() &&
-                (Sales_Config::DOCUMENT_REVERSAL_STATUS_NOT_REVERSED !== $_oldRecord->{Sales_Model_Document_Abstract::FLD_REVERSAL_STATUS} ||
-                Sales_Config::DOCUMENT_REVERSAL_STATUS_NOT_REVERSED === $_record->{Sales_Model_Document_Abstract::FLD_REVERSAL_STATUS})) {
+                (Sales_Config::DOCUMENT_REVERSED_STATUS_NOT_REVERSED !== $_oldRecord->{Sales_Model_Document_Abstract::FLD_REVERSED_STATUS} ||
+                Sales_Config::DOCUMENT_REVERSED_STATUS_NOT_REVERSED === $_record->{Sales_Model_Document_Abstract::FLD_REVERSED_STATUS})) {
             // nothing to do if we were already booked, not much is allowed to change -> no change -> nothing to do
             return;
         }
@@ -700,10 +726,10 @@ abstract class Sales_Controller_Document_Abstract extends Tinebase_Controller_Re
             Tinebase_Record_Expander::EXPANDER_PROPERTIES => [
                 Sales_Model_Document_Transition::FLD_SOURCE_DOCUMENTS => [
                     Tinebase_Record_Expander::EXPANDER_PROPERTIES => [
-                        Sales_Model_Document_TransitionSource::FLD_SOURCE_DOCUMENT => [],
+                        Sales_Model_Document_TransitionSource::FLD_SOURCE_DOCUMENT => [Tinebase_Record_Expander::EXPANDER_USE_JSON_EXPANDER => true],
                         Sales_Model_Document_TransitionSource::FLD_SOURCE_POSITIONS => [
                             Tinebase_Record_Expander::EXPANDER_PROPERTIES => [
-                                Sales_Model_DocumentPosition_TransitionSource::FLD_SOURCE_DOCUMENT_POSITION => []
+                                Sales_Model_DocumentPosition_TransitionSource::FLD_SOURCE_DOCUMENT_POSITION => [Tinebase_Record_Expander::EXPANDER_USE_JSON_EXPANDER => true]
                             ],
                         ],
                     ],

@@ -216,3 +216,12 @@ input.x-tree-node-cb {
 .x-tree-root-ct {
     zoom:1;
 }
+
+a.x-tree-node-anchor {
+  -webkit-touch-callout: none;
+}
+
+.x-tree-badge-container {
+  display: none;
+  position: relative;
+}

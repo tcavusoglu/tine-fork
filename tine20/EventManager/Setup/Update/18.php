@@ -27,6 +27,8 @@ class EventManager_Setup_Update_18 extends Setup_Update_Abstract
     protected const RELEASE018_UPDATE011 = __CLASS__ . '::update011';
     protected const RELEASE018_UPDATE012 = __CLASS__ . '::update012';
     protected const RELEASE018_UPDATE013 = __CLASS__ . '::update013';
+    protected const RELEASE018_UPDATE014 = __CLASS__ . '::update014';
+    protected const RELEASE018_UPDATE015 = __CLASS__ . '::update015';
 
 
     protected static $_allUpdates = [
@@ -45,6 +47,14 @@ class EventManager_Setup_Update_18 extends Setup_Update_Abstract
             ],
         ],
         self::PRIO_NORMAL_APP_STRUCTURE     => [
+            self::RELEASE018_UPDATE015          => [
+                self::CLASS_CONST                   => self::class,
+                self::FUNCTION_CONST                => 'update015',
+            ],
+            self::RELEASE018_UPDATE014          => [
+                self::CLASS_CONST                   => self::class,
+                self::FUNCTION_CONST                => 'update014',
+            ],
             self::RELEASE018_UPDATE013          => [
                 self::CLASS_CONST                   => self::class,
                 self::FUNCTION_CONST                => 'update013',
@@ -219,5 +229,21 @@ class EventManager_Setup_Update_18 extends Setup_Update_Abstract
         ]);
 
         $this->addApplicationUpdate(EventManager_Config::APP_NAME, '18.13', self::RELEASE018_UPDATE013);
+    }
+
+    public function update014()
+    {
+        Setup_SchemaTool::updateSchema([
+            EventManager_Model_Event::class,
+            EventManager_Model_ImageMetadata::class,
+        ]);
+
+        $this->addApplicationUpdate(EventManager_Config::APP_NAME, '18.14', self::RELEASE018_UPDATE014);
+    }
+
+    public function update015()
+    {
+        EventManager_Setup_Initialize::initializeCostCenterCostBearer();
+        $this->addApplicationUpdate(EventManager_Config::APP_NAME, '18.15', self::RELEASE018_UPDATE015);
     }
 }

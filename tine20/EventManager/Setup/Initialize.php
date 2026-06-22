@@ -25,6 +25,7 @@ class EventManager_Setup_Initialize extends Setup_Initialize
     public function _initializeEventFolders(Tinebase_Model_Application $_application, $_options = null)
     {
         self::createEventFolder();
+        self::addPastoralUrl();
     }
 
     /**
@@ -82,8 +83,29 @@ class EventManager_Setup_Initialize extends Setup_Initialize
         Tinebase_Controller_EvaluationDimension::addModelsToDimension(Tinebase_Model_EvaluationDimension::COST_CENTER, [
             EventManager_Model_Event::class,
         ]);
+
         Tinebase_Controller_EvaluationDimension::addModelsToDimension(Tinebase_Model_EvaluationDimension::COST_BEARER, [
             EventManager_Model_Event::class,
         ]);
+
+        try {
+            $def = Tinebase_ImportExportDefinition::getInstance()->getByName('tinebase_import_costcenter_csv');
+            $importer = Tinebase_Import_Csv_Generic::createFromDefinition($def);
+            $importer->importFile(__DIR__ . '/DemoData/files/costcenter.csv');
+        } catch (Tinebase_Exception_NotFound $tenf) {
+            Tinebase_Exception::log($tenf);
+        }
+    }
+
+    /**
+     * set url for events in pastoral Erzbistum Hamburg (Website)
+     */
+    public static function addPastoralUrl()
+    {
+        $url =  'https://pastoral-erzbistum-hamburg.de/' ; //todo change this to correct url
+        $url = Tinebase_Core::getUrl() . '/EventManager/view/events'; // todo delete this when correct url is set
+
+        EventManager_Config::getInstance()
+            ->set(EventManager_Config::EVENT_PASTORAL_URL, $url);
     }
 }

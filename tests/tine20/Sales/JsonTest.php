@@ -291,6 +291,39 @@ class Sales_JsonTest extends Sales_Document_Abstract
     }
 
     /**
+     * try to find a contract by customer name via quick search (query filter)
+     */
+    public function testSearchContractsByCustomerName()
+    {
+        $customerName = 'Peek GmbH ' . Tinebase_Record_Abstract::generateUID(6);
+        $customer = Sales_Controller_Customer::getInstance()->create(new Sales_Model_Customer([
+            'name' => $customerName,
+            Sales_Model_Customer::FLD_DEBITORS => [[
+                Sales_Model_Debitor::FLD_DIVISION_ID => Sales_Controller_Division::getInstance()->getAll()->getFirstRecord()->getId(),
+            ]],
+        ]));
+
+        $contract = $this->_getContract();
+        $contractData = $this->_instance->saveContract($contract->toArray());
+        $this->_deleteContracts = [$contractData['id']];
+
+        Tinebase_Relations::getInstance()->setRelations('Sales_Model_Contract', 'Sql', $contractData['id'], [[
+            'related_degree' => 'sibling',
+            'related_model'  => 'Sales_Model_Customer',
+            'related_backend' => 'Sql',
+            'related_id'     => $customer->getId(),
+            'type'           => 'CUSTOMER',
+        ]]);
+
+        Tinebase_TransactionManager::getInstance()->commitTransaction($this->_transactionId);
+        $this->_transactionId = Tinebase_TransactionManager::getInstance()->startTransaction(Tinebase_Core::getDb());
+
+        $search = $this->_instance->searchContracts($this->_getFilter($customerName), $this->_getPaging());
+        self::assertEquals(1, $search['totalcount'], 'contract should be found by customer name via quick search');
+        self::assertEquals($contractData['id'], $search['results'][0]['id']);
+    }
+
+    /**
      * try to get a contract by product
      */
     public function testSearchContractsByProduct()
@@ -1025,14 +1058,14 @@ class Sales_JsonTest extends Sales_Document_Abstract
     public function testInvoiceReversalStatusUpdate()
     {
         $invoice = $this->_createInvoice();
-        $invoice->{Sales_Model_Document_Invoice::FLD_REVERSAL_STATUS} = Sales_Config::DOCUMENT_REVERSAL_STATUS_REVERSED;
+        $invoice->{Sales_Model_Document_Invoice::FLD_REVERSED_STATUS} = Sales_Config::DOCUMENT_REVERSED_STATUS_REVERSED;
         $updatedInvoice = Sales_Controller_Document_Invoice::getInstance()->update($invoice);
-        self::assertEquals(Sales_Config::DOCUMENT_REVERSAL_STATUS_REVERSED,
-            $updatedInvoice->{Sales_Model_Document_Invoice::FLD_REVERSAL_STATUS});
+        self::assertEquals(Sales_Config::DOCUMENT_REVERSED_STATUS_REVERSED,
+            $updatedInvoice->{Sales_Model_Document_Invoice::FLD_REVERSED_STATUS});
 
         $invoiceUpdatedViaJsonFE = $this->_instance->saveDocument_Invoice($updatedInvoice->toArray());
-        self::assertEquals(Sales_Config::DOCUMENT_REVERSAL_STATUS_REVERSED,
-            $invoiceUpdatedViaJsonFE[Sales_Model_Document_Invoice::FLD_REVERSAL_STATUS],
+        self::assertEquals(Sales_Config::DOCUMENT_REVERSED_STATUS_REVERSED,
+            $invoiceUpdatedViaJsonFE[Sales_Model_Document_Invoice::FLD_REVERSED_STATUS],
             'reversal status should stay the same');
     }
 }

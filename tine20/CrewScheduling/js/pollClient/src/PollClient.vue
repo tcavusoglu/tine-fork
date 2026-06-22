@@ -36,6 +36,7 @@ import 'bootstrap/dist/css/bootstrap.css'
 import 'bootstrap-vue-next/dist/bootstrap-vue-next.css'
 import { BAlert } from 'bootstrap-vue-next'
 import { format_date } from 'Tinebase/js/util/datetimeformat'
+import PollReply from "../../Model/PollReply";
 
 export default {
   components: {Poll, BAlert},
@@ -132,6 +133,9 @@ export default {
           if (a.dtstart > b.dtstart) return 1
           return 0
         })
+        events.forEach(event => {
+            event.id = PollReply.getEventRef(event)
+        })
         this.events = events
       }).catch(error => {
         this.errorStatus = error.response.status
@@ -200,7 +204,7 @@ export default {
       let sites = ''
       if (this.poll.sites && this.poll.sites.length > 0) {
         let siteNames = []
-        this.poll.sites.every(function (site) {
+        this.poll.sites.forEach(function (site) {
           siteNames.push(site.site_id.n_fn)
         })
         sites = ', ' + siteNames.join(', ')
@@ -212,7 +216,7 @@ export default {
     getEventTypeList () {
       if (this.poll.event_types && this.poll.event_types.length > 0) {
         let typeNames = []
-        this.poll.event_types.every(function (type) {
+        this.poll.event_types.forEach(function (type) {
           typeNames.push(type.event_type_id.name)
         })
         return this.formatMessage('for') + ' ' + typeNames.join(', ')

@@ -123,6 +123,8 @@ Tine.Tinebase.tineInit = {
     },
 
     initWindow: function () {
+        // document.getElementsByTagName('html')[0].className += ' bs-token-carrier btn';
+        // Ext.getBody().addClass(['bs-token-carrier-reset'])
         Ext.getBody().on('keydown', function (e) {
             if (e.ctrlKey && e.getKey() === e.A && ! (e.getTarget('form') || e.getTarget('input') || e.getTarget('textarea'))) {
                 // disable the native 'select all'
@@ -285,7 +287,8 @@ Tine.Tinebase.tineInit = {
                 if (wavesEl && !wavesEl.hasClass('x-item-disabled')) {
                     wavesEl.addClass('waves-effect');
                     Waves.ripple(wavesEl.dom);
-                    wavesEl.removeClass.defer(1500, wavesEl, ['waves-effect']);
+                    // 2026-06-11 cweiss i don't know why we removed the class. but is causes problems with btn's when fast clicking
+                    // wavesEl.removeClass.defer(1500, wavesEl, ['waves-effect']);
                 }
             }
         }, this);

@@ -31,9 +31,26 @@ class Timetracker_Model_TimeaccountNotBillable extends Timetracker_Model_Timeacc
         parent::inheritModelConfigHook($_definition);
         unset($_definition[self::VERSION]);
         unset($_definition[self::TABLE]);
+        unset($_definition[self::CREATE_MODULE]);
         $_definition[self::MODEL_NAME] = self::MODEL_NAME_PART;
         $_definition[self::RECORD_NAME] = 'Zeitkonto (nicht abrechenbar)';
         $_definition[self::RECORDS_NAME] = 'Zeitkonten (nicht abrechenbar)';
+    }
+
+    public function isBillable(Tinebase_DateTime $date, ?\Sales_Model_Contract $contract = NULL, ?\Sales_Model_ProductAggregate $productAggregate = NULL)
+    {
+        if (intval($this->budget) > 0) {
+            return false;
+        }
+        $raii = null;
+        if (!$this->is_billable) {
+            $oldValue = $this->_properties['is_billable'];
+            $this->_properties['is_billable'] = true;
+            $raii = new Tinebase_RAII(fn() => $this->_properties['is_billable'] = $oldValue);
+        }
+        $result = parent::isBillable($date, $contract, $productAggregate);
+        unset($raii);
+        return $result;
     }
 
     protected function _getBillableTimesheetsFilter(Tinebase_DateTime $date, ?\Sales_Model_Contract $contract = NULL)
@@ -67,11 +84,11 @@ class Timetracker_Model_TimeaccountNotBillable extends Timetracker_Model_Timeacc
      *
      * @param Tinebase_DateTime $date
      * @param Sales_Model_ProductAggregate $productAggregate
-     * @param Sales_Model_Invoice $invoice
+     * @param Sales_Model_Document_Invoice $invoice
      * @param Sales_Model_Contract $contract
      * @return boolean
      */
-    public function needsInvoiceRecreation(Tinebase_DateTime $date, Sales_Model_ProductAggregate $productAggregate, Sales_Model_Invoice $invoice, Sales_Model_Contract $contract)
+    public function needsInvoiceRecreation(Tinebase_DateTime $date, Sales_Model_ProductAggregate $productAggregate, Sales_Model_Document_Invoice $invoice, Sales_Model_Contract $contract)
     {
         if (intval($this->budget) > 0) {
 
@@ -144,12 +161,14 @@ class Timetracker_Model_TimeaccountNotBillable extends Timetracker_Model_Timeacc
     public function loadBillables(Tinebase_DateTime $date, Sales_Model_ProductAggregate $productAggregate)
     {
         parent::loadBillables($date, $productAggregate);
-        foreach ($this->_billables as &$billables) {
-            $result = [];
-            foreach ($billables as $ts) {
-                $result[] = new Timetracker_Model_TimesheetNotBillable($ts->toArray());
+        if (!(intval($this->budget) > 0)) {
+            foreach ($this->_billables as &$billables) {
+                $result = [];
+                foreach ($billables as $ts) {
+                    $result[] = new Timetracker_Model_TimesheetNotBillable($ts->toArray());
+                }
+                $billables = $result;
             }
-            $billables = $result;
         }
     }
 }

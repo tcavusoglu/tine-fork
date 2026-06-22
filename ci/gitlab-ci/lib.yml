@@ -125,6 +125,7 @@
               --file ./ci/dockerimage/Dockerfile \
               --build-arg PHP_IMAGE=php${PHP_VERSION} \
               --build-arg APT_MIRROR=${APT_MIRROR} \
+              --build-arg APT_MIRROR_UNSUPPORTED_CODENAME=${APT_MIRROR_UNSUPPORTED_CODENAME} \
               .
       
           log dev image: pushing ...
@@ -142,6 +143,7 @@
               --file ./ci/dockerimage/Dockerfile \
               --build-arg PHP_IMAGE=php${PHP_VERSION} \
               --build-arg APT_MIRROR=${APT_MIRROR} \
+              --build-arg APT_MIRROR_UNSUPPORTED_CODENAME=${APT_MIRROR_UNSUPPORTED_CODENAME} \
               .
       
           log test image: pushing ...
@@ -158,6 +160,7 @@
               --file ./ci/dockerimage/Dockerfile \
               --build-arg PHP_IMAGE=php${PHP_VERSION} \
               --build-arg APT_MIRROR=${APT_MIRROR} \
+              --build-arg APT_MIRROR_UNSUPPORTED_CODENAME=${APT_MIRROR_UNSUPPORTED_CODENAME} \
               --build-arg JSDEPENDENCY_IMAGE \
               --build-arg ZIP_PACKAGES \
               --build-arg RELEASE_TYPE \
@@ -184,6 +187,7 @@
               --file ./ci/dockerimage/Dockerfile \
               --build-arg PHP_IMAGE=php${PHP_VERSION} \
               --build-arg APT_MIRROR=${APT_MIRROR} \
+              --build-arg APT_MIRROR_UNSUPPORTED_CODENAME=${APT_MIRROR_UNSUPPORTED_CODENAME} \
               --build-arg JSDEPENDENCY_IMAGE \
               --build-arg ZIP_PACKAGES \
               --build-arg RELEASE_TYPE \
@@ -209,6 +213,7 @@
               --target packages \
               --file ./ci/dockerimage/Dockerfile \
               --build-arg APT_MIRROR=${APT_MIRROR} \
+              --build-arg APT_MIRROR_UNSUPPORTED_CODENAME=${APT_MIRROR_UNSUPPORTED_CODENAME} \
               --build-arg BUILT_IMAGE \
               --build-arg ZIP_PACKAGES \
               --build-arg RELEASE=$(release_get_package_version) \
@@ -1011,7 +1016,7 @@
               fi
       
               if ! release_is_patch_level_release; then
-                  matrix_send_message "${matrix_room}" "We just released the new version ${CODENAME} ${version} 🎉\\nCheck https://www.tine-groupware.de/ and https://github.com/tine-groupware/tine/releases for more information and the downloads.\\nYou can also pull the image from dockerhub: https://hub.docker.com/r/tinegroupware/tine"
+                  matrix_send_message "${matrix_room}" "We just released the new version ${CODENAME} ${version} 🎉\\nCheck https://www.tine-groupware.de/ and https://github.com/tine-groupware/tine/releases/tag/${version} for more information and the downloads.\\nYou can also pull the image from dockerhub: https://hub.docker.com/r/tinegroupware/tine"
               fi
       
           fi
@@ -1557,1201 +1562,6 @@
                 cache_cleanup_atomic_dir_cache $MAX_AGE_USED_CACHE $MAX_AGE_CACHE
             done
         }
-
-        # lib/scripts/docker_build_image.sh
-        docker_build_image_dev() {
-            log dev image: building ...
-            image="${REGISTRY}/dev-commit:${IMAGE_TAG}"
-            # cd ${CI_BUILDS_DIR}/${CI_PROJECT_NAMESPACE}/tine20
-            docker build \
-                --target dev \
-                --tag ${image} \
-                --file ./ci/dockerimage/Dockerfile \
-                --build-arg PHP_IMAGE=php${PHP_VERSION} \
-                --build-arg APT_MIRROR=${APT_MIRROR} \
-                .
-        
-            log dev image: pushing ...
-            docker push ${image}
-        }
-        
-        docker_build_image_test() {
-            log test image: building ...
-            commit_ref_name_escaped=$(echo ${CI_COMMIT_REF_NAME} | sed sI/I-Ig)
-            image=${TEST_IMAGE_REGISTRY}:${commit_ref_name_escaped}-${PHP_VERSION}-${TEST_IMAGE_VERSION}
-            # cd ${CI_BUILDS_DIR}/${CI_PROJECT_NAMESPACE}/tine20
-            docker build \
-                --target test \
-                --tag ${image} \
-                --file ./ci/dockerimage/Dockerfile \
-                --build-arg PHP_IMAGE=php${PHP_VERSION} \
-                --build-arg APT_MIRROR=${APT_MIRROR} \
-                .
-        
-            log test image: pushing ...
-            docker push ${image}
-        }
-        
-        docker_build_image_built() {
-            log built image: building ...
-            image="${REGISTRY}/built-commit:${IMAGE_TAG}"
-            # cd ${CI_BUILDS_DIR}/${CI_PROJECT_NAMESPACE}/tine20
-            docker build \
-                --target built \
-                --tag ${image} \
-                --file ./ci/dockerimage/Dockerfile \
-                --build-arg PHP_IMAGE=php${PHP_VERSION} \
-                --build-arg APT_MIRROR=${APT_MIRROR} \
-                --build-arg JSDEPENDENCY_IMAGE \
-                --build-arg ZIP_PACKAGES \
-                --build-arg RELEASE_TYPE \
-                --build-arg CUSTOM_APP_VENDOR \
-                --build-arg CUSTOM_APP_NAME \
-                --build-arg CUSTOM_APP_GIT_URL \
-                --build-arg CUSTOM_APP_VERSION \
-                --build-arg RELEASE=$(release_get_package_version) \
-                --build-arg CODENAME \
-                --build-arg REVISION=0 \
-                .
-        
-            log built image: pushing ...
-            docker push ${image}
-        }
-        
-        docker_build_image_built_test() {
-            log test-built image: building ...
-            image="${REGISTRY}/test-built-commit:${IMAGE_TAG}"
-            # cd ${CI_BUILDS_DIR}/${CI_PROJECT_NAMESPACE}/tine20
-            docker build \
-                --target test-built \
-                --tag ${image} \
-                --file ./ci/dockerimage/Dockerfile \
-                --build-arg PHP_IMAGE=php${PHP_VERSION} \
-                --build-arg APT_MIRROR=${APT_MIRROR} \
-                --build-arg JSDEPENDENCY_IMAGE \
-                --build-arg ZIP_PACKAGES \
-                --build-arg RELEASE_TYPE \
-                --build-arg CUSTOM_APP_VENDOR \
-                --build-arg CUSTOM_APP_NAME \
-                --build-arg CUSTOM_APP_GIT_URL \
-                --build-arg CUSTOM_APP_VERSION \
-                --build-arg RELEASE=$(release_get_package_version) \
-                --build-arg CODENAME \
-                --build-arg REVISION=0 \
-                .
-        
-            log test-built image: pushing ...
-            docker push ${image}
-        }
-        
-        docker_build_image_packages() {
-            outputPath=$1
-        
-            log packages image: building ...
-            # cd ${CI_BUILDS_DIR}/${CI_PROJECT_NAMESPACE}/tine20
-            docker build \
-                --target packages \
-                --file ./ci/dockerimage/Dockerfile \
-                --build-arg APT_MIRROR=${APT_MIRROR} \
-                --build-arg BUILT_IMAGE \
-                --build-arg ZIP_PACKAGES \
-                --build-arg RELEASE=$(release_get_package_version) \
-                --build-arg CODENAME \
-                --build-arg REVISION=0 \
-                -o type=tar,dest=${outputPath} \
-                .
-        }
-
-        # lib/scripts/docker_hub.sh
-        docker_hub_deploy () {
-            set -e
-            name=$1
-            dockerhubname=$2
-            dockerhubtag=$3
-        
-            docker login -u "${DOCKERHUB_USER}" -p "${DOCKERHUB_TOKEN}" "docker.io"
-        
-            FROM_IMAGE="${REGISTRY}/${name}-commit:${IMAGE_TAG}"
-            DESTINATION_IMAGE="docker.io/tinegroupware/${dockerhubname}:${dockerhubtag}"
-        
-            docker pull "${FROM_IMAGE}"
-            docker tag "${FROM_IMAGE}" "${DESTINATION_IMAGE}"
-            docker push "${DESTINATION_IMAGE}"
-        }
-
-        # lib/scripts/docker_registry.sh
-        docker_registry_login () {
-            registry="$1"
-            username="$2"
-            password="$3"
-        
-            for i in {1..6}; do
-                if docker login "$registry" --username "$username" --password "$password"; then
-                    return 0
-                fi
-        
-                echo "($i) docker login failed, retrying it in 5 second ..."
-                curl https://${REGISTRY}/fail-${CI_PIPELINE_ID}-${CI_JOB_ID} # create a marker in the log if login fails
-                sleep 5
-            done
-        
-            echo "docker login failed, aborting ..."
-            return 1
-        }
-        
-        docker_registry_release_image() {
-            name="$1"
-            destination="$2"
-            latest="$3"
-        
-            from="${REGISTRY}/${name}-commit:${IMAGE_TAG}"
-        
-            if [ -z "$CI_COMMIT_TAG" ]; then
-                echo "pushing nightly"
-                docker_registry_push "${from}" "${destination}:$(release_get_package_version)" # release_get_package_version => tag or nightly name
-                return
-            fi
-        
-            if [ "$latest" == "true" ]; then
-                docker_registry_push "${from}" "${destination}:latest"
-            fi
-        
-            docker_registry_push "${from}" "${destination}:${CI_COMMIT_TAG}"
-        
-            # For customer image we only release latest and the full tag.
-            # We push customer images with their full tag into our local tine registry,
-            # if we release there image to our test cloud. If we would release partial tags we might overwrite the main tine version.
-            # TODO: the test cloud should probably, get the images from the customer repository. NOTE: That would require all customer to have an repository.
-            if [ "$CUSTOMER_MAJOR_COMMIT_REF_NAME" == "" ]; then
-                docker_registry_push "${from}" "${destination}:$(echo ${CI_COMMIT_TAG} | cut -d '.' -f 1)"
-            fi
-        }
-        
-        docker_registry_release_dev_image() {
-            name=dev
-            targetRegistry="$1"
-        
-            from="${REGISTRY}/${name}-commit:${IMAGE_TAG}"
-        
-            docker_registry_push_multi_platform ${from} ${targetRegistry}:$(echo $CI_COMMIT_REF_NAME | sed sI/I-Ig)-${PHP_VERSION}
-        }
-        
-        docker_registry_push() {
-            from="$1"
-            to="$2"
-        
-            docker pull "${from}"
-            docker tag "${from}" "${to}"
-            docker push "${to}"
-        }
-        
-        # needs to be run one time per architecture, with $ARCH set.
-        # Why?: This allows us push new architectures as their build finishes
-        docker_registry_push_multi_platform() {
-            from="$1"
-            to="$2"
-        
-            skopeo copy docker://${from}-${ARCH} docker://${to}-${ARCH}
-        
-            # create multi platform manifest, for platform specific images, available during runtime. Overwrites existing manifest.
-            manifest-tool push from-args --platforms linux/amd64,linux/arm64 --template ${to}-ARCH --target ${to} --ignore-missing
-        }
-
-        # lib/scripts/git_repo.sh
-        git_repo_clone () {
-            git clone ${CI_REPOSITORY_URL} --branch ${CI_COMMIT_REF_NAME} --depth 1 --single-branch ${CI_BUILDS_DIR}/${CI_PROJECT_NAMESPACE}/tine20
-        }
-        
-        git_repo_clone_cached () {
-            targetDir=${1:-$CI_PROJECT_DIR}
-        
-            cacheRepoPath=${CI_CUSTOM_CACHE_DIR}/git-cache/v2/$(echo "${CI_REPOSITORY_URL}" | cut -d '@' -f2)/$CI_CONCURRENT_ID
-            echo $cacheRepoPath
-            
-            mkdir -p $cacheRepoPath
-        
-            pushd $cacheRepoPath
-            if ! git rev-parse --is-inside-work-tree 2> /dev/null; then
-                log "not a git repo. Initialzing new bare git repo ..."
-                git init --bare
-            fi
-        
-            log "setting up remote"
-            if git remote | grep origin > /dev/null; then
-                git remote rm origin
-            fi
-        
-            git remote add origin "${CI_REPOSITORY_URL}"
-        
-            log "fetching from gitlab" 
-            git fetch --force origin '*:*'
-            popd
-        
-        
-            log "cloning into working dir"
-            git clone $cacheRepoPath --branch "${CI_COMMIT_REF_NAME}" --local --no-hardlinks "${targetDir}"
-            pushd ${targetDir}
-            # switch orign from cache to gitlab
-            git remote rm origin
-            git remote add origin "${CI_REPOSITORY_URL}"
-            # fetch new origin again
-            git fetch
-            # setup branch upstream again
-            git branch --set-upstream-to="origin/${CI_COMMIT_REF_NAME}" "${CI_COMMIT_REF_NAME}"
-            popd
-        }
-
-        # lib/scripts/github.sh
-        github_create_release() {
-            tag=$1
-            user=$2
-            token=$3
-        
-            if [ "${RELEASE_TYPE}" != "nightly" ]; then
-                body="$(repo_release_notes "$tag" | jq -Rs .)"
-                draft="false"
-            else
-                echo "only publshing as draft: nigtly release detected" > /dev/stderr
-                body="$(repo_release_notes "HEAD" | jq -Rs .)"
-                draft="true"
-            fi
-        
-            if [ "${RELEASE_TYPE}" == "be" ]; then
-                prerelease="false"
-            else
-                prerelease="true"
-            fi
-        
-            curl -s \
-                -X POST \
-                -u "$user:$token" \
-                -H "accept: application/vnd.github.v3+json" \
-                "https://api.github.com/repos/tine-groupware/tine/releases" \
-                -d '{"name":"'"$tag"'", "tag_name":"'"$tag"'", "body":'"$body"', "draft":'$draft', "prerelease":'$prerelease'}'
-        }
-        
-        github_release_add_asset() {
-            release_json=$1
-            name=$2
-            path_to_asset=$3
-            user=$4
-            token=$5
-        
-            upload_url=$(echo $release_json | jq -r '.upload_url')
-            upload_url="${upload_url%\{*}"
-        
-            curl -s \
-                -X POST \
-                -u "$user:$token" \
-                -T "$path_to_asset" \
-                -H "accept: application/vnd.github.v3+json" \
-                -H "content-type: $(file -b --mime-type $path_to_asset)" \
-                "$upload_url?name=$name.tar.bz2"
-        }
-
-        # lib/scripts/matrix.sh
-        matrix_send_message() {
-            roomid=$1
-            message=$2
-        
-            if test -z "$MATRIX_SERVER"; then
-                echo "MATRIX_SERVER needs to be set!"
-                return 1
-            fi
-        
-            if test -z "$MATRIX_ACCESS_TOKEN"; then
-                if test -z "$MATRIX_USERNAME" || test -z "$MATRIX_PASSWORD"; then
-                    echo "Either MATRIX_ACCESS_TOKEN or MATRIX_USERNAME and MATRIX_PASSWORD needs to be set!"
-                    return 1
-                fi
-            
-                response=$(curl -s -XPOST -d '{"type":"m.login.password", "user":"'"$MATRIX_USERNAME"'", "password":"'"$MATRIX_PASSWORD"'"}' "https://$MATRIX_SERVER/_matrix/client/r0/login")
-                MATRIX_ACCESS_TOKEN=$(echo "$response" | jq -r '.access_token')
-                
-            fi
-        
-            curl -XPOST -d '{}' "https://$MATRIX_SERVER/_matrix/client/r0/rooms/$roomid/join?access_token=$MATRIX_ACCESS_TOKEN"
-        
-            curl -XPOST -d '{"msgtype":"m.text", "body":"'"$message"'"}' "https://$MATRIX_SERVER/_matrix/client/r0/rooms/$roomid/send/m.room.message?access_token=$MATRIX_ACCESS_TOKEN"
-        }
-
-
-        # lib/scripts/merge.sh
-        merge_merge_upwards () {
-            if ! ${CI_BUILDS_DIR}/${CI_PROJECT_NAMESPACE}/tine20/scripts/git/merge_helper.sh MergeUpwards "$1" "$2" "customers"; then
-                matrix_send_message "$MATRIX_ROOM" "🔴 Auto merging $1 into $2 failed in $CI_PIPELINE_NAME $CI_JOB_URL."
-                return 1
-            fi
-        }
-        
-        merge_update_custom_app () {
-            ${CI_BUILDS_DIR}/${CI_PROJECT_NAMESPACE}/tine20/scripts/git/merge_helper.sh UpdateCustomApp "$1" "$2" || true
-        }
-        
-        merge_merge_mirror () {
-            source_remote="$1"
-            source_branch="$2"
-            destination_remote="$3"
-            destination_branch="$4"
-        
-            git fetch "$source_remote" "$source_branch" || return 1
-            git fetch "$destination_remote" "$destination_branch" || return 1
-        
-            if git rev-parse --quiet --verify $destination_branch > /dev/null; then
-                git checkout "$destination_branch"
-                git reset --hard "$destination_remote/$destination_branch"
-            else
-                git checkout --track "$destination_remote/$destination_branch" || return 1
-            fi
-            
-            echo "git mergeing $source_remote/$source_branch into $destination_remote/$destination_branch ..."
-        
-            if ! git merge "$source_remote/$source_branch"; then
-        
-                if ! php ${CI_BUILDS_DIR}/${CI_PROJECT_NAMESPACE}/tine20/scripts/git/repairMerge.php "$source_remote/$source_branch" "$destination_branch"; then
-                    echo "merging $source_remote/$source_branch into $destination_remote/$destination_branch failed"
-                    return 1
-                fi
-            fi
-            
-            git push "$destination_remote" "$destination_branch"
-        }
-        
-        merge_trigger_next () {
-            MERGE_MAP=${MERGE_MAP:-"{}"}
-            
-            if ! echo $MERGE_MAP | jq --arg ref $CI_COMMIT_REF_NAME -e '.[$ref]' > /dev/null; then
-                echo "nothing to trigger"
-                return
-            fi
-        
-            for i in $(echo $MERGE_MAP | jq -c --arg ref $CI_COMMIT_REF_NAME '.[$ref][]'); do
-                ref=$(echo $i | jq -r '.ref')
-                var=$(echo $i | jq -r '.var')
-        
-                echo "trigger $ref with $var:"
-        
-                curl -X POST -F token=$MERGE_TRIGGER_TOKEN \
-                    -F ref=$ref \
-                    -F "variables[$var]=true" \
-                    -F "variables[SEND_PIPELINE_STATUS]=true" \
-                    "$CI_API_V4_URL/projects/$CI_PROJECT_ID/trigger/pipeline" > /dev/null
-            done
-        }
-
-        # lib/scripts/packaging.sh
-        packaging_build_packages() {
-            echo "packaging_build_packages()"
-        
-            if echo "$CI_COMMIT_TAG" | grep '/'; then
-                echo "Error: CI_COMMIT_TAG must not contain a /"
-                exit 1
-            fi
-        
-            # config via env
-            export BUILT_IMAGE="${REGISTRY}/built-commit:${IMAGE_TAG}"
-            # RELEASE is set during packageing to $(packaing_version)
-        
-            cd ${CI_BUILDS_DIR}/${CI_PROJECT_NAMESPACE}/tine20
-            # create archives
-            if ! docker_build_image_packages "${CI_BUILDS_DIR}/${CI_PROJECT_NAMESPACE}/tine20/packages.tar"; then
-                return 1
-            fi
-        }
-        
-        packaging_extract_all_package_tar() {
-            cd "${CI_BUILDS_DIR}/${CI_PROJECT_NAMESPACE}/tine20/"
-            tar -xf "${CI_BUILDS_DIR}/${CI_PROJECT_NAMESPACE}/tine20/packages.tar"
-        }
-        
-        packaging_push_packages_to_gitlab() {
-            version=$1
-        
-            package_repo=$(release_packages_determin_package_repo_name)
-        
-            curl -S -s \
-                --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
-                --upload-file "${CI_BUILDS_DIR}/${CI_PROJECT_NAMESPACE}/tine20/packages.tar" \
-                "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${package_repo}/${version}/all.tar"
-        
-            echo "published packages to ${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${package_repo}/${version}/all.tar"
-        
-            cd "${CI_BUILDS_DIR}/${CI_PROJECT_NAMESPACE}/tine20/${version}/"
-        
-            for f in *; do
-                curl -S -s \
-                --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
-                --upload-file "$f" \
-                "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${package_repo}/${version}/$f"
-            done
-        
-            echo ""
-            echo "published packages to ${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${package_repo}/${version}/all.tar"
-            echo ""
-        }
-        
-        packaging_gitlab_set_ci_id_link() {
-            version=$1
-        
-            echo "packaging_gitlab_set_ci_id_link() CI_PIPELINE_ID: $CI_PIPELINE_ID version: $version MAJOR_COMMIT_REF_NAME: $MAJOR_COMMIT_REF_NAME"
-        
-            if ! curl -S -s \
-                --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
-                -XPUT --data "${version}" \
-                "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/ci/links/${CI_PIPELINE_ID}"
-            then
-                return 1
-            fi
-        }
-        
-        packaging_gitlab_get_version_for_pipeline_id() {
-            if ! curl \
-                --fail \
-                --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
-                "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/ci/links/${CI_PIPELINE_ID}"
-            then
-                return 1
-            fi
-        }
-        
-        packaging() {
-            version=$(release_get_package_version)
-        
-            echo "packaging() CI_COMMIT_TAG: $CI_COMMIT_TAG version/release: $version MAJOR_COMMIT_REF_NAME: $MAJOR_COMMIT_REF_NAME"
-        
-            if ! release_determin_customer; then
-                echo "No packages are build for major_commit_ref: $MAJOR_COMMIT_REF_NAME for version: $version"
-                return 1
-            fi
-        
-            echo "building packages ..."
-            if ! packaging_build_packages; then
-                echo "Failed to build packages."
-                return 1
-            fi
-        
-            if ! packaging_extract_all_package_tar; then
-                echo "Failed to extract tar archive."
-                return 1
-            fi
-        
-            echo "pushing packages to gitlab ..."
-            if ! packaging_push_packages_to_gitlab $version; then
-                echo "Failed to push to gitlab."
-                return 1
-            fi
-        
-            # this is only needed for nightlitys. As calculating there name requies a fully fteched git, and deploy do not have need thah
-            echo "setting ci pipeline id link"
-            if ! packaging_gitlab_set_ci_id_link $version; then
-                echo "Failed to set ci pipeline id link."
-                return 1
-            fi
-        }
-
-        # lib/scripts/phpstan.sh
-        phpstan_analyse() {
-            if test "${CI_PROJECT_NAME}" == "tine20"; then
-                dir=tine20
-            else
-                dir=tine20/vendor/$(cat ${CI_PROJECT_DIR}/composer.json | jq -r '.name')/lib;
-            fi
-        
-            log "fixing symlinks ..."
-            # fix: phpstan fails if custom apps are symlinked. They need to be analysed in the vendor dir.
-            #    exclude symlinks
-            find $TINE20ROOT/tine20 -maxdepth 1 -type l -exec echo "        - '{}'" \; >> excludes;
-            #    unexclude vendor/metaways
-            find $TINE20ROOT/tine20/vendor -mindepth 1 -maxdepth 1 -type d -exec echo "        - '{}'" \; >> excludes;
-            sort -o excludes excludes
-            sed -i '/tine20\/vendor\*/r excludes' $TINE20ROOT/phpstan.neon;
-            sed -i '/tine20\/vendor\/metaways/d' $TINE20ROOT/phpstan.neon;
-            rm excludes
-        
-            log "setting max processes ..."
-            sed -i "s/maximumNumberOfProcesses: 32/maximumNumberOfProcesses: $KUBERNETES_CPU_REQUEST/g" $TINE20ROOT/phpstan.neon
-        
-            log "setting up cache ..."
-            # CI_CUSTOM_CACHE_DIR is a volume shared betwean runners
-            # todo: monitor if composer.lock file hash prodoces to mutch dead cache
-            phpstan_cache_key=$(echo $MAJOR_COMMIT_REF_NAME $PHP_VERSION $(sha256sum $TINE20ROOT/tine20/composer.lock | cut -d ' ' -f 1) | sha256sum | cut -d ' ' -f 1)
-            export PHPSTAN_CACHE_DIR=${CI_CUSTOM_CACHE_DIR}/${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAME}/phpstan-cache/v2/$phpstan_cache_key
-            echo PHPSTAN_CACHE_DIR=$PHPSTAN_CACHE_DIR
-            mkdir -p ${PHPSTAN_CACHE_DIR}
-            sed -i "s%tmpDir:%tmpDir: $PHPSTAN_CACHE_DIR%g" $TINE20ROOT/phpstan.neon
-            # create marker for cache cleanup
-            date --utc +%FT%TZ > $PHPSTAN_CACHE_DIR-lastused
-        
-            $TINE20ROOT/tine20/vendor/bin/phpstan --version
-            log "analyse target: $dir"
-            set -o pipefail
-            php -d memory_limit=2G $TINE20ROOT/tine20/vendor/bin/phpstan analyse --autoload-file=$TINE20ROOT/tine20/vendor/autoload.php --error-format=gitlab --no-progress -vvv $dir | tee ${CI_PROJECT_DIR}/code-quality-report.json
-        }
-
-        # lib/scripts/pipeline_status.sh
-        pipeline_status_send () {
-            errors=$(curl --header "JOB-TOKEN: $CI_JOB_TOKEN" "$CI_API_V4_URL/projects/$CI_PROJECT_ID/pipelines/$CI_PIPELINE_ID/test_report" | jq -c '.test_suites[] | select((.error_count>0) or .failed_count>0)| {name,error_count,failed_count}')
-        
-            ref=$(curl --header "JOB-TOKEN: $CI_JOB_TOKEN" "$CI_API_V4_URL/projects/$CI_PROJECT_ID/pipelines/$CI_PIPELINE_ID/" | jq -r .ref)
-        
-            message="pipeline $CI_PIPELINE_NAME #$CI_PIPELINE_ID for $ref failed with:"
-        
-            IFS=$'\n' 
-            for error in $errors; do
-                n=$(echo $error | jq -r '.name')
-                e=$(echo $error | jq -r '.error_count')
-                f=$(echo $error | jq -r '.failed_count')
-                message="$message"'\n'"+ $n  --  errors: $e failures: $f"
-            done
-        
-            message="$message"'\n'"$CI_PIPELINE_URL"
-        
-            echo "$message"
-        
-            matrix_send_message $MATRIX_ROOM "$message"
-        }
-
-        # lib/scripts/prevent_upsteam_changes.sh
-        function prevent_upstream_change() {
-            downstream=${MAJOR_COMMIT_REF_NAME}
-        
-            if [ "$downstream" == "$CI_COMMIT_REF_NAME" ]; then
-                return
-            fi
-        
-            git config user.email "ci@gitlab.metaways.net"
-            git config user.name "ci"
-            git rebase origin/$downstream
-        
-            changes="$(git diff --name-only -r --diff-filter=a origin/$downstream)"
-        
-            for allowed in $(cat ci/upstream-change-global-whitelist.txt) $(cat ci/upstream-change-whitelist.txt || true); do
-                changes="$(echo "$changes" | grep -v -E "^$allowed$" || true)"
-            done
-        
-            if [[ -z "$changes" ]]; then
-                return
-            fi
-        
-            echo 'Changing downstream files upstream is not encouraged! If changing them is necessary, either:'
-            echo '* disable this job with the merge request label "allow-failure-prevent-upstream-changes"'
-            echo '* or add an permanent exception to "ci/upstream-change-whitelist.txt".'
-            echo Changes:
-            echo "$changes"
-        
-            return 1
-        }
-
-        # lib/scripts/release.sh
-        release_tag() {
-            branch="$(echo "$CI_COMMIT_REF_NAME" | sed sI/I-Ig)"
-            tag_prefix="$branch-$(date '+%Y.%m.%d.')"
-        
-            last_counter="$(curl -H "Authorization: Bearer $GITLAB_TOKEN" "$CI_API_V4_URL/projects/$CI_PROJECT_ID/repository/tags?search=^$tag_prefix" | jq -r '.[].name' | sort --version-sort | tail -n 1 | awk -F '.' '{print $NF}')"
-            counter="$((${last_counter:-0}+1))"
-        
-            tag="$tag_prefix$counter"
-        
-            echo "tag: $tag"
-        
-            curl -H "Authorization: Bearer $GITLAB_TOKEN" -XPOST "$CI_API_V4_URL/projects/$CI_PROJECT_ID/repository/tags?tag_name=$tag&ref=$CI_COMMIT_SHA&message=version+$tag"
-        }
-        
-        release_weekly_tag() {
-            tag_prefix="weekly-$(date '+%Y.%V.')"
-        
-            last_counter="$(curl -H "Authorization: Bearer $GITLAB_TOKEN" "$CI_API_V4_URL/projects/$CI_PROJECT_ID/repository/tags?search=^$tag_prefix" | jq -r '.[].name' | sort --version-sort | tail -n 1 | awk -F '.' '{print $NF}')"
-            counter="$((${last_counter:-0}+1))"
-        
-            tag="$tag_prefix$counter"
-        
-            echo "tag: $tag"
-        
-            curl -H "Authorization: Bearer $GITLAB_TOKEN" -XPOST "$CI_API_V4_URL/projects/$CI_PROJECT_ID/repository/tags?tag_name=$tag&ref=$CI_COMMIT_SHA&message=version+$tag"
-        }
-        
-        release_to_gitlab() {
-            tag="${CI_COMMIT_TAG}"
-            package_repo="$(release_packages_determin_package_repo_name)"
-        
-            release-cli create --description "$(repo_release_notes "$tag")" --tag-name "$tag" --ref "$tag" --name "$tag" \
-                --assets-link "{\"name\":\"all.tar\",\"url\":\"${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${package_repo}/${tag}/all.tar\"}"
-        }
-        
-        # possible values tine20.org tine20.com <customer> ""
-        release_determin_customer () {
-            if test -z "${BASE_MAJOR_COMMIT_REF_NAME}"; then
-                # For branches without BASE_MAJOR_COMMIT_REF_NAME and CUSTOMER_MAJOR_COMMIT_REF_NAME variables
-                # todo remove is these kind of branches do not exist any more
-                if ! echo "${branch}" | grep -q '/'; then
-                    echo tine20.com
-                    return
-                else
-                    if [ $(echo "${branch}" | awk -F"/" '{print NF-1}') != 1 ]; then
-                        return 1
-                    fi
-        
-                    echo "${branch}" | cut -d '/' -f1
-                    return
-                fi
-            else
-                # For branches with BASE_MAJOR_COMMIT_REF_NAME and CUSTOMER_MAJOR_COMMIT_REF_NAME variables
-                if test -z "${CUSTOMER_MAJOR_COMMIT_REF_NAME}"; then
-                    if echo ${CI_COMMIT_TAG} | grep -Eq 'weekly'; then
-                        echo "tine20.org"
-                        return
-                    fi
-        
-                    echo "tine20.com"
-                    return
-                else
-                    echo "${CUSTOMER_MAJOR_COMMIT_REF_NAME}" | sed 's:/*$::'
-                    return
-                fi 
-            fi
-        }
-        
-        release_get_package_version() {
-            CI_COMMIT_REF_NAME_ESCAPED=$(echo ${CI_COMMIT_REF_NAME} | sed sI/I-Ig)
-        
-            echo ${CI_COMMIT_TAG:-"nightly-${CI_COMMIT_REF_NAME_ESCAPED}-$(date -d "$CI_COMMIT_TIMESTAMP" '+%Y.%m.%d')-${CI_COMMIT_SHORT_SHA}"}
-        }
-        
-        release_is_patch_level_release() {
-            # 20[0-9][0-9]\.11\.[1-9]+[0-9] => match tine version e.g. => 2023.11.17
-            # *(-.*)*(-pl[0-9]+)(-.*) => match any postfix e.g. -rc1 -test, but require postfix -pl<number> e.g -pl10
-            # note the gitlab release rule regex is broader and matches ^20..\.11\..*. It should also be switched to ^20[0-9][0-9]\.11\.[1-9]+[0-9]*(-.*)*$
-        
-            echo "$CI_COMMIT_TAG" | grep -Pq '^20[0-9][0-9]\.11\.[1-9]+[0-9]*(-.*)*(-pl[0-9]+)(-.*)*$ ]]'
-        }
-
-        # lib/scripts/release_packages.sh
-        release_packages_github_create_release() {
-            package_repo=$(release_packages_determin_package_repo_name)
-            version=${CI_COMMIT_TAG:-$(packaging_gitlab_get_version_for_pipeline_id)}
-        
-            cd ${CI_BUILDS_DIR}/${CI_PROJECT_NAMESPACE}/tine20/
-        
-            echo curl "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${package_repo}/${version}/tine20-allinone_${version}.tar.bz2" -o "${CI_BUILDS_DIR}/${CI_PROJECT_NAMESPACE}/tine20/tine20-allinone_${version}.tar.bz2"
-            curl "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${package_repo}/${version}/tine20-allinone_${version}.tar.bz2" -o "${CI_BUILDS_DIR}/${CI_PROJECT_NAMESPACE}/tine20/tine20-allinone_${version}.tar.bz2"
-        
-            release_json=$(github_create_release "$version" "$GITHUB_RELEASE_USER" "$GITHUB_RELEASE_TOKEN")
-            if [ "$?" != "0" ]; then
-                echo "$release_json"
-                return 1
-            fi
-        
-            echo "package_repo: $package_repo version: $version release_json: $release_json"
-        
-            github_release_add_asset "$release_json" "$version" "${CI_BUILDS_DIR}/${CI_PROJECT_NAMESPACE}/tine20/tine20-allinone_${version}.tar.bz2" "$GITHUB_RELEASE_USER" "$GITHUB_RELEASE_TOKEN"
-        }
-        
-        release_packages_notify_matrix() {
-            version=${CI_COMMIT_TAG:-$(packaging_gitlab_get_version_for_pipeline_id)}
-        
-            matrix_send_message $MATRIX_ROOM "🟢 Packages for ${version} have been released to github."
-        
-            if [ "${RELEASE_TYPE}" == "be" ] || [ "${RELEASE_TYPE}" == "nightly" ]; then
-                matrix_room="!gGPNgDOyMWwSPjFFXa:matrix.org"
-        
-                if [ "${RELEASE_TYPE}" == "nightly" ]; then
-                    matrix_room="${MATRIX_ROOM}"
-                fi
-        
-                if ! release_is_patch_level_release; then
-                    matrix_send_message "${matrix_room}" "We just released the new version ${CODENAME} ${version} 🎉\\nCheck https://www.tine-groupware.de/ and https://github.com/tine-groupware/tine/releases for more information and the downloads.\\nYou can also pull the image from dockerhub: https://hub.docker.com/r/tinegroupware/tine"
-                fi
-        
-            fi
-        }
-        
-        release_push_release_tag_to_github() {
-            if ! test "$CI_COMMIT_TAG"; then
-                echo "no tag to push: '$CI_COMMIT_TAG'"
-                return
-            fi
-        
-            cp $DOCKER_GIT_CONFIG ~/.gitconfig
-            git config --global user.email "gitlabci@metaways.de"
-            git config --global user.name "gitlabci"
-            git remote add github https://github.com/tine-groupware/tine.git
-        
-            git push github refs/tags/$CI_COMMIT_TAG
-        }
-        
-        release_packages_vpackages_push() {
-            customer=$(release_determin_customer)
-            package_repo=$(release_packages_determin_package_repo_name)
-            version=${CI_COMMIT_TAG:-$(packaging_gitlab_get_version_for_pipeline_id)}
-            release=$(echo ${version} | sed sI-I~Ig)
-        
-            echo "publishing ${release} (${version}) for ${customer} from ${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${package_repo}/${version}/all.tar"
-        
-            if ! ssh ${VPACKAGES_SSH_URL} -o StrictHostKeyChecking=no -C  "sudo -u www-data curl ${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${package_repo}/${version}/all.tar -o /tmp/${release}-source-${customer}.tar"; then
-                echo "Failed to download packages to vpackages"
-                return 1
-            fi
-        
-            if ! ssh ${VPACKAGES_SSH_URL} -o StrictHostKeyChecking=no -C  "sudo -u www-data /srv/packages.tine20.com/www/scripts/importTine20Repo.sh /tmp/${release}-source-${customer}.tar; sudo -u www-data rm -f /tmp/${release}-source-${customer}.tar"; then
-                echo "Failed to import package to repo"
-                return 1
-            fi
-        }
-        
-        release_packages_vpackages_create_current_link() {
-            customer=$(release_determin_customer)
-            version=${CI_COMMIT_TAG:-$(packaging_gitlab_get_version_for_pipeline_id ${customer})}
-            release=$(echo ${version} | sed sI-I~Ig)
-        
-            if [ "$customer" == "tine20.com" ]; then
-                customer="maintenance"
-            fi
-        
-            if ! ssh ${VPACKAGES_SSH_URL} -o StrictHostKeyChecking=no -C  "if test -d /srv/packages.tine20.com/www/htdocs/${customer}/source/; then sudo -u www-data rm -f /srv/packages.tine20.com/www/htdocs/${customer}/source/tine-groupware-current.tar.bz2; sudo -u www-data ln -s ${version}/tine20-allinone_${version}.tar.bz2 /srv/packages.tine20.com/www/htdocs/${customer}/source/tine-groupware-current.tar.bz2; fi"; then
-                echo "Failed to set current link"
-                return 1
-            fi
-        }
-        
-        release_packages_gitlab_set_current_link() {
-            package_repo=$(release_packages_determin_package_repo_name)
-            version=${CI_COMMIT_TAG:-$(packaging_gitlab_get_version_for_pipeline_id ${customer})}
-        
-            curl \
-                --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
-                -XPUT --data "${version}" \
-                "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${package_repo}/links/current"
-        
-            matrix_send_message $MATRIX_ROOM "🟢 Package for ${version} is ready."
-        }
-        
-        release_packages_determin_package_repo_name () {
-            if [ "$RELEASE_TYPE" == "weekly" ]; then
-                echo "weekly"
-                return
-            fi
-        
-            if [ "$RELEASE_TYPE" == "monthly" ]; then
-                echo "monthly"
-                return
-            fi
-        
-            if [ "$RELEASE_TYPE" == "beta" ]; then
-                echo "beta"
-                return
-            fi
-        
-            if [ "$RELEASE_TYPE" == "be" ]; then
-                echo "tine20.com"
-                return
-            fi
-        
-            if [ "$RELEASE_TYPE" == "customer" ]; then
-                if [ -n "$PACKAGE_REPO_NAME_OVERWRITE" ]; then
-                    echo "$PACKAGE_REPO_NAME_OVERWRITE"
-                    return
-                fi
-        
-                release_determin_customer # basicly `echo "${CUSTOMER_MAJOR_COMMIT_REF_NAME}" | sed 's:/*$::'` as all other case cant match
-                return $?
-            fi
-        
-            echo "ci"
-            return
-        }
-
-        # lib/scripts/repo.sh
-        repo_release_notes() {
-            tag=$1
-            previous_tag="$(git describe --abbrev=0 --tags HEAD~1 2> /dev/null || git fetch --unshallow --quiet && git describe --abbrev=0 --tags HEAD~1)" # if describe fails unshallow repo and try again
-        
-            echo '# Releasenotes'
-            echo '## Updating from Community Edition'
-            echo 'If you update to this version from an older Community Edition (like https://github.com/tine20/tine20/releases/tag/2023.12.1), you might have to check the number of activated users. Without an activation key, this version only supports 5 enabled users.'
-            echo '# Changelog'
-            ${CI_BUILDS_DIR}/${CI_PROJECT_NAMESPACE}/tine20/scripts/git/changelog.sh "$tag" "$previous_tag"
-        }
-
-        # lib/scripts/test.sh
-        test_prepare_working_dir() {
-            if [ "${TINE20ROOT}" != "${CI_BUILDS_DIR}/${CI_PROJECT_NAMESPACE}/tine20" ]; then
-                log "test_preapre_working_dir requires the tine root to be: \${CI_BUILDS_DIR}/\${CI_PROJECT_NAMESPACE}/tine20"
-                # This function is only intended to work with the source from gitlab...
-                # intended: for the main repo => do basicly nothing. Or for customapps => clone main repo and include customapp
-                # and setup vars as if we where running in the main repo. 
-                return 1
-            fi
-        
-            if [ "${CI_PROJECT_NAME}" != "tine20" ] && [ "$CI_IS_CUSTOMAPP" != "true" ]; then
-                log "project name needs to be tine20 (for this, and) other test scrips to work"
-                # In many places ${CI_BUILDS_DIR}/${CI_PROJECT_NAMESPACE}/tine20 is used. If we use TINE20ROOT root any where
-                # the project name can be anything. As long as TINE20ROOT points to the correct CI_POOJECT_DIR.
-                # todo remove this if. if we removed all occurents of ${CI_BUILDS_DIR}/${CI_PROJECT_NAMESPACE}/tine20
-                return 1
-            fi
-        
-            # Clone tine repo, if pipeline runs for a customapp
-            if [ "${CI_IS_CUSTOMAPP}" == "true" ]; then
-                log "cloning tine ..."
-                git clone -b $TINE20_BRANCH --single-branch --depth 1 $TINE20_REPO_URL ${TINE20ROOT};
-            fi
-        
-            # todo: move into customapp case, and let gitlab hanled submodule init for the main repo
-            log "init git submodules ..."
-            cd ${TINE20ROOT}
-            git submodule init
-            git submodule update
-            
-            
-            # Install source customapp, if pipeline runs for a customapp
-            if [ "${CI_IS_CUSTOMAPP}" == "true" ]; then
-                # COMPOSER custom cache
-                # CI_CUSTOM_CACHE_DIR is a volume shared betwean runners
-                # export COMPOSER_CACHE_DIR=${CI_CUSTOM_CACHE_DIR}/${CI_PROJECT_NAMESPACE}/composer-cache/v1/
-                # mkdir -p ${COMPOSER_CACHE_DIR}
-        
-                log "instaling custom app ..."
-                customappname=$(cat ${CI_PROJECT_DIR}/composer.json | jq -r '.name')
-                pushd ${TINE20ROOT}/tine20
-        
-                composer config "repositories.ci" git "${CI_REPOSITORY_URL}";
-                COMPOSER_ALLOW_SUPERUSER=1 composer require "$customappname dev-master#${CI_COMMIT_SHA}";
-                popd
-            fi
-        
-            # the shell should be left in the new working dir
-            cd ${TINE20ROOT}
-        }
-        
-        test_prepare_global_configs() {
-            log "Preparing global configs ..."
-            rm /etc/supervisor.d/worker.ini || true
-            rm /etc/crontabs/tine20 || true
-            gomplate --config /etc/gomplate/config.yaml
-            # cp ${CI_BUILDS_DIR}/${CI_PROJECT_NAMESPACE}/tine20/ci/dockerimage/supervisor.d/webpack.ini /etc/supervisor.d/; # 2023.11 >= todo have/need this file
-            # todo move config dir to ${TINE20ROOT}/etc build test should be ablte to handle that
-            rsync -a -I --delete ${CI_BUILDS_DIR}/${CI_PROJECT_NAMESPACE}/tine20/etc/ /config;
-            echo "$TINE20_SETUP_HTPASSWD" > /etc/tine20/setup.htpasswd
-        }
-        
-        test_prepare_mail_db() {
-            log "Preparing databases for mail setup ..."
-            mysql -h$MAIL_DB_HOST -uroot -p"$MYSQL_ROOT_PASSWORD" -e"SET GLOBAL wait_timeout=31536000; SET GLOBAL interactive_timeout=31536000"
-            mysql -h$MAIL_DB_HOST -uroot -p"$MYSQL_ROOT_PASSWORD" -e"CREATE DATABASE IF NOT EXISTS dovecot"
-            mysql -h$MAIL_DB_HOST -uroot -p"$MYSQL_ROOT_PASSWORD" -e"CREATE DATABASE IF NOT EXISTS postfix"
-            mysql -h$MAIL_DB_HOST -uroot -p"$MYSQL_ROOT_PASSWORD" -e"CREATE USER IF NOT EXISTS '$MYSQL_USER'@'%' IDENTIFIED BY '$MYSQL_PASSWORD';"
-            mysql -h$MAIL_DB_HOST -uroot -p"$MYSQL_ROOT_PASSWORD" -e"GRANT ALL PRIVILEGES ON postfix.* TO '$MYSQL_USER'@'%'"
-            mysql -h$MAIL_DB_HOST -uroot -p"$MYSQL_ROOT_PASSWORD" -e"GRANT ALL PRIVILEGES ON dovecot.* TO '$MYSQL_USER'@'%'"
-            mysql -h$MAIL_DB_HOST -uroot -p"$MYSQL_ROOT_PASSWORD" "dovecot" < /config/sql/dovecot_tables.sql
-            mysql -h$MAIL_DB_HOST -uroot -p"$MYSQL_ROOT_PASSWORD" "postfix" < $ARG_POSTFIX_INIT_SQL_PATH
-        }
-        
-        test_composer_install() {
-            log "trying to use cached vendor dir"
-            composer_lock_hash=$(cd ${TINE20ROOT}/tine20; sha1sum composer.json composer.lock | sha1sum | cut -d ' ' -f 1)
-            export VENDOR_CACHE_DIR=${CI_CUSTOM_CACHE_DIR}/${CI_PROJECT_NAMESPACE}/tine20/composer-cache/v1/${composer_lock_hash}
-        
-            mkdir -p $(dirname $VENDOR_CACHE_DIR)
-        
-            if [ -d $VENDOR_CACHE_DIR ] && [ ! -d ${TINE20ROOT}/tine20/vendor ]; then
-                log "found cached vendor dir using it..."
-                echo VENDOR_CACHE_DIR=$VENDOR_CACHE_DIR
-        
-                cp -r $VENDOR_CACHE_DIR ${TINE20ROOT}/tine20/vendor
-                # create marker for cache cleanup
-                date --utc +%FT%TZ > $VENDOR_CACHE_DIR-lastused
-                # do not return here, we need to run composer install, so it creates the customapps links for us
-            fi
-        
-            log "prepearing composer cache ..."
-            # CI_CUSTOM_CACHE_DIR is a volume shared betwean runners
-            export COMPOSER_CACHE_DIR=${CI_CUSTOM_CACHE_DIR}/${CI_PROJECT_NAMESPACE}/composer-cache/v1/
-            mkdir -p ${COMPOSER_CACHE_DIR}
-        
-            log "composer install ..."
-            pushd ${TINE20ROOT}/tine20
-            # trigger customapploader plugin, to create links
-            rm -rf vendor/metaways
-            COMPOSER_ALLOW_SUPERUSER=1 composer install --no-ansi --no-progress --no-suggest
-            popd
-        
-            if [ ! -d $VENDOR_CACHE_DIR ]; then
-                log "storing vendor dir as cache"
-                cp -r ${TINE20ROOT}/tine20/vendor $VENDOR_CACHE_DIR || log "storing vendor dir failed. continuing"
-            fi
-        }
-        
-        test_npm_install() {
-            additional_npm_args="$1"
-            log "trying to use cache..."
-            package_shrinkwrap_hash=$(cd ${TINE20ROOT}/tine20/Tinebase/js; echo $(sha1sum npm-shrinkwrap.json package.json)"$additional_npm_args" | sha1sum | cut -d ' ' -f 1)
-            export NODE_MODULE_CACHE_DIR=${CI_CUSTOM_CACHE_DIR}/${CI_PROJECT_NAMESPACE}/tine20/npm-cache/v1/${package_shrinkwrap_hash}
-        
-            mkdir -p $(dirname $NODE_MODULE_CACHE_DIR)
-        
-            if [ -d $NODE_MODULE_CACHE_DIR ] && [ ! -d ${TINE20ROOT}/tine20/Tinebase/js/node_modules ]; then
-                log "found cached node_modules using it..."
-                echo NODE_MODULE_CACHE_DIR=$NODE_MODULE_CACHE_DIR
-        
-                cp -r $NODE_MODULE_CACHE_DIR ${TINE20ROOT}/tine20/Tinebase/js/node_modules
-        
-                # create marker for cache cleanup
-                date --utc +%FT%TZ > $NODE_MODULE_CACHE_DIR-lastused
-                return 0
-            fi
-        
-            log "installing npm ..."
-            pushd ${TINE20ROOT}/tine20/Tinebase/js
-            npm --no-optional install $additional_npm_args
-            popd
-        
-            if [ ! -d $NODE_MODULE_CACHE_DIR ]; then
-                log "storing node_modles dir as cache"
-                cp -r ${TINE20ROOT}/tine20/Tinebase/js/node_modules $NODE_MODULE_CACHE_DIR || log "storing node_modles dir failed. continuing"
-            fi
-        }
-        
-        
-        test_phpunit() {
-            log "Preparing test .."
-            if [ -f ${TINE20ROOT}/scripts/postInstallGitlab.sh ]; then
-                ${TINE20ROOT}/scripts/postInstallGitlab.sh
-            fi
-            
-            php -v
-            echo ${NODE_TOTAL} ${NODE_INDEX};
-            echo cd ${TINE20ROOT}/${ARG_TEST_PATH_FROM_TINE20ROOT}
-        
-            cd ${TINE20ROOT}/${ARG_TEST_PATH_FROM_TINE20ROOT}
-        
-            log "Testing ..."
-            cmd="php -d pcov.directory=$TINE20ROOT/tine20 -d memory_limit=-1 ${TINE20ROOT}/tine20/vendor/bin/phpunit --color --log-junit ${CI_PROJECT_DIR}/phpunit-report.xml --debug";
-        
-            if test -n "${ARG_FILTER}"; then
-                cmd="${cmd} --filter ${ARG_FILTER}"
-            fi
-            
-            if test -n "${ARG_EXCLUDE_GROUP}"; then
-                cmd="${cmd} --exclude-group ${ARG_EXCLUDE_GROUP}"
-            fi
-        
-            if test -n "${ARG_GROUP}"; then
-                cmd="${cmd} --group ${ARG_GROUP}"
-            fi
-        
-            mkdir -p ${CI_PROJECT_DIR}/coverage    
-            cmd="${cmd} --coverage-cobertura=${CI_PROJECT_DIR}/phpunit-coverage.xml --coverage-html=${CI_PROJECT_DIR}/coverage"
-        
-            cmd="${cmd} ${ARG_TEST}";
-        
-            echo ${cmd};
-            ${cmd}
-        }
-        
-        # log in blue
-        log() {
-            echo -e "\033[0;34m"$@"\033[0m"
-        }
-        
-        test_release_update_test_determine_start_version() {
-            # we can automatically determine the start version for main, beta and be. - git describe only works for lts and be, as other branches are "contaminated" with different tags 
-            if [ -z "${CUSTOMER_MAJOR_COMMIT_REF_NAME}" ]; then
-                if [ "${BASE_MAJOR_COMMIT_REF_NAME}" == "${TINE_VERSION_NEXT}" ] || [ "${BASE_MAJOR_COMMIT_REF_NAME}" == "${TINE_VERSION_BETA}" ]; then
-                    git describe --tags --abbrev=0 origin/${TINE_VERSION_BE}
-                    return
-                fi
-        
-                if [ "${BASE_MAJOR_COMMIT_REF_NAME}" == "${TINE_VERSION_BE}" ]; then
-                    git describe --tags --abbrev=0 origin/${TINE_VERSION_LTS}
-                    return
-                fi
-            fi
-        
-            if [ -n "${RELEASE_UPDATE_TEST_START_REF}" ]; then
-                echo ${RELEASE_UPDATE_TEST_START_REF}
-                return
-            fi
-        
-            if [ -n "${CUSTOMER_MAJOR_COMMIT_REF_NAME}" ]; then
-                if [ "${BASE_MAJOR_COMMIT_REF_NAME}" == "${TINE_VERSION_NEXT}" ] || [ "${BASE_MAJOR_COMMIT_REF_NAME}" == "${TINE_VERSION_BETA}" ]; then
-                    git describe --tags --abbrev=0  --match="*${CUSTOMER_MAJOR_COMMIT_REF_NAME::-1}*"  origin/${CUSTOMER_MAJOR_COMMIT_REF_NAME}${TINE_VERSION_BE}
-                    return
-                fi
-        
-                if [ "${BASE_MAJOR_COMMIT_REF_NAME}" == "${TINE_VERSION_BE}" ]; then
-                    git describe --tags --abbrev=0 --match="*${CUSTOMER_MAJOR_COMMIT_REF_NAME::-1}*" origin/${CUSTOMER_MAJOR_COMMIT_REF_NAME}${TINE_VERSION_LTS}
-                    return
-                fi
-            fi
-        }
-        
-        test_update_tine() {
-            log update
-            su tine20 -c "php setup.php --config=/etc/tine20 --update -v -- strict=1"
-        }
-
-
-        # lib/scripts/test_cloud.sh
-        test_cloud_generate_deployment_name() {
-            echo -n $DEPLOYMENT_NAME_RAW | sed 's/\./-/g' | sed 's/\//-/g'
-        }
-        
-        test_cloud_deploy() {
-            export DEPLOYMENT_NAME=$(test_cloud_generate_deployment_name)
-            export DEPLOYMENT_IMAGE_TAG=${TEST_CLOUD_DEPLOY_DEPLOYMENT_IMAGE_TAG_OVERWRITE:-$(release_get_package_version)}
-        
-            echo $DEPLOYMENT_NAME $DEPLOYMENT_IMAGE_TAG
-        
-            # todo: but later (is not mvp)
-            # if [ "$RELEASE_TYPE" == "nightly" ]; then
-            #     helmfile -f path/to/helmfile.yaml destroy
-            #     # remove jobs 
-            #     # fail for pvc to be deleted
-            # fi
-        
-            # other functions need thees values
-            helmfile -f ${CI_BUILDS_DIR}/${CI_PROJECT_NAMESPACE}/tine20/ci/test-cloud/helmfile.yaml write-values --output-file-template=/tmp/values.yaml
-        
-            test_cloud_setup_database
-        
-            helmfile -f ${CI_BUILDS_DIR}/${CI_PROJECT_NAMESPACE}/tine20/ci/test-cloud/helmfile.yaml sync
-        }
-        
-        test_cloud_teardown() {
-            export DEPLOYMENT_NAME=$(test_cloud_generate_deployment_name)
-            export DEPLOYMENT_IMAGE_TAG=${TEST_CLOUD_DEPLOY_DEPLOYMENT_IMAGE_TAG_OVERWRITE:-$(release_get_package_version)}
-        
-            echo $DEPLOYMENT_NAME $DEPLOYMENT_IMAGE_TAG
-        
-            # other functions need thees values
-            helmfile -f ${CI_BUILDS_DIR}/${CI_PROJECT_NAMESPACE}/tine20/ci/test-cloud/helmfile.yaml write-values --output-file-template=/tmp/values.yaml
-        
-            helmfile -f ${CI_BUILDS_DIR}/${CI_PROJECT_NAMESPACE}/tine20/ci/test-cloud/helmfile.yaml destroy
-        
-            test_cloud_teardown_database
-        
-            kubectl --context tine20/gitlab-agent:k8s-se01 -n test-tine delete jobs.batch -l app.kubernetes.io/instance=tine-${DEPLOYMENT_NAME},app.kubernetes.io/name=tine
-        }
-        
-        test_cloud_mariadb() {
-            # helmfile write-values needs to run before!
-        
-            db_host=$(cat /tmp/values.yaml | yq .database.host)
-            db_username=$(cat /tmp/values.yaml | yq .database.username)
-            db_password=$(cat /tmp/values.yaml | yq .database.password)
-        
-            mysql -h ${db_host} -u ${db_username} -p${db_password} --skip-ssl
-        }
-        
-        test_cloud_setup_database() {
-            db_name=$(cat /tmp/values.yaml | yq .database.name)
-        
-            echo 'CREATE DATABASE IF NOT EXISTS `'${db_name}'`;' | test_cloud_mariadb
-        }
-        
-        test_cloud_teardown_database() {
-            db_name=$(cat /tmp/values.yaml | yq .database.name)
-        
-            echo 'DROP DATABASE IF EXISTS `'${db_name}'`;' | test_cloud_mariadb
-        }
-
-        # lib/scripts/version_check.sh
-        version_check_update () {
-            version_check_update_file htdocs%2FversionCheck%2Fversion.json
-            version_check_update_file htdocs%2FversionCheck%2Fbe%2Fversion.json
-        }
-        
-        version_check_update_file () {
-            path=$1
-            
-            release_time="$(date "+%Y-%m-%d 00:00:00")"
-            version="{\\\"codeName\\\":\\\"${CODE_NAME}\\\",\\\"packageString\\\":\\\"${PACKAGE_STRING}\\\",\\\"releaseTime\\\":\\\"${release_time}\\\",\\\"critical\\\":\\\"false\\\",\\\"build\\\":\\\"${BUILD}\\\"}"
-        
-            curl --request PUT --header "PRIVATE-TOKEN: ${VERSION_CHECK_UPDATE_TOKEN}" \
-             --header "Content-Type: application/json" \
-             --data '{"branch": "master", "commit_message": "update version", "content": "'"$version"'"}' \
-             "${CI_API_V4_URL}/projects/${VERSION_CHECK_PROJECT_ID}/repository/files/$path"
-        }
-
-        #!/bin/bash
-        echo -n 'wait for signal_mount_ready ...'; while [ ! -f ${CI_BUILDS_DIR}/${CI_PROJECT_NAMESPACE}/signal_mount_ready ]; do sleep 1; done; echo ' done'
-        
-        test_prepare_working_dir
-        touch ${CI_BUILDS_DIR}/${CI_PROJECT_NAMESPACE}/tine20/signal_files_ready
-        
-        test_composer_install
-        touch ${CI_BUILDS_DIR}/${CI_PROJECT_NAMESPACE}/tine20/signal_php_deps_installed
-        # lib/entry_points/prepare_working_dir_js_tests.sh
-
-
-    # lib/entry_points/tine_as_a_service.sh
-    tine_as_a_service:
-      - /bin/bash
-      - -c
-      - |
-        # lib/scripts/cache_cleanup.sh
-        # requres gnu date - busybox date wont work
-        function cache_cleanup_atomic_dir_cache () {
-            MAX_AGE_USED_CACHE=$1
-            MAX_AGE_CACHE=$2
-        
-            dirs=$(find . -type d -path './*' -prune -print)
-        
-            threshold_used=$(( $(date +%s) -  60 * 60  * $MAX_AGE_USED_CACHE ))
-            threshold=$(( $(date +%s) -  60 * 60 * $MAX_AGE_CACHE ))
-        
-            for dir in $dirs; do
-                if [ -f $dir-lastused ]; then
-                    lastused=$(date -d $(cat $dir-lastused) +%s)
-        
-                    if [ $lastused -gt $threshold_used ]; then
-                        continue
-                    fi
-        
-                    rm -f $dir-lastused
-                fi
-        
-                modified=$(stat -c %Y $dir)
-                if [ $modified -gt $threshold ]; then
-                    continue
-                fi
-        
-                rm -rf $dir
-            done
-        }
-        
-        function cache_cleanup_vendor_dir_cache () {
-            MAX_AGE_USED_CACHE=48
-            MAX_AGE_CACHE=10
-        
-            cd ${CI_CUSTOM_CACHE_DIR}/${CI_PROJECT_NAMESPACE}/tine20/composer-cache/v1/
-        
-            cache_cleanup_atomic_dir_cache $MAX_AGE_USED_CACHE $MAX_AGE_CACHE
-        }
-        
-        function cache_cleanup_npm_dir_cache () {
-            MAX_AGE_USED_CACHE=336
-            MAX_AGE_CACHE=48
-        
-            cd ${CI_CUSTOM_CACHE_DIR}/${CI_PROJECT_NAMESPACE}/tine20/npm-cache/v1/
-        
-            cache_cleanup_atomic_dir_cache $MAX_AGE_USED_CACHE $MAX_AGE_CACHE
-        }
-        
-        function cache_cleanup_phpstan_cache () {
-            MAX_AGE_USED_CACHE=744
-            MAX_AGE_CACHE=168
-        
-            dirs=$(find ${CI_CUSTOM_CACHE_DIR}/${CI_PROJECT_NAMESPACE} -type d -path ${CI_CUSTOM_CACHE_DIR}/${CI_PROJECT_NAMESPACE}/'*' -prune -print)
-            for dir in $dirs; do
-                if ! [ -d $dir/phpstan-cache/v2/ ]; then
-                    continue
-                fi
-        
-                cd $dir/phpstan-cache/v2/
-                cache_cleanup_atomic_dir_cache $MAX_AGE_USED_CACHE $MAX_AGE_CACHE
-            done
-        }
         
         function cache_cleanup_metrics_lifetime_atomic_dir_cache() {
             dirs=$(find . -type d -path './*' -prune -print)
@@ -2808,6 +1618,7 @@
                 --file ./ci/dockerimage/Dockerfile \
                 --build-arg PHP_IMAGE=php${PHP_VERSION} \
                 --build-arg APT_MIRROR=${APT_MIRROR} \
+                --build-arg APT_MIRROR_UNSUPPORTED_CODENAME=${APT_MIRROR_UNSUPPORTED_CODENAME} \
                 .
         
             log dev image: pushing ...
@@ -2825,6 +1636,7 @@
                 --file ./ci/dockerimage/Dockerfile \
                 --build-arg PHP_IMAGE=php${PHP_VERSION} \
                 --build-arg APT_MIRROR=${APT_MIRROR} \
+                --build-arg APT_MIRROR_UNSUPPORTED_CODENAME=${APT_MIRROR_UNSUPPORTED_CODENAME} \
                 .
         
             log test image: pushing ...
@@ -2841,6 +1653,7 @@
                 --file ./ci/dockerimage/Dockerfile \
                 --build-arg PHP_IMAGE=php${PHP_VERSION} \
                 --build-arg APT_MIRROR=${APT_MIRROR} \
+                --build-arg APT_MIRROR_UNSUPPORTED_CODENAME=${APT_MIRROR_UNSUPPORTED_CODENAME} \
                 --build-arg JSDEPENDENCY_IMAGE \
                 --build-arg ZIP_PACKAGES \
                 --build-arg RELEASE_TYPE \
@@ -2867,6 +1680,7 @@
                 --file ./ci/dockerimage/Dockerfile \
                 --build-arg PHP_IMAGE=php${PHP_VERSION} \
                 --build-arg APT_MIRROR=${APT_MIRROR} \
+                --build-arg APT_MIRROR_UNSUPPORTED_CODENAME=${APT_MIRROR_UNSUPPORTED_CODENAME} \
                 --build-arg JSDEPENDENCY_IMAGE \
                 --build-arg ZIP_PACKAGES \
                 --build-arg RELEASE_TYPE \
@@ -2892,6 +1706,7 @@
                 --target packages \
                 --file ./ci/dockerimage/Dockerfile \
                 --build-arg APT_MIRROR=${APT_MIRROR} \
+                --build-arg APT_MIRROR_UNSUPPORTED_CODENAME=${APT_MIRROR_UNSUPPORTED_CODENAME} \
                 --build-arg BUILT_IMAGE \
                 --build-arg ZIP_PACKAGES \
                 --build-arg RELEASE=$(release_get_package_version) \
@@ -3680,7 +2495,1492 @@
                 fi
         
                 if ! release_is_patch_level_release; then
-                    matrix_send_message "${matrix_room}" "We just released the new version ${CODENAME} ${version} 🎉\\nCheck https://www.tine-groupware.de/ and https://github.com/tine-groupware/tine/releases for more information and the downloads.\\nYou can also pull the image from dockerhub: https://hub.docker.com/r/tinegroupware/tine"
+                    matrix_send_message "${matrix_room}" "We just released the new version ${CODENAME} ${version} 🎉\\nCheck https://www.tine-groupware.de/ and https://github.com/tine-groupware/tine/releases/tag/${version} for more information and the downloads.\\nYou can also pull the image from dockerhub: https://hub.docker.com/r/tinegroupware/tine"
+                fi
+        
+            fi
+        }
+        
+        release_push_release_tag_to_github() {
+            if ! test "$CI_COMMIT_TAG"; then
+                echo "no tag to push: '$CI_COMMIT_TAG'"
+                return
+            fi
+        
+            cp $DOCKER_GIT_CONFIG ~/.gitconfig
+            git config --global user.email "gitlabci@metaways.de"
+            git config --global user.name "gitlabci"
+            git remote add github https://github.com/tine-groupware/tine.git
+        
+            git push github refs/tags/$CI_COMMIT_TAG
+        }
+        
+        release_packages_vpackages_push() {
+            customer=$(release_determin_customer)
+            package_repo=$(release_packages_determin_package_repo_name)
+            version=${CI_COMMIT_TAG:-$(packaging_gitlab_get_version_for_pipeline_id)}
+            release=$(echo ${version} | sed sI-I~Ig)
+        
+            echo "publishing ${release} (${version}) for ${customer} from ${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${package_repo}/${version}/all.tar"
+        
+            if ! ssh ${VPACKAGES_SSH_URL} -o StrictHostKeyChecking=no -C  "sudo -u www-data curl ${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${package_repo}/${version}/all.tar -o /tmp/${release}-source-${customer}.tar"; then
+                echo "Failed to download packages to vpackages"
+                return 1
+            fi
+        
+            if ! ssh ${VPACKAGES_SSH_URL} -o StrictHostKeyChecking=no -C  "sudo -u www-data /srv/packages.tine20.com/www/scripts/importTine20Repo.sh /tmp/${release}-source-${customer}.tar; sudo -u www-data rm -f /tmp/${release}-source-${customer}.tar"; then
+                echo "Failed to import package to repo"
+                return 1
+            fi
+        }
+        
+        release_packages_vpackages_create_current_link() {
+            customer=$(release_determin_customer)
+            version=${CI_COMMIT_TAG:-$(packaging_gitlab_get_version_for_pipeline_id ${customer})}
+            release=$(echo ${version} | sed sI-I~Ig)
+        
+            if [ "$customer" == "tine20.com" ]; then
+                customer="maintenance"
+            fi
+        
+            if ! ssh ${VPACKAGES_SSH_URL} -o StrictHostKeyChecking=no -C  "if test -d /srv/packages.tine20.com/www/htdocs/${customer}/source/; then sudo -u www-data rm -f /srv/packages.tine20.com/www/htdocs/${customer}/source/tine-groupware-current.tar.bz2; sudo -u www-data ln -s ${version}/tine20-allinone_${version}.tar.bz2 /srv/packages.tine20.com/www/htdocs/${customer}/source/tine-groupware-current.tar.bz2; fi"; then
+                echo "Failed to set current link"
+                return 1
+            fi
+        }
+        
+        release_packages_gitlab_set_current_link() {
+            package_repo=$(release_packages_determin_package_repo_name)
+            version=${CI_COMMIT_TAG:-$(packaging_gitlab_get_version_for_pipeline_id ${customer})}
+        
+            curl \
+                --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
+                -XPUT --data "${version}" \
+                "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${package_repo}/links/current"
+        
+            matrix_send_message $MATRIX_ROOM "🟢 Package for ${version} is ready."
+        }
+        
+        release_packages_determin_package_repo_name () {
+            if [ "$RELEASE_TYPE" == "weekly" ]; then
+                echo "weekly"
+                return
+            fi
+        
+            if [ "$RELEASE_TYPE" == "monthly" ]; then
+                echo "monthly"
+                return
+            fi
+        
+            if [ "$RELEASE_TYPE" == "beta" ]; then
+                echo "beta"
+                return
+            fi
+        
+            if [ "$RELEASE_TYPE" == "be" ]; then
+                echo "tine20.com"
+                return
+            fi
+        
+            if [ "$RELEASE_TYPE" == "customer" ]; then
+                if [ -n "$PACKAGE_REPO_NAME_OVERWRITE" ]; then
+                    echo "$PACKAGE_REPO_NAME_OVERWRITE"
+                    return
+                fi
+        
+                release_determin_customer # basicly `echo "${CUSTOMER_MAJOR_COMMIT_REF_NAME}" | sed 's:/*$::'` as all other case cant match
+                return $?
+            fi
+        
+            echo "ci"
+            return
+        }
+
+        # lib/scripts/repo.sh
+        repo_release_notes() {
+            tag=$1
+            previous_tag="$(git describe --abbrev=0 --tags HEAD~1 2> /dev/null || git fetch --unshallow --quiet && git describe --abbrev=0 --tags HEAD~1)" # if describe fails unshallow repo and try again
+        
+            echo '# Releasenotes'
+            echo '## Updating from Community Edition'
+            echo 'If you update to this version from an older Community Edition (like https://github.com/tine20/tine20/releases/tag/2023.12.1), you might have to check the number of activated users. Without an activation key, this version only supports 5 enabled users.'
+            echo '# Changelog'
+            ${CI_BUILDS_DIR}/${CI_PROJECT_NAMESPACE}/tine20/scripts/git/changelog.sh "$tag" "$previous_tag"
+        }
+
+        # lib/scripts/test.sh
+        test_prepare_working_dir() {
+            if [ "${TINE20ROOT}" != "${CI_BUILDS_DIR}/${CI_PROJECT_NAMESPACE}/tine20" ]; then
+                log "test_preapre_working_dir requires the tine root to be: \${CI_BUILDS_DIR}/\${CI_PROJECT_NAMESPACE}/tine20"
+                # This function is only intended to work with the source from gitlab...
+                # intended: for the main repo => do basicly nothing. Or for customapps => clone main repo and include customapp
+                # and setup vars as if we where running in the main repo. 
+                return 1
+            fi
+        
+            if [ "${CI_PROJECT_NAME}" != "tine20" ] && [ "$CI_IS_CUSTOMAPP" != "true" ]; then
+                log "project name needs to be tine20 (for this, and) other test scrips to work"
+                # In many places ${CI_BUILDS_DIR}/${CI_PROJECT_NAMESPACE}/tine20 is used. If we use TINE20ROOT root any where
+                # the project name can be anything. As long as TINE20ROOT points to the correct CI_POOJECT_DIR.
+                # todo remove this if. if we removed all occurents of ${CI_BUILDS_DIR}/${CI_PROJECT_NAMESPACE}/tine20
+                return 1
+            fi
+        
+            # Clone tine repo, if pipeline runs for a customapp
+            if [ "${CI_IS_CUSTOMAPP}" == "true" ]; then
+                log "cloning tine ..."
+                git clone -b $TINE20_BRANCH --single-branch --depth 1 $TINE20_REPO_URL ${TINE20ROOT};
+            fi
+        
+            # todo: move into customapp case, and let gitlab hanled submodule init for the main repo
+            log "init git submodules ..."
+            cd ${TINE20ROOT}
+            git submodule init
+            git submodule update
+            
+            
+            # Install source customapp, if pipeline runs for a customapp
+            if [ "${CI_IS_CUSTOMAPP}" == "true" ]; then
+                # COMPOSER custom cache
+                # CI_CUSTOM_CACHE_DIR is a volume shared betwean runners
+                # export COMPOSER_CACHE_DIR=${CI_CUSTOM_CACHE_DIR}/${CI_PROJECT_NAMESPACE}/composer-cache/v1/
+                # mkdir -p ${COMPOSER_CACHE_DIR}
+        
+                log "instaling custom app ..."
+                customappname=$(cat ${CI_PROJECT_DIR}/composer.json | jq -r '.name')
+                pushd ${TINE20ROOT}/tine20
+        
+                composer config "repositories.ci" git "${CI_REPOSITORY_URL}";
+                COMPOSER_ALLOW_SUPERUSER=1 composer require "$customappname dev-master#${CI_COMMIT_SHA}";
+                popd
+            fi
+        
+            # the shell should be left in the new working dir
+            cd ${TINE20ROOT}
+        }
+        
+        test_prepare_global_configs() {
+            log "Preparing global configs ..."
+            rm /etc/supervisor.d/worker.ini || true
+            rm /etc/crontabs/tine20 || true
+            gomplate --config /etc/gomplate/config.yaml
+            # cp ${CI_BUILDS_DIR}/${CI_PROJECT_NAMESPACE}/tine20/ci/dockerimage/supervisor.d/webpack.ini /etc/supervisor.d/; # 2023.11 >= todo have/need this file
+            # todo move config dir to ${TINE20ROOT}/etc build test should be ablte to handle that
+            rsync -a -I --delete ${CI_BUILDS_DIR}/${CI_PROJECT_NAMESPACE}/tine20/etc/ /config;
+            echo "$TINE20_SETUP_HTPASSWD" > /etc/tine20/setup.htpasswd
+        }
+        
+        test_prepare_mail_db() {
+            log "Preparing databases for mail setup ..."
+            mysql -h$MAIL_DB_HOST -uroot -p"$MYSQL_ROOT_PASSWORD" -e"SET GLOBAL wait_timeout=31536000; SET GLOBAL interactive_timeout=31536000"
+            mysql -h$MAIL_DB_HOST -uroot -p"$MYSQL_ROOT_PASSWORD" -e"CREATE DATABASE IF NOT EXISTS dovecot"
+            mysql -h$MAIL_DB_HOST -uroot -p"$MYSQL_ROOT_PASSWORD" -e"CREATE DATABASE IF NOT EXISTS postfix"
+            mysql -h$MAIL_DB_HOST -uroot -p"$MYSQL_ROOT_PASSWORD" -e"CREATE USER IF NOT EXISTS '$MYSQL_USER'@'%' IDENTIFIED BY '$MYSQL_PASSWORD';"
+            mysql -h$MAIL_DB_HOST -uroot -p"$MYSQL_ROOT_PASSWORD" -e"GRANT ALL PRIVILEGES ON postfix.* TO '$MYSQL_USER'@'%'"
+            mysql -h$MAIL_DB_HOST -uroot -p"$MYSQL_ROOT_PASSWORD" -e"GRANT ALL PRIVILEGES ON dovecot.* TO '$MYSQL_USER'@'%'"
+            mysql -h$MAIL_DB_HOST -uroot -p"$MYSQL_ROOT_PASSWORD" "dovecot" < /config/sql/dovecot_tables.sql
+            mysql -h$MAIL_DB_HOST -uroot -p"$MYSQL_ROOT_PASSWORD" "postfix" < $ARG_POSTFIX_INIT_SQL_PATH
+        }
+        
+        test_composer_install() {
+            log "trying to use cached vendor dir"
+            composer_lock_hash=$(cd ${TINE20ROOT}/tine20; sha1sum composer.json composer.lock | sha1sum | cut -d ' ' -f 1)
+            export VENDOR_CACHE_DIR=${CI_CUSTOM_CACHE_DIR}/${CI_PROJECT_NAMESPACE}/tine20/composer-cache/v1/${composer_lock_hash}
+        
+            mkdir -p $(dirname $VENDOR_CACHE_DIR)
+        
+            if [ -d $VENDOR_CACHE_DIR ] && [ ! -d ${TINE20ROOT}/tine20/vendor ]; then
+                log "found cached vendor dir using it..."
+                echo VENDOR_CACHE_DIR=$VENDOR_CACHE_DIR
+        
+                cp -r $VENDOR_CACHE_DIR ${TINE20ROOT}/tine20/vendor
+                # create marker for cache cleanup
+                date --utc +%FT%TZ > $VENDOR_CACHE_DIR-lastused
+                # do not return here, we need to run composer install, so it creates the customapps links for us
+            fi
+        
+            log "preparing composer cache ..."
+            # CI_CUSTOM_CACHE_DIR is a volume shared betwean runners
+            export COMPOSER_CACHE_DIR=${CI_CUSTOM_CACHE_DIR}/${CI_PROJECT_NAMESPACE}/composer-cache/v1/
+            mkdir -p ${COMPOSER_CACHE_DIR}
+        
+            log "composer install ..."
+            pushd ${TINE20ROOT}/tine20
+            # trigger customapploader plugin, to create links
+            rm -rf vendor/metaways
+            COMPOSER_ALLOW_SUPERUSER=1 composer install --no-ansi --no-progress --no-suggest
+            popd
+        
+            # Store cache, but not for custom apps. composer.lock contains commit specific data. Therefor the cache will be never reused.
+            # Unless the pipeline is rerun for the same commit.
+            if [ ! -d $VENDOR_CACHE_DIR ] && [ "${CI_IS_CUSTOMAPP}" != "true" ]; then
+                log "storing vendor dir as cache"
+                cp -r ${TINE20ROOT}/tine20/vendor $VENDOR_CACHE_DIR || log "storing vendor dir failed. continuing"
+            fi
+        }
+        
+        test_npm_install() {
+            additional_npm_args="$1"
+            log "trying to use cache..."
+            package_shrinkwrap_hash=$(cd ${TINE20ROOT}/tine20/Tinebase/js; echo $(sha1sum npm-shrinkwrap.json package.json)"$additional_npm_args" | sha1sum | cut -d ' ' -f 1)
+            export NODE_MODULE_CACHE_DIR=${CI_CUSTOM_CACHE_DIR}/${CI_PROJECT_NAMESPACE}/tine20/npm-cache/v1/${package_shrinkwrap_hash}
+        
+            mkdir -p $(dirname $NODE_MODULE_CACHE_DIR)
+        
+            if [ -d $NODE_MODULE_CACHE_DIR ] && [ ! -d ${TINE20ROOT}/tine20/Tinebase/js/node_modules ]; then
+                log "found cached node_modules using it..."
+                echo NODE_MODULE_CACHE_DIR=$NODE_MODULE_CACHE_DIR
+        
+                cp -r $NODE_MODULE_CACHE_DIR ${TINE20ROOT}/tine20/Tinebase/js/node_modules
+        
+                # create marker for cache cleanup
+                date --utc +%FT%TZ > $NODE_MODULE_CACHE_DIR-lastused
+                return 0
+            fi
+        
+            log "installing npm ..."
+            pushd ${TINE20ROOT}/tine20/Tinebase/js
+            npm --no-optional install $additional_npm_args
+            popd
+        
+            if [ ! -d $NODE_MODULE_CACHE_DIR ]; then
+                log "storing node_modles dir as cache"
+                cp -r ${TINE20ROOT}/tine20/Tinebase/js/node_modules $NODE_MODULE_CACHE_DIR || log "storing node_modles dir failed. continuing"
+            fi
+        }
+        
+        
+        test_phpunit() {
+            log "Preparing test .."
+            if [ -f ${TINE20ROOT}/scripts/postInstallGitlab.sh ]; then
+                ${TINE20ROOT}/scripts/postInstallGitlab.sh
+            fi
+            
+            php -v
+            echo ${NODE_TOTAL} ${NODE_INDEX};
+            echo cd ${TINE20ROOT}/${ARG_TEST_PATH_FROM_TINE20ROOT}
+        
+            cd ${TINE20ROOT}/${ARG_TEST_PATH_FROM_TINE20ROOT}
+        
+            log "Testing ..."
+            cmd="php -d pcov.directory=$TINE20ROOT/tine20 -d memory_limit=-1 ${TINE20ROOT}/tine20/vendor/bin/phpunit --color --log-junit ${CI_PROJECT_DIR}/phpunit-report.xml --debug";
+        
+            if test -n "${ARG_FILTER}"; then
+                cmd="${cmd} --filter ${ARG_FILTER}"
+            fi
+            
+            if test -n "${ARG_EXCLUDE_GROUP}"; then
+                cmd="${cmd} --exclude-group ${ARG_EXCLUDE_GROUP}"
+            fi
+        
+            if test -n "${ARG_GROUP}"; then
+                cmd="${cmd} --group ${ARG_GROUP}"
+            fi
+        
+            mkdir -p ${CI_PROJECT_DIR}/coverage    
+            cmd="${cmd} --coverage-cobertura=${CI_PROJECT_DIR}/phpunit-coverage.xml --coverage-html=${CI_PROJECT_DIR}/coverage"
+        
+            cmd="${cmd} ${ARG_TEST}";
+        
+            echo ${cmd};
+            ${cmd}
+        }
+        
+        # log in blue
+        log() {
+            echo -e "\033[0;34m"$@"\033[0m"
+        }
+        
+        test_release_update_test_determine_start_version() {
+            # we can automatically determine the start version for main, beta and be. - git describe only works for lts and be, as other branches are "contaminated" with different tags 
+            if [ -z "${CUSTOMER_MAJOR_COMMIT_REF_NAME}" ]; then
+                if [ "${BASE_MAJOR_COMMIT_REF_NAME}" == "${TINE_VERSION_NEXT}" ] || [ "${BASE_MAJOR_COMMIT_REF_NAME}" == "${TINE_VERSION_BETA}" ]; then
+                    git describe --tags --abbrev=0 origin/${TINE_VERSION_BE}
+                    return
+                fi
+        
+                if [ "${BASE_MAJOR_COMMIT_REF_NAME}" == "${TINE_VERSION_BE}" ]; then
+                    git describe --tags --abbrev=0 origin/${TINE_VERSION_LTS}
+                    return
+                fi
+            fi
+        
+            if [ -n "${RELEASE_UPDATE_TEST_START_REF}" ]; then
+                echo ${RELEASE_UPDATE_TEST_START_REF}
+                return
+            fi
+        
+            if [ -n "${CUSTOMER_MAJOR_COMMIT_REF_NAME}" ]; then
+                if [ "${BASE_MAJOR_COMMIT_REF_NAME}" == "${TINE_VERSION_NEXT}" ] || [ "${BASE_MAJOR_COMMIT_REF_NAME}" == "${TINE_VERSION_BETA}" ]; then
+                    git describe --tags --abbrev=0  --match="*${CUSTOMER_MAJOR_COMMIT_REF_NAME::-1}*"  origin/${CUSTOMER_MAJOR_COMMIT_REF_NAME}${TINE_VERSION_BE}
+                    return
+                fi
+        
+                if [ "${BASE_MAJOR_COMMIT_REF_NAME}" == "${TINE_VERSION_BE}" ]; then
+                    git describe --tags --abbrev=0 --match="*${CUSTOMER_MAJOR_COMMIT_REF_NAME::-1}*" origin/${CUSTOMER_MAJOR_COMMIT_REF_NAME}${TINE_VERSION_LTS}
+                    return
+                fi
+            fi
+        }
+        
+        test_update_tine() {
+            log update
+            su tine20 -c "php setup.php --config=/etc/tine20 --update -v -- strict=1"
+        }
+
+
+        # lib/scripts/test_cloud.sh
+        # DEPLOYMENT_NAME should a an dns label
+        # DEPLOYMENT_NAME must not excide a specific length. The limiting factor is that the email user name is not allowed
+        # to be longer than 80 charts. The email user name contains a 40 char hash and an @ leaving 39 for DEPLOYMENT_NAME and
+        # DEPLOYMENT_BASE_DOMAIN (and a dot).
+        test_cloud_generate_deployment_name() {
+            DEPLOYMENT_NAME=$(echo -n $CI_ENVIRONMENT_NAME | sed 's/\./-/g' | sed 's/\//-/g' | awk '{print tolower($0)}')
+        
+            if [[ $(echo -n $DEPLOYMENT_NAME.$DEPLOYMENT_BASE_DOMAIN | wc -c) -le 39 ]]; then
+                echo $DEPLOYMENT_NAME
+                return
+            fi
+        
+            # replace nightly- with n-, if it is enough to stay under the limit 
+            if [[ "$DEPLOYMENT_NAME" == "nightly-"* ]] && [[ $(echo -n $DEPLOYMENT_NAME.$DEPLOYMENT_BASE_DOMAIN | wc -c) -le 45 ]]; then
+                echo n${DEPLOYMENT_NAME#"nightly"}
+                return
+            fi
+        
+            # replace review- with r-, if it is enough to stay under the limit 
+            if [[ "$DEPLOYMENT_NAME" == "review-"* ]] && [[ $(echo -n $DEPLOYMENT_NAME.$DEPLOYMENT_BASE_DOMAIN | wc -c) -le 44 ]]; then
+                echo r${DEPLOYMENT_NAME#"review"}
+                return
+            fi
+        
+            #add hash to prevent name collisions
+            HASH=$(echo -n $DEPLOYMENT_NAME | md5sum | cut -c -4)
+        
+            echo $(echo -n $DEPLOYMENT_NAME | cut -c -$((80-41-$(echo -n "-$HASH.$DEPLOYMENT_BASE_DOMAIN" | wc -c))))-$HASH
+        }
+        
+        test_cloud_deploy() {
+            export DEPLOYMENT_NAME=$(test_cloud_generate_deployment_name)
+            export DEPLOYMENT_IMAGE_TAG=${TEST_CLOUD_DEPLOY_DEPLOYMENT_IMAGE_TAG_OVERWRITE:-$(release_get_package_version)}
+        
+            echo $DEPLOYMENT_NAME $DEPLOYMENT_IMAGE_TAG
+        
+            if [ "$DEPLOY_TYPE" == "nightly" ]; then
+                test_cloud_teardown
+                if kubectl --context tine20/gitlab-agent:k8s-se01 -n test-tine get pvc tine-$DEPLOYMENT_NAME-tine-data; then
+                    kubectl --context tine20/gitlab-agent:k8s-se01 -n test-tine wait pvc tine-$DEPLOYMENT_NAME-tine-data --for=delete --timeout 5m
+                fi
+            fi
+        
+            # other functions need thees values
+            helmfile -f ${CI_BUILDS_DIR}/${CI_PROJECT_NAMESPACE}/tine20/ci/test-cloud/helmfile.yaml write-values --output-file-template=/tmp/values.yaml
+        
+            test_cloud_setup_database
+        
+            helmfile -f ${CI_BUILDS_DIR}/${CI_PROJECT_NAMESPACE}/tine20/ci/test-cloud/helmfile.yaml sync
+        
+            echo DYNAMIC_ENVIRONMENT_URL=https://$DEPLOYMENT_NAME.$DEPLOYMENT_BASE_DOMAIN/ > deploy.env
+        }
+        
+        test_cloud_teardown() {
+            export DEPLOYMENT_NAME=$(test_cloud_generate_deployment_name)
+            export DEPLOYMENT_IMAGE_TAG=${TEST_CLOUD_DEPLOY_DEPLOYMENT_IMAGE_TAG_OVERWRITE:-$(release_get_package_version)}
+        
+            echo $DEPLOYMENT_NAME $DEPLOYMENT_IMAGE_TAG
+        
+            # other functions need thees values
+            helmfile -f ${CI_BUILDS_DIR}/${CI_PROJECT_NAMESPACE}/tine20/ci/test-cloud/helmfile.yaml write-values --output-file-template=/tmp/values.yaml
+        
+            if helmfile -f ${CI_BUILDS_DIR}/${CI_PROJECT_NAMESPACE}/tine20/ci/test-cloud/helmfile.yaml status; then
+                helmfile -f ${CI_BUILDS_DIR}/${CI_PROJECT_NAMESPACE}/tine20/ci/test-cloud/helmfile.yaml destroy
+            fi
+        
+            test_cloud_teardown_database
+        
+            kubectl --context tine20/gitlab-agent:k8s-se01 -n test-tine delete jobs.batch -l app.kubernetes.io/instance=tine-${DEPLOYMENT_NAME},app.kubernetes.io/name=tine
+        }
+        
+        test_cloud_mariadb() {
+            # helmfile write-values needs to run before!
+        
+            db_host=$(cat /tmp/values.yaml | yq .database.host)
+            db_username=$(cat /tmp/values.yaml | yq .database.username)
+            db_password=$(cat /tmp/values.yaml | yq .database.password)
+        
+            mysql -h ${db_host} -u ${db_username} -p${db_password} --skip-ssl
+        }
+        
+        test_cloud_imap_mariadb() {
+            # helmfile write-values needs to run before!
+            db_host=$(cat /tmp/values.yaml | yq .tine.features.mail.imap.dovecot.host)
+            db_name=$(cat /tmp/values.yaml | yq .tine.features.mail.imap.dovecot.dbname)
+            db_username=$(cat /tmp/values.yaml | yq .tine.features.mail.imap.dovecot.username)
+            db_password=$(cat /tmp/values.yaml | yq .tine.features.mail.imap.dovecot.password)
+        
+            mysql -h ${db_host} -u ${db_username} -p${db_password} --skip-ssl ${db_name}
+        }
+        
+        test_cloud_smtp_mariadb() {
+            # helmfile write-values needs to run before!
+        
+            db_host=$(cat /tmp/values.yaml | yq .tine.features.mail.smtp.postfix.host)
+            db_name=$(cat /tmp/values.yaml | yq .tine.features.mail.smtp.postfix.dbname)
+            db_username=$(cat /tmp/values.yaml | yq .tine.features.mail.smtp.postfix.username)
+            db_password=$(cat /tmp/values.yaml | yq .tine.features.mail.smtp.postfix.password)
+        
+            mysql -h ${db_host} -u ${db_username} -p${db_password} --skip-ssl ${db_name}
+        }
+        
+        test_cloud_setup_database() {
+            db_name=$(cat /tmp/values.yaml | yq .database.name)
+        
+            echo 'CREATE DATABASE IF NOT EXISTS `'${db_name}'`;' | test_cloud_mariadb
+        }
+        
+        test_cloud_teardown_database() {
+            db_name=$(cat /tmp/values.yaml | yq .database.name)
+        
+            echo 'DROP DATABASE IF EXISTS `'${db_name}'`;' | test_cloud_mariadb
+        
+            # delete artifacts in mail db if they exists
+            echo "DELETE FROM dovecot_users WHERE domain='${DEPLOYMENT_NAME}.${DEPLOYMENT_BASE_DOMAIN}';" | test_cloud_imap_mariadb
+            echo "DELETE FROM smtp_destinations WHERE destination LIKE '%${DEPLOYMENT_NAME}.${DEPLOYMENT_BASE_DOMAIN}';" | test_cloud_smtp_mariadb
+            echo "DELETE FROM smtp_users WHERE email LIKE '%${DEPLOYMENT_NAME}.${DEPLOYMENT_BASE_DOMAIN}';" | test_cloud_smtp_mariadb
+            echo "DELETE FROM smtp_virtual_domains WHERE domain='${DEPLOYMENT_NAME}.${DEPLOYMENT_BASE_DOMAIN}';" | test_cloud_smtp_mariadb
+        }
+
+        # lib/scripts/version_check.sh
+        version_check_update () {
+            version_check_update_file htdocs%2FversionCheck%2Fversion.json
+            version_check_update_file htdocs%2FversionCheck%2Fbe%2Fversion.json
+        }
+        
+        version_check_update_file () {
+            path=$1
+            
+            release_time="$(date "+%Y-%m-%d 00:00:00")"
+            version="{\\\"codeName\\\":\\\"${CODE_NAME}\\\",\\\"packageString\\\":\\\"${PACKAGE_STRING}\\\",\\\"releaseTime\\\":\\\"${release_time}\\\",\\\"critical\\\":\\\"false\\\",\\\"build\\\":\\\"${BUILD}\\\"}"
+        
+            curl --request PUT --header "PRIVATE-TOKEN: ${VERSION_CHECK_UPDATE_TOKEN}" \
+             --header "Content-Type: application/json" \
+             --data '{"branch": "master", "commit_message": "update version", "content": "'"$version"'"}' \
+             "${CI_API_V4_URL}/projects/${VERSION_CHECK_PROJECT_ID}/repository/files/$path"
+        }
+
+        #!/bin/bash
+        echo -n 'wait for signal_mount_ready ...'; while [ ! -f ${CI_BUILDS_DIR}/${CI_PROJECT_NAMESPACE}/signal_mount_ready ]; do sleep 1; done; echo ' done'
+        
+        test_prepare_working_dir
+        touch ${CI_BUILDS_DIR}/${CI_PROJECT_NAMESPACE}/tine20/signal_files_ready
+        
+        test_composer_install
+        touch ${CI_BUILDS_DIR}/${CI_PROJECT_NAMESPACE}/tine20/signal_php_deps_installed
+        # lib/entry_points/prepare_working_dir_js_tests.sh
+
+
+    # lib/entry_points/tine_as_a_service.sh
+    tine_as_a_service:
+      - /bin/bash
+      - -c
+      - |
+        # lib/scripts/cache_cleanup.sh
+        # requres gnu date - busybox date wont work
+        function cache_cleanup_atomic_dir_cache () {
+            MAX_AGE_USED_CACHE=$1
+            MAX_AGE_CACHE=$2
+        
+            dirs=$(find . -type d -path './*' -prune -print)
+        
+            threshold_used=$(( $(date +%s) -  60 * 60  * $MAX_AGE_USED_CACHE ))
+            threshold=$(( $(date +%s) -  60 * 60 * $MAX_AGE_CACHE ))
+        
+            for dir in $dirs; do
+                if [ -f $dir-lastused ]; then
+                    lastused=$(date -d $(cat $dir-lastused) +%s)
+        
+                    if [ $lastused -gt $threshold_used ]; then
+                        continue
+                    fi
+        
+                    rm -f $dir-lastused
+                fi
+        
+                modified=$(stat -c %Y $dir)
+                if [ $modified -gt $threshold ]; then
+                    continue
+                fi
+        
+                rm -rf $dir
+            done
+        }
+        
+        function cache_cleanup_vendor_dir_cache () {
+            MAX_AGE_USED_CACHE=48
+            MAX_AGE_CACHE=10
+        
+            cd ${CI_CUSTOM_CACHE_DIR}/${CI_PROJECT_NAMESPACE}/tine20/composer-cache/v1/
+        
+            cache_cleanup_atomic_dir_cache $MAX_AGE_USED_CACHE $MAX_AGE_CACHE
+        }
+        
+        function cache_cleanup_npm_dir_cache () {
+            MAX_AGE_USED_CACHE=336
+            MAX_AGE_CACHE=48
+        
+            cd ${CI_CUSTOM_CACHE_DIR}/${CI_PROJECT_NAMESPACE}/tine20/npm-cache/v1/
+        
+            cache_cleanup_atomic_dir_cache $MAX_AGE_USED_CACHE $MAX_AGE_CACHE
+        }
+        
+        function cache_cleanup_phpstan_cache () {
+            MAX_AGE_USED_CACHE=744
+            MAX_AGE_CACHE=168
+        
+            dirs=$(find ${CI_CUSTOM_CACHE_DIR}/${CI_PROJECT_NAMESPACE} -type d -path ${CI_CUSTOM_CACHE_DIR}/${CI_PROJECT_NAMESPACE}/'*' -prune -print)
+            for dir in $dirs; do
+                if ! [ -d $dir/phpstan-cache/v2/ ]; then
+                    continue
+                fi
+        
+                cd $dir/phpstan-cache/v2/
+                cache_cleanup_atomic_dir_cache $MAX_AGE_USED_CACHE $MAX_AGE_CACHE
+            done
+        }
+        
+        function cache_cleanup_metrics_lifetime_atomic_dir_cache() {
+            dirs=$(find . -type d -path './*' -prune -print)
+        
+            now=$(date +%s)
+        
+            for dir in $dirs; do
+                lastusediff=NaN
+                if [ -f $dir-lastused ]; then
+                    lastused=$(date -d $(cat $dir-lastused) +%s)
+        
+                    lastusediff=$(echo "($now - $lastused) / 60 / 60" | bc)
+                fi
+        
+                modified=$(stat -c %Y $dir)
+                modifieddiff=$(echo "($now - $modified) / 60 / 60" | bc)
+        
+                echo "$(pwd)$(echo $dir | cut -d. -f2), $lastusediff, $modifieddiff"
+            done
+        }
+        
+        function cache_cleanup_metrics_lifetime() {
+            set +x
+        
+            echo path lastused modified
+        
+            dirs=$(find ${CI_CUSTOM_CACHE_DIR}/${CI_PROJECT_NAMESPACE} -type d -path ${CI_CUSTOM_CACHE_DIR}/${CI_PROJECT_NAMESPACE}/'*' -prune -print)
+            for dir in $dirs; do
+                if ! [ -d $dir/phpstan-cache/v2/ ]; then
+                    continue
+                fi
+        
+                cd $dir/phpstan-cache/v2/
+                cache_cleanup_metrics_lifetime_atomic_dir_cache
+            done
+        
+            cd ${CI_CUSTOM_CACHE_DIR}/${CI_PROJECT_NAMESPACE}/tine20/npm-cache/v1/
+            cache_cleanup_metrics_lifetime_atomic_dir_cache
+        
+            cd ${CI_CUSTOM_CACHE_DIR}/${CI_PROJECT_NAMESPACE}/tine20/composer-cache/v1/
+        
+            cache_cleanup_metrics_lifetime_atomic_dir_cache
+            set -x
+        }
+
+        # lib/scripts/docker_build_image.sh
+        docker_build_image_dev() {
+            log dev image: building ...
+            image="${REGISTRY}/dev-commit:${IMAGE_TAG}"
+            # cd ${CI_BUILDS_DIR}/${CI_PROJECT_NAMESPACE}/tine20
+            docker build \
+                --target dev \
+                --tag ${image} \
+                --file ./ci/dockerimage/Dockerfile \
+                --build-arg PHP_IMAGE=php${PHP_VERSION} \
+                --build-arg APT_MIRROR=${APT_MIRROR} \
+                --build-arg APT_MIRROR_UNSUPPORTED_CODENAME=${APT_MIRROR_UNSUPPORTED_CODENAME} \
+                .
+        
+            log dev image: pushing ...
+            docker push ${image}
+        }
+        
+        docker_build_image_test() {
+            log test image: building ...
+            commit_ref_name_escaped=$(echo ${CI_COMMIT_REF_NAME} | sed sI/I-Ig)
+            image=${TEST_IMAGE_REGISTRY}:${commit_ref_name_escaped}-${PHP_VERSION}-${TEST_IMAGE_VERSION}
+            # cd ${CI_BUILDS_DIR}/${CI_PROJECT_NAMESPACE}/tine20
+            docker build \
+                --target test \
+                --tag ${image} \
+                --file ./ci/dockerimage/Dockerfile \
+                --build-arg PHP_IMAGE=php${PHP_VERSION} \
+                --build-arg APT_MIRROR=${APT_MIRROR} \
+                --build-arg APT_MIRROR_UNSUPPORTED_CODENAME=${APT_MIRROR_UNSUPPORTED_CODENAME} \
+                .
+        
+            log test image: pushing ...
+            docker push ${image}
+        }
+        
+        docker_build_image_built() {
+            log built image: building ...
+            image="${REGISTRY}/built-commit:${IMAGE_TAG}"
+            # cd ${CI_BUILDS_DIR}/${CI_PROJECT_NAMESPACE}/tine20
+            docker build \
+                --target built \
+                --tag ${image} \
+                --file ./ci/dockerimage/Dockerfile \
+                --build-arg PHP_IMAGE=php${PHP_VERSION} \
+                --build-arg APT_MIRROR=${APT_MIRROR} \
+                --build-arg APT_MIRROR_UNSUPPORTED_CODENAME=${APT_MIRROR_UNSUPPORTED_CODENAME} \
+                --build-arg JSDEPENDENCY_IMAGE \
+                --build-arg ZIP_PACKAGES \
+                --build-arg RELEASE_TYPE \
+                --build-arg CUSTOM_APP_VENDOR \
+                --build-arg CUSTOM_APP_NAME \
+                --build-arg CUSTOM_APP_GIT_URL \
+                --build-arg CUSTOM_APP_VERSION \
+                --build-arg RELEASE=$(release_get_package_version) \
+                --build-arg CODENAME \
+                --build-arg REVISION=0 \
+                .
+        
+            log built image: pushing ...
+            docker push ${image}
+        }
+        
+        docker_build_image_built_test() {
+            log test-built image: building ...
+            image="${REGISTRY}/test-built-commit:${IMAGE_TAG}"
+            # cd ${CI_BUILDS_DIR}/${CI_PROJECT_NAMESPACE}/tine20
+            docker build \
+                --target test-built \
+                --tag ${image} \
+                --file ./ci/dockerimage/Dockerfile \
+                --build-arg PHP_IMAGE=php${PHP_VERSION} \
+                --build-arg APT_MIRROR=${APT_MIRROR} \
+                --build-arg APT_MIRROR_UNSUPPORTED_CODENAME=${APT_MIRROR_UNSUPPORTED_CODENAME} \
+                --build-arg JSDEPENDENCY_IMAGE \
+                --build-arg ZIP_PACKAGES \
+                --build-arg RELEASE_TYPE \
+                --build-arg CUSTOM_APP_VENDOR \
+                --build-arg CUSTOM_APP_NAME \
+                --build-arg CUSTOM_APP_GIT_URL \
+                --build-arg CUSTOM_APP_VERSION \
+                --build-arg RELEASE=$(release_get_package_version) \
+                --build-arg CODENAME \
+                --build-arg REVISION=0 \
+                .
+        
+            log test-built image: pushing ...
+            docker push ${image}
+        }
+        
+        docker_build_image_packages() {
+            outputPath=$1
+        
+            log packages image: building ...
+            # cd ${CI_BUILDS_DIR}/${CI_PROJECT_NAMESPACE}/tine20
+            docker build \
+                --target packages \
+                --file ./ci/dockerimage/Dockerfile \
+                --build-arg APT_MIRROR=${APT_MIRROR} \
+                --build-arg APT_MIRROR_UNSUPPORTED_CODENAME=${APT_MIRROR_UNSUPPORTED_CODENAME} \
+                --build-arg BUILT_IMAGE \
+                --build-arg ZIP_PACKAGES \
+                --build-arg RELEASE=$(release_get_package_version) \
+                --build-arg CODENAME \
+                --build-arg REVISION=0 \
+                -o type=tar,dest=${outputPath} \
+                .
+        }
+
+
+        # lib/scripts/docker_hub.sh
+        docker_hub_deploy () {
+            set -e
+            name=$1
+            dockerhubname=$2
+            dockerhubtag=$3
+        
+            docker login -u "${DOCKERHUB_USER}" -p "${DOCKERHUB_TOKEN}" "docker.io"
+        
+            FROM_IMAGE="${REGISTRY}/${name}-commit:${IMAGE_TAG}"
+            DESTINATION_IMAGE="docker.io/tinegroupware/${dockerhubname}:${dockerhubtag}"
+        
+            docker pull "${FROM_IMAGE}"
+            docker tag "${FROM_IMAGE}" "${DESTINATION_IMAGE}"
+            docker push "${DESTINATION_IMAGE}"
+        }
+
+        # lib/scripts/docker_registry.sh
+        docker_registry_login () {
+            registry="$1"
+            username="$2"
+            password="$3"
+        
+            for i in {1..6}; do
+                if docker login "$registry" --username "$username" --password "$password"; then
+                    return 0
+                fi
+        
+                echo "($i) docker login failed, retrying it in 5 second ..."
+                curl https://${REGISTRY}/fail-${CI_PIPELINE_ID}-${CI_JOB_ID} # create a marker in the log if login fails
+                sleep 5
+            done
+        
+            echo "docker login failed, aborting ..."
+            return 1
+        }
+        
+        docker_registry_release_image() {
+            name="$1"
+            destination="$2"
+            latest="$3"
+        
+            from="${REGISTRY}/${name}-commit:${IMAGE_TAG}"
+        
+            if [ -z "$CI_COMMIT_TAG" ]; then
+                echo "pushing nightly"
+                docker_registry_push "${from}" "${destination}:$(release_get_package_version)" # release_get_package_version => tag or nightly name
+                return
+            fi
+        
+            if [ "$latest" == "true" ]; then
+                docker_registry_push "${from}" "${destination}:latest"
+            fi
+        
+            docker_registry_push "${from}" "${destination}:${CI_COMMIT_TAG}"
+        
+            # For customer image we only release latest and the full tag.
+            # We push customer images with their full tag into our local tine registry,
+            # if we release there image to our test cloud. If we would release partial tags we might overwrite the main tine version.
+            # TODO: the test cloud should probably, get the images from the customer repository. NOTE: That would require all customer to have an repository.
+            if [ "$CUSTOMER_MAJOR_COMMIT_REF_NAME" == "" ]; then
+                docker_registry_push "${from}" "${destination}:$(echo ${CI_COMMIT_TAG} | cut -d '.' -f 1)"
+            fi
+        }
+        
+        docker_registry_release_dev_image() {
+            name=dev
+            targetRegistry="$1"
+        
+            from="${REGISTRY}/${name}-commit:${IMAGE_TAG}"
+        
+            docker_registry_push_multi_platform ${from} ${targetRegistry}:$(echo $CI_COMMIT_REF_NAME | sed sI/I-Ig)-${PHP_VERSION}
+        }
+        
+        docker_registry_push() {
+            from="$1"
+            to="$2"
+        
+            docker pull "${from}"
+            docker tag "${from}" "${to}"
+            docker push "${to}"
+        }
+        
+        # needs to be run one time per architecture, with $ARCH set.
+        # Why?: This allows us push new architectures as their build finishes
+        docker_registry_push_multi_platform() {
+            from="$1"
+            to="$2"
+        
+            skopeo copy docker://${from}-${ARCH} docker://${to}-${ARCH}
+        
+            # create multi platform manifest, for platform specific images, available during runtime. Overwrites existing manifest.
+            manifest-tool push from-args --platforms linux/amd64,linux/arm64 --template ${to}-ARCH --target ${to} --ignore-missing
+        }
+
+        # lib/scripts/docs.sh
+        function docs_deploy () {
+            set -x
+        
+            # determine alias based on BASE_MAJOR_COMMIT_REF_NAME. Using BASE_MAJOR_COMMIT_REF_NAME instead of CI_COMMIT_REF_NAME makes the code work for ecclesias too 
+            if [[ "$BASE_MAJOR_COMMIT_REF_NAME" == "$TINE_VERSION_NEXT" ]]; then
+                alias=next
+            elif [[ "$BASE_MAJOR_COMMIT_REF_NAME" == "$TINE_VERSION_BETA" ]] && [[ "$TINE_VERSION_BETA" != "" ]]; then
+                alias=beta
+            elif [[ "$BASE_MAJOR_COMMIT_REF_NAME" == "$TINE_VERSION_BE" ]]; then
+                alias=be
+            elif [[ "$BASE_MAJOR_COMMIT_REF_NAME" == "$TINE_VERSION_LTS" ]]; then
+                alias=lts
+            else
+                echo "$BASE_MAJOR_COMMIT_REF_NAME not supported"
+                exit 1
+            fi
+        
+            version=$BASE_MAJOR_COMMIT_REF_NAME
+        
+            echo $version $alias
+        
+            docs_build_php_doc
+        
+            # build and sync doc with correct site url for version an alias
+            docs_build_and_sync $version
+            docs_build_and_sync $alias
+        
+            s3cmd --access_key=${DOCS_S3_ACCESS_KEY} --secret_key=${DOCS_S3_SECRET_KEY} --host ${DOCS_S3_HOST} --host-bucket "%(bucket)s.${DOCS_S3_HOST}" --acl-public --delete-removed --no-mime-magic sync ./site/ s3://${DOCS_S3_BUCKET}/$alias/
+        
+            docs_update_versions $version $alias
+        }
+        
+        function docs_build_php_doc() {
+            cd tine20
+            composer install --ignore-platform-reqs
+            vendor/bin/phpdoc-md
+            cd ..
+        
+        }
+        
+        function docs_build_and_sync() {
+            target=$1
+        
+            sed -e "s%^site_url:.*$%site_url: $DOCS_URL/$target%g" -i mkdocs.yml
+        
+            mkdocs build
+        
+            s3cmd --access_key=${DOCS_S3_ACCESS_KEY} --secret_key=${DOCS_S3_SECRET_KEY} --host ${DOCS_S3_HOST} --host-bucket "%(bucket)s.${DOCS_S3_HOST}" --acl-public --delete-removed --no-mime-magic sync ./site/ s3://${DOCS_S3_BUCKET}/$target/
+        }
+        
+        function docs_update_versions() {
+            version=$1
+            alias=$2
+        
+            versions_path=./versions.json
+        
+            s3cmd --access_key=${DOCS_S3_ACCESS_KEY} --secret_key=${DOCS_S3_SECRET_KEY} --host ${DOCS_S3_HOST} --host-bucket "%(bucket)s.${DOCS_S3_HOST}" sync s3://${DOCS_S3_BUCKET}/versions.json $versions_path
+        
+            # create or update version entry for this version
+            if [[ $(jq --arg version $version '.[] | select(.version == $version)' $versions_path) == "" ]]; then
+                jq --arg version $version --arg alias $alias '.[ . | length ] = {"version": $version, "title": $version, "aliases": [$alias]}' $versions_path > $versions_path.tmp
+            else
+                jq --arg version $version --arg alias $alias '(.[] | select(.version == $version)) = {"version": $version, "title": $version, "aliases": [$alias]}' $versions_path > $versions_path.tmp
+            fi
+        
+            # remove this alias from other versions
+            jq --arg version $version --arg alias $alias 'del((.[] | select(.version != $version)).aliases[] | select(. == $alias))' $versions_path.tmp > $versions_path
+        
+            rm $versions_path.tmp
+        
+            cat $versions_path
+        
+            s3cmd --access_key=${DOCS_S3_ACCESS_KEY} --secret_key=${DOCS_S3_SECRET_KEY} --host ${DOCS_S3_HOST} --host-bucket "%(bucket)s.${DOCS_S3_HOST}" --acl-public --delete-removed --no-mime-magic sync $versions_path s3://${DOCS_S3_BUCKET}/versions.json
+        }
+        
+        function docs_build_docker_image() {
+            image="${REGISTRY}/docs-commit:${IMAGE_TAG}"
+        
+            docker build \
+                --target manual \
+                --tag $image \
+                --file ./docs/Dockerfile \
+                --build-arg SCREENSHOTS_S3_BUCKET \
+                --build-arg SCREENSHOTS_S3_HOST \
+                --build-arg SCREENSHOTS_S3_ACCESS_KEY \
+                --build-arg SCREENSHOTS_S3_SECRET_KEY \
+                .
+        
+        }
+        
+        function docs_push_docker_image() {
+            target=$1
+            tag=$(echo ${CI_COMMIT_REF_NAME} | sed sI/I-Ig)
+            image="${REGISTRY}/docs-commit:${IMAGE_TAG}"
+        
+            docker tag $image $target:$tag
+            docker push $target:$tag
+        }
+        
+        function docs_find_missing_screenshots() {
+            touch ${CI_PROJECT_DIR}/missing-screenshots.txt
+        
+            for f in $(grep --recursive --no-filename --only-matching --perl-regexp '(?<=img_url_desktop }}).*(?=#only-light)' ${CI_PROJECT_DIR}/docs | tail -n +2 | sort | uniq ); do
+                if ! [[ -f ${CI_PROJECT_DIR}/tests/e2etests/screenshots/$f ]]; then
+                    echo ${CI_COMMIT_REF_NAME}/${CI_RESOLUTION}/$f >> ${CI_PROJECT_DIR}/missing-screenshots.txt
+                fi
+            done
+        }
+        
+        function docs_update_screenshots() {
+            if [ "${CI_COMMIT_REF_NAME}" == "${MAJOR_COMMIT_REF_NAME}" ] && [ -n "${CI_RESOLUTION}" ]; then
+                s3cmd sync ${CI_PROJECT_DIR}/tests/e2etests/screenshots/ s3://${SCREENSHOTS_S3_BUCKET}/${CI_COMMIT_REF_NAME}/${CI_RESOLUTION}/ \
+                    --access_key=${SCREENSHOTS_S3_ACCESS_KEY} \
+                    --secret_key=${SCREENSHOTS_S3_SECRET_KEY} \
+                    --host ${SCREENSHOTS_S3_HOST} \
+                    --host-bucket "%(bucket)s.${SCREENSHOTS_S3_HOST}" \
+                    --acl-public \
+                    --no-mime-magic \
+                    --no-delete-removed
+            else
+                echo skipping screenshot upload
+            fi
+        }
+
+        # lib/scripts/git_repo.sh
+        git_repo_clone () {
+            git clone ${CI_REPOSITORY_URL} --branch ${CI_COMMIT_REF_NAME} --depth 1 --single-branch ${CI_BUILDS_DIR}/${CI_PROJECT_NAMESPACE}/tine20
+        }
+        
+        git_repo_clone_cached () {
+            targetDir=${1:-$CI_PROJECT_DIR}
+        
+            cacheRepoPath=${CI_CUSTOM_CACHE_DIR}/git-cache/v2/$(echo "${CI_REPOSITORY_URL}" | cut -d '@' -f2)/$CI_CONCURRENT_ID
+            echo $cacheRepoPath
+            
+            mkdir -p $cacheRepoPath
+        
+            pushd $cacheRepoPath
+            if ! git rev-parse --is-inside-work-tree 2> /dev/null; then
+                log "not a git repo. Initialzing new bare git repo ..."
+                git init --bare
+            fi
+        
+            log "setting up remote"
+            if git remote | grep origin > /dev/null; then
+                git remote rm origin
+            fi
+        
+            git remote add origin "${CI_REPOSITORY_URL}"
+        
+            log "fetching from gitlab" 
+            git fetch --force origin '*:*'
+            popd
+        
+        
+            log "cloning into working dir"
+            git clone $cacheRepoPath --branch "${CI_COMMIT_REF_NAME}" --local --no-hardlinks "${targetDir}"
+            pushd ${targetDir}
+            # switch orign from cache to gitlab
+            git remote rm origin
+            git remote add origin "${CI_REPOSITORY_URL}"
+            # fetch new origin again
+            git fetch
+            # setup branch upstream again
+            git branch --set-upstream-to="origin/${CI_COMMIT_REF_NAME}" "${CI_COMMIT_REF_NAME}"
+            popd
+        }
+
+        # lib/scripts/github.sh
+        github_create_release() {
+            tag=$1
+            user=$2
+            token=$3
+        
+            if [ "${RELEASE_TYPE}" != "nightly" ]; then
+                body="$(repo_release_notes "$tag" | jq -Rs .)"
+                draft="false"
+            else
+                echo "only publshing as draft: nigtly release detected" > /dev/stderr
+                body="$(repo_release_notes "HEAD" | jq -Rs .)"
+                draft="true"
+            fi
+        
+            if [ "${RELEASE_TYPE}" == "be" ]; then
+                prerelease="false"
+            else
+                prerelease="true"
+            fi
+        
+            curl -s \
+                -X POST \
+                -u "$user:$token" \
+                -H "accept: application/vnd.github.v3+json" \
+                "https://api.github.com/repos/tine-groupware/tine/releases" \
+                -d '{"name":"'"$tag"'", "tag_name":"'"$tag"'", "body":'"$body"', "draft":'$draft', "prerelease":'$prerelease'}'
+        }
+        
+        github_release_add_asset() {
+            release_json=$1
+            name=$2
+            path_to_asset=$3
+            user=$4
+            token=$5
+        
+            upload_url=$(echo $release_json | jq -r '.upload_url')
+            upload_url="${upload_url%\{*}"
+        
+            curl -s \
+                -X POST \
+                -u "$user:$token" \
+                -T "$path_to_asset" \
+                -H "accept: application/vnd.github.v3+json" \
+                -H "content-type: $(file -b --mime-type $path_to_asset)" \
+                "$upload_url?name=$name.tar.bz2"
+        }
+
+        # lib/scripts/matrix.sh
+        matrix_send_message() {
+            roomid=$1
+            message=$2
+        
+            if test -z "$MATRIX_SERVER"; then
+                echo "MATRIX_SERVER needs to be set!"
+                return 1
+            fi
+        
+            if test -z "$MATRIX_ACCESS_TOKEN"; then
+                if test -z "$MATRIX_USERNAME" || test -z "$MATRIX_PASSWORD"; then
+                    echo "Either MATRIX_ACCESS_TOKEN or MATRIX_USERNAME and MATRIX_PASSWORD needs to be set!"
+                    return 1
+                fi
+            
+                response=$(curl -s -XPOST -d '{"type":"m.login.password", "user":"'"$MATRIX_USERNAME"'", "password":"'"$MATRIX_PASSWORD"'"}' "https://$MATRIX_SERVER/_matrix/client/r0/login")
+                MATRIX_ACCESS_TOKEN=$(echo "$response" | jq -r '.access_token')
+                
+            fi
+        
+            curl -XPOST -d '{}' "https://$MATRIX_SERVER/_matrix/client/r0/rooms/$roomid/join?access_token=$MATRIX_ACCESS_TOKEN"
+        
+            curl -XPOST -d '{"msgtype":"m.text", "body":"'"$message"'"}' "https://$MATRIX_SERVER/_matrix/client/r0/rooms/$roomid/send/m.room.message?access_token=$MATRIX_ACCESS_TOKEN"
+        }
+
+
+        # lib/scripts/merge.sh
+        merge_merge_upwards () {
+            if ! ${CI_BUILDS_DIR}/${CI_PROJECT_NAMESPACE}/tine20/scripts/git/merge_helper.sh MergeUpwards "$1" "$2" "customers"; then
+                matrix_send_message "$MATRIX_ROOM" "🔴 Auto merging $1 into $2 failed in $CI_PIPELINE_NAME $CI_JOB_URL."
+                return 1
+            fi
+        }
+        
+        merge_update_custom_app () {
+            ${CI_BUILDS_DIR}/${CI_PROJECT_NAMESPACE}/tine20/scripts/git/merge_helper.sh UpdateCustomApp "$1" "$2" || true
+        }
+        
+        merge_merge_mirror () {
+            source_remote="$1"
+            source_branch="$2"
+            destination_remote="$3"
+            destination_branch="$4"
+        
+            git fetch "$source_remote" "$source_branch" || return 1
+            git fetch "$destination_remote" "$destination_branch" || return 1
+        
+            if git rev-parse --quiet --verify $destination_branch > /dev/null; then
+                git checkout "$destination_branch"
+                git reset --hard "$destination_remote/$destination_branch"
+            else
+                git checkout --track "$destination_remote/$destination_branch" || return 1
+            fi
+            
+            echo "git mergeing $source_remote/$source_branch into $destination_remote/$destination_branch ..."
+        
+            if ! git merge "$source_remote/$source_branch"; then
+        
+                if ! php ${CI_BUILDS_DIR}/${CI_PROJECT_NAMESPACE}/tine20/scripts/git/repairMerge.php "$source_remote/$source_branch" "$destination_branch"; then
+                    echo "merging $source_remote/$source_branch into $destination_remote/$destination_branch failed"
+                    return 1
+                fi
+            fi
+            
+            git push "$destination_remote" "$destination_branch"
+        }
+        
+        merge_trigger_next () {
+            MERGE_MAP=${MERGE_MAP:-"{}"}
+            
+            if ! echo $MERGE_MAP | jq --arg ref $CI_COMMIT_REF_NAME -e '.[$ref]' > /dev/null; then
+                echo "nothing to trigger"
+                return
+            fi
+        
+            for i in $(echo $MERGE_MAP | jq -c --arg ref $CI_COMMIT_REF_NAME '.[$ref][]'); do
+                ref=$(echo $i | jq -r '.ref')
+                var=$(echo $i | jq -r '.var')
+        
+                echo "trigger $ref with $var:"
+        
+                curl -X POST -F token=$MERGE_TRIGGER_TOKEN \
+                    -F ref=$ref \
+                    -F "variables[$var]=true" \
+                    -F "variables[SEND_PIPELINE_STATUS]=true" \
+                    "$CI_API_V4_URL/projects/$CI_PROJECT_ID/trigger/pipeline" > /dev/null
+            done
+        }
+
+        # lib/scripts/packaging.sh
+        packaging_build_packages() {
+            echo "packaging_build_packages()"
+        
+            if echo "$CI_COMMIT_TAG" | grep '/'; then
+                echo "Error: CI_COMMIT_TAG must not contain a /"
+                exit 1
+            fi
+        
+            # config via env
+            export BUILT_IMAGE="${REGISTRY}/built-commit:${IMAGE_TAG}"
+            # RELEASE is set during packageing to $(packaing_version)
+        
+            cd ${CI_BUILDS_DIR}/${CI_PROJECT_NAMESPACE}/tine20
+            # create archives
+            if ! docker_build_image_packages "${CI_BUILDS_DIR}/${CI_PROJECT_NAMESPACE}/tine20/packages.tar"; then
+                return 1
+            fi
+        }
+        
+        packaging_extract_all_package_tar() {
+            cd "${CI_BUILDS_DIR}/${CI_PROJECT_NAMESPACE}/tine20/"
+            tar -xf "${CI_BUILDS_DIR}/${CI_PROJECT_NAMESPACE}/tine20/packages.tar"
+        }
+        
+        packaging_push_packages_to_gitlab() {
+            version=$1
+        
+            package_repo=$(release_packages_determin_package_repo_name)
+        
+            curl -S -s \
+                --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
+                --upload-file "${CI_BUILDS_DIR}/${CI_PROJECT_NAMESPACE}/tine20/packages.tar" \
+                "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${package_repo}/${version}/all.tar"
+        
+            echo "published packages to ${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${package_repo}/${version}/all.tar"
+        
+            cd "${CI_BUILDS_DIR}/${CI_PROJECT_NAMESPACE}/tine20/${version}/"
+        
+            for f in *; do
+                curl -S -s \
+                --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
+                --upload-file "$f" \
+                "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${package_repo}/${version}/$f"
+            done
+        
+            echo ""
+            echo "published packages to ${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${package_repo}/${version}/all.tar"
+            echo ""
+        }
+        
+        packaging_gitlab_set_ci_id_link() {
+            version=$1
+        
+            echo "packaging_gitlab_set_ci_id_link() CI_PIPELINE_ID: $CI_PIPELINE_ID version: $version MAJOR_COMMIT_REF_NAME: $MAJOR_COMMIT_REF_NAME"
+        
+            if ! curl -S -s \
+                --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
+                -XPUT --data "${version}" \
+                "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/ci/links/${CI_PIPELINE_ID}"
+            then
+                return 1
+            fi
+        }
+        
+        packaging_gitlab_get_version_for_pipeline_id() {
+            if ! curl \
+                --fail \
+                --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
+                "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/ci/links/${CI_PIPELINE_ID}"
+            then
+                return 1
+            fi
+        }
+        
+        packaging() {
+            version=$(release_get_package_version)
+        
+            echo "packaging() CI_COMMIT_TAG: $CI_COMMIT_TAG version/release: $version MAJOR_COMMIT_REF_NAME: $MAJOR_COMMIT_REF_NAME"
+        
+            if ! release_determin_customer; then
+                echo "No packages are build for major_commit_ref: $MAJOR_COMMIT_REF_NAME for version: $version"
+                return 1
+            fi
+        
+            echo "building packages ..."
+            if ! packaging_build_packages; then
+                echo "Failed to build packages."
+                return 1
+            fi
+        
+            if ! packaging_extract_all_package_tar; then
+                echo "Failed to extract tar archive."
+                return 1
+            fi
+        
+            echo "pushing packages to gitlab ..."
+            if ! packaging_push_packages_to_gitlab $version; then
+                echo "Failed to push to gitlab."
+                return 1
+            fi
+        
+            # this is only needed for nightlitys. As calculating there name requies a fully fteched git, and deploy do not have need thah
+            echo "setting ci pipeline id link"
+            if ! packaging_gitlab_set_ci_id_link $version; then
+                echo "Failed to set ci pipeline id link."
+                return 1
+            fi
+        }
+
+        # lib/scripts/phpstan.sh
+        phpstan_analyse() {
+            if test "${CI_PROJECT_NAME}" == "tine20"; then
+                dir=tine20
+            else
+                dir=tine20/vendor/$(cat ${CI_PROJECT_DIR}/composer.json | jq -r '.name')/lib;
+            fi
+        
+            log "fixing symlinks ..."
+            # fix: phpstan fails if custom apps are symlinked. They need to be analysed in the vendor dir.
+            #    exclude symlinks
+            find $TINE20ROOT/tine20 -maxdepth 1 -type l -exec echo "        - '{}'" \; >> excludes;
+            #    unexclude vendor/metaways
+            find $TINE20ROOT/tine20/vendor -mindepth 1 -maxdepth 1 -type d -exec echo "        - '{}'" \; >> excludes;
+            sort -o excludes excludes
+            sed -i '/tine20\/vendor\*/r excludes' $TINE20ROOT/phpstan.neon;
+            sed -i '/tine20\/vendor\/metaways/d' $TINE20ROOT/phpstan.neon;
+            rm excludes
+        
+            log "setting max processes ..."
+            sed -i "s/maximumNumberOfProcesses: 32/maximumNumberOfProcesses: $KUBERNETES_CPU_REQUEST/g" $TINE20ROOT/phpstan.neon
+        
+            log "setting up cache ..."
+            # CI_CUSTOM_CACHE_DIR is a volume shared betwean runners
+            # todo: monitor if composer.lock file hash prodoces to mutch dead cache
+            phpstan_cache_key=$(echo $MAJOR_COMMIT_REF_NAME $PHP_VERSION $(sha256sum $TINE20ROOT/tine20/composer.lock | cut -d ' ' -f 1) | sha256sum | cut -d ' ' -f 1)
+            export PHPSTAN_CACHE_DIR=${CI_CUSTOM_CACHE_DIR}/${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAME}/phpstan-cache/v2/$phpstan_cache_key
+            echo PHPSTAN_CACHE_DIR=$PHPSTAN_CACHE_DIR
+            mkdir -p ${PHPSTAN_CACHE_DIR}
+            sed -i "s%tmpDir:%tmpDir: $PHPSTAN_CACHE_DIR%g" $TINE20ROOT/phpstan.neon
+            # create marker for cache cleanup
+            date --utc +%FT%TZ > $PHPSTAN_CACHE_DIR-lastused
+        
+            $TINE20ROOT/tine20/vendor/bin/phpstan --version
+            log "analyse target: $dir"
+            set -o pipefail
+            php -d memory_limit=2G $TINE20ROOT/tine20/vendor/bin/phpstan analyse --autoload-file=$TINE20ROOT/tine20/vendor/autoload.php --error-format=gitlab --no-progress -vvv $dir | tee ${CI_PROJECT_DIR}/code-quality-report.json
+        }
+
+        # lib/scripts/pipeline_status.sh
+        pipeline_status_send () {
+            errors=$(curl --header "JOB-TOKEN: $CI_JOB_TOKEN" "$CI_API_V4_URL/projects/$CI_PROJECT_ID/pipelines/$CI_PIPELINE_ID/test_report" | jq -c '.test_suites[] | select((.error_count>0) or .failed_count>0)| {name,error_count,failed_count}')
+        
+            ref=$(curl --header "JOB-TOKEN: $CI_JOB_TOKEN" "$CI_API_V4_URL/projects/$CI_PROJECT_ID/pipelines/$CI_PIPELINE_ID/" | jq -r .ref)
+        
+            message="pipeline $CI_PIPELINE_NAME #$CI_PIPELINE_ID for $ref failed with:"
+        
+            IFS=$'\n' 
+            for error in $errors; do
+                n=$(echo $error | jq -r '.name')
+                e=$(echo $error | jq -r '.error_count')
+                f=$(echo $error | jq -r '.failed_count')
+                message="$message"'\n'"+ $n  --  errors: $e failures: $f"
+            done
+        
+            message="$message"'\n'"$CI_PIPELINE_URL"
+        
+            echo "$message"
+        
+            matrix_send_message $MATRIX_ROOM "$message"
+        }
+
+        # lib/scripts/prevent_upsteam_changes.sh
+        function prevent_upstream_change() {
+            downstream=${MAJOR_COMMIT_REF_NAME}
+        
+            if [ "$downstream" == "$CI_COMMIT_REF_NAME" ]; then
+                return
+            fi
+        
+            git config user.email "ci@gitlab.metaways.net"
+            git config user.name "ci"
+            git rebase origin/$downstream
+        
+            changes="$(git diff --name-only -r --diff-filter=a origin/$downstream)"
+        
+            for f in ci/upstream-change-global-whitelist.txt ci/upstream-change-whitelist.txt; do
+                if [ -f $f ]; then
+                    while read allowed; do
+                        changes="$(echo "$changes" | grep -v -E "^$allowed$" || true)"
+                    done < <(grep "" $f) # using grep as it adds a new line to the end of the file. If there is no newline at the end of the last line, the loop will skip it
+                fi
+            done
+        
+            if [[ -z "$changes" ]]; then
+                return
+            fi
+        
+            echo -e "\033[0;31m"
+            echo 'Changing downstream files upstream is not encouraged! If changing them is necessary, either:'
+            echo '* disable this job with the merge request label "allow-failure-prevent-upstream-changes"'
+            echo '* or add an permanent exception to "ci/upstream-change-whitelist.txt".'
+            echo -n -e "\033[0m"
+            echo Changes:
+            echo "$changes"
+        
+            return 1
+        }
+
+        # lib/scripts/prevent_wrong_update_script_changes.sh
+        prevent_wrong_update_script_changes() {
+            wrong=""
+            unset failed
+        
+            if [[ "$BASE_MAJOR_COMMIT_REF_NAME" != "main" ]]; then
+                if ! branchVersion=$(echo "$BASE_MAJOR_COMMIT_REF_NAME" | grep -Po 20..); then
+                    echo -e -n "\033[1;31m"
+                    echo Error: Can not determine branch version. BASE_MAJOR_COMMIT_REF_NAME=$BASE_MAJOR_COMMIT_REF_NAME
+                    echo -n -e "\033[0m"
+                    return 1
+                fi
+            else
+                if [[ "$TINE_VERSION_BETA" != "" ]]; then
+                    branchVersion=$(($(echo "$TINE_VERSION_BETA" | grep -Po 20..) + 1 ))
+                else
+                    branchVersion=$(($(echo "$TINE_VERSION_BE" | grep -Po 20..) + 1 ))
+                fi
+            fi
+        
+            for f in $(find tine20/*/Setup/Update/*.php); do
+                if ! versionLine=$(cat $f | grep -P '^ \* this ist? 20..\.11 \(ONLY!\)$'); then
+                    continue
+                fi
+        
+                version=$(echo "$versionLine" | grep -Po 20..)
+                if (( $version >= $branchVersion )); then
+                    continue
+                fi
+        
+                if ! git diff origin/$CUSTOMER_MAJOR_COMMIT_REF_NAME$BASE_MAJOR_COMMIT_REF_NAME --quiet -- $f; then
+                    failed=1
+                    wrong="$wrong\n$f"
+                    git --no-pager diff origin/$CUSTOMER_MAJOR_COMMIT_REF_NAME$BASE_MAJOR_COMMIT_REF_NAME -- $f
+                fi
+            done
+        
+            if [ $failed ]; then
+                echo
+                echo -e -n "\033[1;31m"
+                echo Update scripts should only be changed, on the corresponding versions branch.
+                echo If you are sure you need to update this update script, you can skip this job,
+                echo 'by setting the merge request label "allow-failure-prevent-wrong-update-script-changes"'.
+                echo -e -n "\033[0;31m"
+                echo -e "Changes: $wrong"
+                echo -n -e "\033[0m"
+                return 1
+            fi
+        }
+
+        # lib/scripts/release.sh
+        release_tag() {
+            branch="$(echo "$CI_COMMIT_REF_NAME" | sed sI/I-Ig)"
+            tag_prefix="$branch-$(date '+%Y.%m.%d.')"
+        
+            last_counter="$(curl -H "Authorization: Bearer $GITLAB_TOKEN" "$CI_API_V4_URL/projects/$CI_PROJECT_ID/repository/tags?search=^$tag_prefix" | jq -r '.[].name' | sort --version-sort | tail -n 1 | awk -F '.' '{print $NF}')"
+            counter="$((${last_counter:-0}+1))"
+        
+            tag="$tag_prefix$counter"
+        
+            echo "tag: $tag"
+        
+            curl -H "Authorization: Bearer $GITLAB_TOKEN" -XPOST "$CI_API_V4_URL/projects/$CI_PROJECT_ID/repository/tags?tag_name=$tag&ref=$CI_COMMIT_SHA&message=version+$tag"
+        }
+        
+        release_weekly_tag() {
+            tag_prefix="weekly-$(date '+%Y.%V.')"
+        
+            last_counter="$(curl -H "Authorization: Bearer $GITLAB_TOKEN" "$CI_API_V4_URL/projects/$CI_PROJECT_ID/repository/tags?search=^$tag_prefix" | jq -r '.[].name' | sort --version-sort | tail -n 1 | awk -F '.' '{print $NF}')"
+            counter="$((${last_counter:-0}+1))"
+        
+            tag="$tag_prefix$counter"
+        
+            echo "tag: $tag"
+        
+            curl -H "Authorization: Bearer $GITLAB_TOKEN" -XPOST "$CI_API_V4_URL/projects/$CI_PROJECT_ID/repository/tags?tag_name=$tag&ref=$CI_COMMIT_SHA&message=version+$tag"
+        }
+        
+        release_to_gitlab() {
+            tag="${CI_COMMIT_TAG}"
+            package_repo="$(release_packages_determin_package_repo_name)"
+        
+            release-cli create --description "$(repo_release_notes "$tag")" --tag-name "$tag" --ref "$tag" --name "$tag" \
+                --assets-link "{\"name\":\"all.tar\",\"url\":\"${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${package_repo}/${tag}/all.tar\"}"
+        }
+        
+        # possible values tine20.org tine20.com <customer> ""
+        release_determin_customer () {
+            if test -z "${BASE_MAJOR_COMMIT_REF_NAME}"; then
+                # For branches without BASE_MAJOR_COMMIT_REF_NAME and CUSTOMER_MAJOR_COMMIT_REF_NAME variables
+                # todo remove is these kind of branches do not exist any more
+                if ! echo "${branch}" | grep -q '/'; then
+                    echo tine20.com
+                    return
+                else
+                    if [ $(echo "${branch}" | awk -F"/" '{print NF-1}') != 1 ]; then
+                        return 1
+                    fi
+        
+                    echo "${branch}" | cut -d '/' -f1
+                    return
+                fi
+            else
+                # For branches with BASE_MAJOR_COMMIT_REF_NAME and CUSTOMER_MAJOR_COMMIT_REF_NAME variables
+                if test -z "${CUSTOMER_MAJOR_COMMIT_REF_NAME}"; then
+                    if echo ${CI_COMMIT_TAG} | grep -Eq 'weekly'; then
+                        echo "tine20.org"
+                        return
+                    fi
+        
+                    echo "tine20.com"
+                    return
+                else
+                    echo "${CUSTOMER_MAJOR_COMMIT_REF_NAME}" | sed 's:/*$::'
+                    return
+                fi 
+            fi
+        }
+        
+        release_get_package_version() {
+            CI_COMMIT_REF_NAME_ESCAPED=$(echo ${CI_COMMIT_REF_NAME} | sed sI/I-Ig)
+        
+            echo ${CI_COMMIT_TAG:-"nightly-${CI_COMMIT_REF_NAME_ESCAPED}-$(date -d "$CI_COMMIT_TIMESTAMP" '+%Y.%m.%d')-${CI_COMMIT_SHORT_SHA}"}
+        }
+        
+        release_is_patch_level_release() {
+            # 20[0-9][0-9]\.11\.[1-9]+[0-9] => match tine version e.g. => 2023.11.17
+            # *(-.*)*(-pl[0-9]+)(-.*) => match any postfix e.g. -rc1 -test, but require postfix -pl<number> e.g -pl10
+            # note the gitlab release rule regex is broader and matches ^20..\.11\..*. It should also be switched to ^20[0-9][0-9]\.11\.[1-9]+[0-9]*(-.*)*$
+        
+            echo "$CI_COMMIT_TAG" | grep -Pq '^20[0-9][0-9]\.11\.[1-9]+[0-9]*(-.*)*(-pl[0-9]+)(-.*)*$ ]]'
+        }
+
+        # lib/scripts/release_packages.sh
+        release_packages_github_create_release() {
+            package_repo=$(release_packages_determin_package_repo_name)
+            version=${CI_COMMIT_TAG:-$(packaging_gitlab_get_version_for_pipeline_id)}
+        
+            cd ${CI_BUILDS_DIR}/${CI_PROJECT_NAMESPACE}/tine20/
+        
+            echo curl "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${package_repo}/${version}/tine20-allinone_${version}.tar.bz2" -o "${CI_BUILDS_DIR}/${CI_PROJECT_NAMESPACE}/tine20/tine20-allinone_${version}.tar.bz2"
+            curl "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${package_repo}/${version}/tine20-allinone_${version}.tar.bz2" -o "${CI_BUILDS_DIR}/${CI_PROJECT_NAMESPACE}/tine20/tine20-allinone_${version}.tar.bz2"
+        
+            release_json=$(github_create_release "$version" "$GITHUB_RELEASE_USER" "$GITHUB_RELEASE_TOKEN")
+            if [ "$?" != "0" ]; then
+                echo "$release_json"
+                return 1
+            fi
+        
+            echo "package_repo: $package_repo version: $version release_json: $release_json"
+        
+            github_release_add_asset "$release_json" "$version" "${CI_BUILDS_DIR}/${CI_PROJECT_NAMESPACE}/tine20/tine20-allinone_${version}.tar.bz2" "$GITHUB_RELEASE_USER" "$GITHUB_RELEASE_TOKEN"
+        }
+        
+        release_packages_notify_matrix() {
+            version=${CI_COMMIT_TAG:-$(packaging_gitlab_get_version_for_pipeline_id)}
+        
+            matrix_send_message $MATRIX_ROOM "🟢 Packages for ${version} have been released to github."
+        
+            if [ "${RELEASE_TYPE}" == "be" ] || [ "${RELEASE_TYPE}" == "nightly" ]; then
+                matrix_room="!gGPNgDOyMWwSPjFFXa:matrix.org"
+        
+                if [ "${RELEASE_TYPE}" == "nightly" ]; then
+                    matrix_room="${MATRIX_ROOM}"
+                fi
+        
+                if ! release_is_patch_level_release; then
+                    matrix_send_message "${matrix_room}" "We just released the new version ${CODENAME} ${version} 🎉\\nCheck https://www.tine-groupware.de/ and https://github.com/tine-groupware/tine/releases/tag/${version} for more information and the downloads.\\nYou can also pull the image from dockerhub: https://hub.docker.com/r/tinegroupware/tine"
                 fi
         
             fi
@@ -4324,6 +4624,7 @@
                 --file ./ci/dockerimage/Dockerfile \
                 --build-arg PHP_IMAGE=php${PHP_VERSION} \
                 --build-arg APT_MIRROR=${APT_MIRROR} \
+                --build-arg APT_MIRROR_UNSUPPORTED_CODENAME=${APT_MIRROR_UNSUPPORTED_CODENAME} \
                 .
         
             log dev image: pushing ...
@@ -4341,6 +4642,7 @@
                 --file ./ci/dockerimage/Dockerfile \
                 --build-arg PHP_IMAGE=php${PHP_VERSION} \
                 --build-arg APT_MIRROR=${APT_MIRROR} \
+                --build-arg APT_MIRROR_UNSUPPORTED_CODENAME=${APT_MIRROR_UNSUPPORTED_CODENAME} \
                 .
         
             log test image: pushing ...
@@ -4357,6 +4659,7 @@
                 --file ./ci/dockerimage/Dockerfile \
                 --build-arg PHP_IMAGE=php${PHP_VERSION} \
                 --build-arg APT_MIRROR=${APT_MIRROR} \
+                --build-arg APT_MIRROR_UNSUPPORTED_CODENAME=${APT_MIRROR_UNSUPPORTED_CODENAME} \
                 --build-arg JSDEPENDENCY_IMAGE \
                 --build-arg ZIP_PACKAGES \
                 --build-arg RELEASE_TYPE \
@@ -4383,6 +4686,7 @@
                 --file ./ci/dockerimage/Dockerfile \
                 --build-arg PHP_IMAGE=php${PHP_VERSION} \
                 --build-arg APT_MIRROR=${APT_MIRROR} \
+                --build-arg APT_MIRROR_UNSUPPORTED_CODENAME=${APT_MIRROR_UNSUPPORTED_CODENAME} \
                 --build-arg JSDEPENDENCY_IMAGE \
                 --build-arg ZIP_PACKAGES \
                 --build-arg RELEASE_TYPE \
@@ -4408,6 +4712,7 @@
                 --target packages \
                 --file ./ci/dockerimage/Dockerfile \
                 --build-arg APT_MIRROR=${APT_MIRROR} \
+                --build-arg APT_MIRROR_UNSUPPORTED_CODENAME=${APT_MIRROR_UNSUPPORTED_CODENAME} \
                 --build-arg BUILT_IMAGE \
                 --build-arg ZIP_PACKAGES \
                 --build-arg RELEASE=$(release_get_package_version) \
@@ -5196,7 +5501,7 @@
                 fi
         
                 if ! release_is_patch_level_release; then
-                    matrix_send_message "${matrix_room}" "We just released the new version ${CODENAME} ${version} 🎉\\nCheck https://www.tine-groupware.de/ and https://github.com/tine-groupware/tine/releases for more information and the downloads.\\nYou can also pull the image from dockerhub: https://hub.docker.com/r/tinegroupware/tine"
+                    matrix_send_message "${matrix_room}" "We just released the new version ${CODENAME} ${version} 🎉\\nCheck https://www.tine-groupware.de/ and https://github.com/tine-groupware/tine/releases/tag/${version} for more information and the downloads.\\nYou can also pull the image from dockerhub: https://hub.docker.com/r/tinegroupware/tine"
                 fi
         
             fi

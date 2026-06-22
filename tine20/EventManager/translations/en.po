@@ -28,32 +28,29 @@ msgstr "Project Event"
 msgid "Status"
 msgstr "Status"
 
-msgid "Open"
-msgstr "Open"
+msgid "Active"
+msgstr "Active"
 
-msgid "Closed"
-msgstr "Closed"
+msgid "Draft"
+msgstr "Draft"
 
-msgid "Cancelled"
-msgstr "Cancelled"
+msgid "Completed"
+msgstr "Completed"
 
-msgid "Planning"
-msgstr "Planning"
+msgid "Canceled"
+msgstr "Canceled"
 
 msgid "Function"
 msgstr "Function"
 
-msgid "Attendee"
-msgstr "Attendee"
+msgid "Participant"
+msgstr "Participant"
+
+msgid "Chair"
+msgstr "Chair"
 
 msgid "Speaker"
 msgstr "Speaker"
-
-msgid "Moderator"
-msgstr "Moderator"
-
-msgid "Employee"
-msgstr "Employee"
 
 msgid "Source"
 msgstr "Source"
@@ -69,6 +66,9 @@ msgstr "Confirmed"
 
 msgid "Waiting list"
 msgstr "Waiting list"
+
+msgid "Cancelled"
+msgstr "Cancelled"
 
 msgid "Reason Waiting List"
 msgstr "Reason Waiting List"
@@ -189,6 +189,9 @@ msgstr "Only themselves"
 
 msgid "Dependants"
 msgstr "Dependants"
+
+msgid "Pastoral Erzbistum Hamburg URL to events"
+msgstr "Pastoral Erzbistum Hamburg URL to events"
 
 msgid "Options"
 msgstr "Options"
@@ -359,6 +362,9 @@ msgstr "Address:"
 msgid "Fee:"
 msgstr "Fee:"
 
+msgid "from "
+msgstr "from "
+
 msgid "Registration possible until:"
 msgstr "Registration possible until:"
 
@@ -422,6 +428,9 @@ msgstr "Event Information:"
 msgid "characters"
 msgstr "characters"
 
+msgid "Price"
+msgstr "Price"
+
 msgid "Download file"
 msgstr "Download file"
 
@@ -452,14 +461,8 @@ msgstr "Mr"
 msgid "Ms"
 msgstr "Ms"
 
-msgid "Company"
-msgstr "Company"
-
 msgid "Person"
 msgstr "Person"
-
-msgid "Deutschland"
-msgstr "Deutschland"
 
 msgid "Registration for"
 msgstr "Registration for"
@@ -554,6 +557,12 @@ msgstr "Creation Time"
 msgid "Last Modified Time"
 msgstr "Last Modified Time"
 
+msgid "Sort"
+msgstr "Sort"
+
+msgid "Consent"
+msgstr "Consent"
+
 msgid "Information regarding your involvement"
 msgstr "Information regarding your involvement"
 
@@ -566,8 +575,32 @@ msgstr "Currently there are no participants signed for this event"
 msgid "Notify Participants"
 msgstr "Notify Participants"
 
+msgid "Attendee"
+msgstr "Attendee"
+
+msgid "Moderator"
+msgstr "Moderator"
+
+msgid "Employee"
+msgstr "Employee"
+
 msgid "All"
 msgstr "All"
+
+msgid "A simple text option that displays a fixed text to the participant in the registration form."
+msgstr "A simple text option that displays a fixed text to the participant in the registration form."
+
+msgid "A checkbox option that allows participants to opt in or out of something, e.g. a dietary preference. The name will be displayed next to the checkbox. If the price and description have a value, they will be displayed underneath the checkbox on the website. Die remaining available spaces will not be displayed for the participants, this is set for internal information purposes."
+msgstr "A checkbox option that allows participants to opt in or out of something, e.g. a dietary preference. The name will be displayed next to the checkbox. If the price and description have a value, they will be displayed underneath the checkbox on the website. Die remaining available spaces will not be displayed for the participants, this is set for internal information purposes."
+
+msgid "A file option that allows participants to acknowledge a document or upload a file, such as a document or image. If in the configuration the acknowledge checkbox is set, participants will be able to download the file and asked to acknowledge the document with a checkbox. If the participant should upload a file they will be able to download the file set in the configuration and upload a new one e.g. the same document signed."
+msgstr "A file option that allows participants to acknowledge a document or upload a file, such as a document or image. If in the configuration the acknowledge checkbox is set, participants will be able to download the file and asked to acknowledge the document with a checkbox. If the participant should upload a file they will be able to download the file set in the configuration and upload a new one e.g. the same document signed."
+
+msgid "A text input option that allows participants to enter free-form text, such as a name or comment. E.g. allergies."
+msgstr "A text input option that allows participants to enter free-form text, such as a name or comment. E.g. allergies."
+
+msgid "Option type"
+msgstr "Option type"
 
 msgid "Edit Rules"
 msgstr "Edit Rules"
@@ -585,6 +618,12 @@ msgstr "Missing Participant"
 
 msgid "Please select a participant first"
 msgstr "Please select a participant first"
+
+msgid "Go to Homepage"
+msgstr "Go to Homepage"
+
+msgid "Go to Event Details page"
+msgstr "Go to Event Details page"
 
 msgid "GENDER_Appointment"
 msgstr "GENDER_Appointment"
@@ -625,9 +664,6 @@ msgid_plural "Checkboxes"
 msgstr[0] "Checkbox"
 msgstr[1] "Checkboxes"
 
-msgid "Price"
-msgstr "Price"
-
 msgid "Total places"
 msgstr "Total places"
 
@@ -661,6 +697,9 @@ msgstr "Event Registrations"
 msgid "Event Appointments"
 msgstr "Event Appointments"
 
+msgid "Images"
+msgstr "Images"
+
 msgid "GENDER_File"
 msgstr "GENDER_File"
 
@@ -674,6 +713,23 @@ msgstr "Only participant acknowledgement is necessary (no participant document u
 
 msgid "Participant should upload a file"
 msgstr "Participant should upload a file"
+
+msgid "Image Metadata"
+msgid_plural "Images Metadata"
+msgstr[0] "Image Metadata"
+msgstr[1] "Images Metadata"
+
+msgid "I have checked the rights to this image and hereby confirm that the image may be published on the Internet"
+msgstr "I have checked the rights to this image and hereby confirm that the image may be published on the Internet"
+
+msgid "If you do not confirm that you have the right to publish the image, it will not be published on the Website"
+msgstr "If you do not confirm that you have the right to publish the image, it will not be published on the Website"
+
+msgid "This is the source of the image, it will be the text of the watermark for the image"
+msgstr "This is the source of the image, it will be the text of the watermark for the image"
+
+msgid "Task"
+msgstr "Task"
 
 msgid "GENDER_Option"
 msgstr "GENDER_Option"
@@ -689,6 +745,9 @@ msgstr "If you want multiple options as a group so that only one option of the g
 
 msgid "Display Sorting"
 msgstr "Display Sorting"
+
+msgid "The higher the level, the greater the indentation on the website."
+msgstr "The higher the level, the greater the indentation on the website."
 
 msgid "Option required"
 msgstr "Option required"
@@ -718,9 +777,6 @@ msgstr "Value"
 
 msgid "GENDER_Registration"
 msgstr "GENDER_Registration"
-
-msgid "Participant"
-msgstr "Participant"
 
 msgid "This participant has been registered by another person"
 msgstr "This participant has been registered by another person"
@@ -787,12 +843,6 @@ msgid_plural "Text Input"
 msgstr[0] "Text Input"
 msgstr[1] "Text Input"
 
-msgid "Text"
-msgstr "Text"
-
-msgid "Here you can ask the participant for relevant information for the event"
-msgstr "Here you can ask the participant for relevant information for the event"
-
 msgid "Reply can only be a number"
 msgstr "Reply can only be a number"
 
@@ -810,6 +860,9 @@ msgid_plural "Text Outputs"
 msgstr[0] "Text Output"
 msgstr[1] "Text Outputs"
 
+msgid "Text"
+msgstr "Text"
+
 msgid "EventManager"
 msgstr "EventManager"
 
@@ -821,51 +874,6 @@ msgstr "Select a Person"
 
 msgid "Select a Participant"
 msgstr "Select a Participant"
-
-msgid "Salutation"
-msgstr "Salutation"
-
-msgid "Title"
-msgstr "Title"
-
-msgid "First Name"
-msgstr "First Name"
-
-msgid "Middle Name"
-msgstr "Middle Name"
-
-msgid "Last Name"
-msgstr "Last Name"
-
-msgid "Day of Birth"
-msgstr "Day of Birth"
-
-msgid "E-mail"
-msgstr "E-mail"
-
-msgid "Mobile"
-msgstr "Mobile"
-
-msgid "Telephone"
-msgstr "Telephone"
-
-msgid "Street"
-msgstr "Street"
-
-msgid "House Nr."
-msgstr "House Nr."
-
-msgid "Postal Code"
-msgstr "Postal Code"
-
-msgid "City"
-msgstr "City"
-
-msgid "Region"
-msgstr "Region"
-
-msgid "Country"
-msgstr "Country"
 
 msgid "Confirmation E-mail"
 msgstr "Confirmation E-mail"

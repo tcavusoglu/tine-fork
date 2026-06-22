@@ -294,7 +294,7 @@ Tine.Felamimail.MessageEditDialog = Ext.extend(Tine.widgets.dialog.EditDialog, {
         });
 
         this.tbar = new Ext.Toolbar({
-            defaults: {height: 43},
+            defaults: {height: 55},
             enableOverflow: true,
                 items: [
                     {
@@ -1160,10 +1160,10 @@ Tine.Felamimail.MessageEditDialog = Ext.extend(Tine.widgets.dialog.EditDialog, {
         if (!active && this.button_massMailing.pressed) this.button_massMailing.toggle();
         if (this.massMailingMode === active) return;
         this.record.set('massMailingFlag', active);
-        await this.switchMassMailingMode(active);
+        await this.switchMassMailingMode(active, e);
     },
     
-    async switchMassMailingMode(active) {
+    async switchMassMailingMode(active, e) {
         this.massMailingMode = active;
         if (this.recipientGrid) this.recipientGrid.massMailingMode = active;
         this.massMailingInfoText.setVisible(active);
@@ -2031,7 +2031,9 @@ Tine.Felamimail.MessageEditDialog = Ext.extend(Tine.widgets.dialog.EditDialog, {
             var attachmentStore = this.attachmentGrid.getStore();
 
             if (attachmentStore.find('attachment_type', 'download_protected_fm') !== -1) {
-                var dialog = new Tine.Tinebase.widgets.dialog.PasswordDialog();
+                var dialog = new Tine.Tinebase.widgets.dialog.PasswordDialog({
+                    policyConfig: Tine.Tinebase.configManager.get('downloadPwPolicy')
+                });
                 dialog.openWindow();
 
                 // password entered

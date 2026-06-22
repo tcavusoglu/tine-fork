@@ -28,15 +28,26 @@ class Sales_EDocument_Service_View
         return $response->getBody();
     }
 
-    public function getXRechnungView(Tinebase_Model_Tree_Node $node): string
+    public function getXRechnungView(string $xrechnung): string
     {
-        $client = new Zend_Http_Client(Sales_Config::getInstance()->{Sales_Config::EDOCUMENT}->{Sales_Config::VIEW_SVC});
+        if ($zugPferd = Sales_EDocument_ZUGFeRD::isStringZugFeRD($xrechnung)) {
+            $xrechnung = $zugPferd->getXml();
+        }
+
+        $isCii = $this->isCiiXml($xrechnung);
+
+        if ($isCii) {
+            $viewSvc = Sales_Config::getInstance()->{Sales_Config::EDOCUMENT}->{Sales_Config::VIEW_CII_SVC};
+        } else {
+            $viewSvc = Sales_Config::getInstance()->{Sales_Config::EDOCUMENT}->{Sales_Config::VIEW_SVC};
+        }
+
+        $client = new Zend_Http_Client($viewSvc);
         if (null !== static::$zendHttpClientAdapter) {
             $client->setAdapter(static::$zendHttpClientAdapter);
         }
 
-        $client->setParameterGet('format', 'xrechnung');
-        $client->setRawData(file_get_contents(Tinebase_FileSystem::getInstance()->getRealPathForHash($node->hash)));
+        $client->setRawData($xrechnung);
         $response = $client->request(Zend_Http_Client::POST);
 
         if ($response->getStatus() !== 200) {
@@ -44,6 +55,15 @@ class Sales_EDocument_Service_View
         }
 
         return $response->getBody();
+    }
+
+    /**
+     * Check if the given XML content is a CII (CrossIndustryInvoice) document.
+     */
+    protected function isCiiXml(string $content): bool
+    {
+        return str_contains($content, '<rsm:CrossIndustryInvoice')
+            || str_contains($content, '<CrossIndustryInvoice');
     }
 
     public static $zendHttpClientAdapter = null;

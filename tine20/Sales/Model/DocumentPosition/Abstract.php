@@ -572,7 +572,7 @@ class Sales_Model_DocumentPosition_Abstract extends Tinebase_Record_NewAbstract
             $source->{Sales_Model_DocumentPosition_Abstract::FLD_IS_REVERSED} = true;
 
             // make document_id dirty
-            $source->{self::FLD_DOCUMENT_ID}->{Sales_Model_Document_Abstract::FLD_REVERSAL_STATUS} = $source->{self::FLD_DOCUMENT_ID}->{Sales_Model_Document_Abstract::FLD_REVERSAL_STATUS};
+            $source->{self::FLD_DOCUMENT_ID}->{Sales_Model_Document_Abstract::FLD_REVERSED_STATUS} = $source->{self::FLD_DOCUMENT_ID}->{Sales_Model_Document_Abstract::FLD_REVERSED_STATUS};
         } elseif ($reversalOfReversal) {
             $translation = Tinebase_Translation::getTranslation(Sales_Config::APP_NAME,
                 new Zend_Locale($this->{self::FLD_DOCUMENT_ID}->{Sales_Model_Document_Abstract::FLD_DOCUMENT_LANGUAGE}));
@@ -655,7 +655,7 @@ class Sales_Model_DocumentPosition_Abstract extends Tinebase_Record_NewAbstract
         }
 
         $total = is_null($this->{self::FLD_POSITION_PRICE}) ? null
-            : $this->{self::FLD_POSITION_PRICE} - $discount;
+            : round($this->{self::FLD_POSITION_PRICE} - $discount, 2);
 
         if ($this->{self::FLD_UNIT_PRICE_TYPE} === Sales_Config::PRICE_TYPE_GROSS) {
             $this->{self::FLD_GROSS_PRICE} = $total;

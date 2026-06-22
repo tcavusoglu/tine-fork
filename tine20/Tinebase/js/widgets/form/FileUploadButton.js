@@ -43,7 +43,8 @@ Tine.widgets.form.FileUploadButton = Ext.extend(Ext.Button, {
     
     // private config overrides
     iconCls: 'action_upload',
-
+    scale: 'medium',
+    iconAlign: 'top',
     multiple: false,
     
     /**

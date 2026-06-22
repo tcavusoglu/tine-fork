@@ -28,9 +28,25 @@ class Sales_Setup_Update_18 extends Setup_Update_Abstract
     protected const RELEASE018_UPDATE009 = __CLASS__ . '::update009';
     protected const RELEASE018_UPDATE010 = __CLASS__ . '::update010';
     protected const RELEASE018_UPDATE011 = __CLASS__ . '::update011';
+    protected const RELEASE018_UPDATE012 = __CLASS__ . '::update012';
+    protected const RELEASE018_UPDATE013 = __CLASS__ . '::update013';
+    protected const RELEASE018_UPDATE014 = __CLASS__ . '::update014';
+    protected const RELEASE018_UPDATE015 = __CLASS__ . '::update015';
+    protected const RELEASE018_UPDATE016 = __CLASS__ . '::update016';
+    protected const RELEASE018_UPDATE017 = __CLASS__ . '::update017';
+    protected const RELEASE018_UPDATE018 = __CLASS__ . '::update018';
 
+    protected const RELEASE018_UPDATE019 = __CLASS__ . '::update019';
+    protected const RELEASE018_UPDATE020 = __CLASS__ . '::update020';
+    protected const RELEASE018_UPDATE021 = __CLASS__ . '::update021';
 
     static protected $_allUpdates = [
+        self::PRIO_TINEBASE_BEFORE_STRUCT   => [
+            self::RELEASE018_UPDATE012          => [
+                self::CLASS_CONST                   => self::class,
+                self::FUNCTION_CONST                => 'update012',
+            ],
+        ],
         self::PRIO_TINEBASE_STRUCTURE       => [
             self::RELEASE018_UPDATE003          => [
                 self::CLASS_CONST                   => self::class,
@@ -74,6 +90,22 @@ class Sales_Setup_Update_18 extends Setup_Update_Abstract
                 self::CLASS_CONST                   => self::class,
                 self::FUNCTION_CONST                => 'update011',
             ],
+            self::RELEASE018_UPDATE013          => [
+                self::CLASS_CONST                   => self::class,
+                self::FUNCTION_CONST                => 'update013',
+            ],
+            self::RELEASE018_UPDATE018          => [
+                self::CLASS_CONST                   => self::class,
+                self::FUNCTION_CONST                => 'update018',
+            ],
+            self::RELEASE018_UPDATE019          => [
+                self::CLASS_CONST                   => self::class,
+                self::FUNCTION_CONST                => 'update019',
+            ],
+            self::RELEASE018_UPDATE021          => [
+                self::CLASS_CONST                   => self::class,
+                self::FUNCTION_CONST                => 'update021',
+            ],
         ],
         self::PRIO_NORMAL_APP_UPDATE        => [
             self::RELEASE018_UPDATE000          => [
@@ -83,6 +115,26 @@ class Sales_Setup_Update_18 extends Setup_Update_Abstract
             self::RELEASE018_UPDATE007          => [
                 self::CLASS_CONST                   => self::class,
                 self::FUNCTION_CONST                => 'update007',
+            ],
+            self::RELEASE018_UPDATE014          => [
+                self::CLASS_CONST                   => self::class,
+                self::FUNCTION_CONST                => 'update014',
+            ],
+            self::RELEASE018_UPDATE015          => [
+                self::CLASS_CONST                   => self::class,
+                self::FUNCTION_CONST                => 'update015',
+            ],
+            self::RELEASE018_UPDATE016          => [
+                self::CLASS_CONST                   => self::class,
+                self::FUNCTION_CONST                => 'update016',
+            ],
+            self::RELEASE018_UPDATE017          => [
+                self::CLASS_CONST                   => self::class,
+                self::FUNCTION_CONST                => 'update017',
+            ],
+            self::RELEASE018_UPDATE020          => [
+                self::CLASS_CONST                   => self::class,
+                self::FUNCTION_CONST                => 'update020',
             ],
         ],
     ];
@@ -359,5 +411,179 @@ class Sales_Setup_Update_18 extends Setup_Update_Abstract
             Sales_Model_Document_PurchaseInvoice::class,
         ]);
         $this->addApplicationUpdate(Sales_Config::APP_NAME, '18.11', self::RELEASE018_UPDATE011);
+    }
+
+    public function update012(): void
+    {
+        $db = $this->getDb();
+        foreach ([
+                    Sales_Model_Document_Delivery::TABLE_NAME,
+                    Sales_Model_Document_Invoice::TABLE_NAME,
+                    Sales_Model_Document_Order::TABLE_NAME,
+                    Sales_Model_Document_PurchaseInvoice::TABLE_NAME,
+                 ] as $tableName) {
+            $tableName = SQL_TABLE_PREFIX . $tableName;
+            if ($db->query('SHOW TABLES LIKE "' . $tableName . '"')->rowCount() > 0) {
+                $db->query('ALTER TABLE ' . $tableName . ' RENAME COLUMN reversal_status TO reversed_status');
+            }
+        }
+
+        $this->addApplicationUpdate(Sales_Config::APP_NAME, '18.12', self::RELEASE018_UPDATE012);
+    }
+
+    public function update013(): void
+    {
+        Setup_SchemaTool::updateSchema([
+            Sales_Model_Document_Delivery::class,
+            Sales_Model_Document_Invoice::class,
+            Sales_Model_Document_Offer::class,
+            Sales_Model_Document_Order::class,
+            Sales_Model_Document_PurchaseInvoice::class,
+        ]);
+        $this->addApplicationUpdate(Sales_Config::APP_NAME, '18.13', self::RELEASE018_UPDATE013);
+    }
+
+    public function update014(): void
+    {
+        $db = $this->getDb();
+        /** @var Sales_Model_Document_Abstract $doc */
+        foreach ([
+                     Sales_Model_Document_Delivery::class,
+                     Sales_Model_Document_Invoice::class,
+                     Sales_Model_Document_Order::class,
+                     Sales_Model_Document_PurchaseInvoice::class,
+                 ] as $doc) {
+            /** @phpstan-ignore-next-line */
+            $tableName = SQL_TABLE_PREFIX . $doc::TABLE_NAME;
+            $db->update($tableName, [
+                $doc::getStatusField() => Sales_Model_Document_Abstract::STATUS_COMPLETED,
+                Sales_Model_Document_Abstract::FLD_REVERSAL => 1,
+            ], $doc::getStatusField() . ' = "REVERSAL"');
+        }
+
+        $db->update(SQL_TABLE_PREFIX . Sales_Model_Document_Order::TABLE_NAME, [
+            Sales_Model_Document_Order::getStatusField() => Sales_Model_Document_Abstract::STATUS_COMPLETED,
+        ], Sales_Model_Document_Order::getStatusField() . ' = "DONE"');
+
+        $this->addApplicationUpdate(Sales_Config::APP_NAME, '18.14', self::RELEASE018_UPDATE014);
+    }
+
+    public function update015(): void
+    {
+        if ($filter = Tinebase_PersistentFilter::getInstance()->search(new Tinebase_Model_PersistentFilterFilter([
+                    [TMFA::FIELD => 'application_id', TMFA::OPERATOR => TMFA::OP_EQUALS, TMFA::VALUE => Tinebase_Application::getInstance()->getApplicationByName(Sales_Config::APP_NAME)->getId()],
+                    [TMFA::FIELD => 'account_id', TMFA::OPERATOR => 'isnull', TMFA::VALUE => true],
+                    [TMFA::FIELD => 'name', TMFA::OPERATOR => TMFA::OP_EQUALS, TMFA::VALUE => 'Unpaid Purchase Invoices'],
+                ]))->getFirstRecord()) {
+            $filter->filters->addFilter($filter->filters->createFilter(
+                Sales_Model_Document_PurchaseInvoice::FLD_PURCHASE_INVOICE_STATUS,
+                TMFA::OPERATOR_NOT,
+                Sales_Model_Document_PurchaseInvoice::STATUS_COMPLETED
+            ));
+
+            Tinebase_PersistentFilter::getInstance()->update($filter);
+        }
+
+        $this->addApplicationUpdate(Sales_Config::APP_NAME, '18.15', self::RELEASE018_UPDATE015);
+    }
+
+    public function update016(): void
+    {
+        $this->getDb()->update(Tinebase_PersistentFilter::getInstance()->getBackend()->getPrefixedTableName(), [
+            'filters' => new Zend_Db_Expr('REPLACE(`filters`, \'"field":"reversal_status"\', \'"field":"reversed_status"\')'),
+        ], '`model` LIKE "Sales_Model_Document_%"');
+
+        $this->addApplicationUpdate(Sales_Config::APP_NAME, '18.16', self::RELEASE018_UPDATE016);
+    }
+
+    public function update017(): void
+    {
+        $this->getDb()->update(Tinebase_PersistentFilter::getInstance()->getBackend()->getPrefixedTableName(), [
+                'is_deleted' => 1,
+                'deleted_time' => new Zend_Db_Expr('NOW()'),
+            ], '`filters` LIKE "Sales_Model_Document_%" and is_deleted=0');
+        $this->addApplicationUpdate(Sales_Config::APP_NAME, '18.17', self::RELEASE018_UPDATE017);
+    }
+
+    public function update018(): void
+    {
+        Setup_SchemaTool::updateSchema([
+            Sales_Model_Boilerplate::class,
+            Sales_Model_Document_Boilerplate::class,
+        ]);
+
+        $this->addApplicationUpdate(Sales_Config::APP_NAME, '18.18', self::RELEASE018_UPDATE018);
+    }
+
+    public function update019(): void
+    {
+        Setup_SchemaTool::updateSchema([
+            Sales_Model_DocumentPosition_Credit::class,
+            Sales_Model_Document_Credit::class,
+        ]);
+
+        Tinebase_Controller_EvaluationDimension::addModelsToDimension(Tinebase_Model_EvaluationDimension::COST_CENTER, [
+            Sales_Model_Document_Credit::class,
+            Sales_Model_DocumentPosition_Credit::class,
+        ]);
+        Tinebase_Controller_EvaluationDimension::addModelsToDimension(Tinebase_Model_EvaluationDimension::COST_BEARER, [
+            Sales_Model_Document_Credit::class,
+            Sales_Model_DocumentPosition_Credit::class,
+        ]);
+        
+        $this->addApplicationUpdate(Sales_Config::APP_NAME, '18.19', self::RELEASE018_UPDATE019);
+    }
+
+    public function update020(): void
+    {
+        Sales_Controller_Boilerplate::getInstance()->create(new Sales_Model_Boilerplate([
+            Sales_Model_Boilerplate::FLD_IS_DEFAULT => true,
+            Sales_Model_Boilerplate::FLD_LANGUAGE => 'de',
+            Sales_Model_Boilerplate::FLD_MODEL => Sales_Model_Document_Credit::class,
+            Sales_Model_Boilerplate::FLD_NAME => 'Pretext',
+            Sales_Model_Boilerplate::FLD_BOILERPLATE => 'Sehr geehrte Damen und Herren,
+
+für die von Ihnen erbrachte Leistung erteilen wir folgende Gutschrift:',
+        ]));
+        Sales_Controller_Boilerplate::getInstance()->create(new Sales_Model_Boilerplate([
+            Sales_Model_Boilerplate::FLD_IS_DEFAULT => true,
+            Sales_Model_Boilerplate::FLD_LANGUAGE => 'de',
+            Sales_Model_Boilerplate::FLD_MODEL => Sales_Model_Document_Credit::class,
+            Sales_Model_Boilerplate::FLD_NAME => 'Posttext',
+            Sales_Model_Boilerplate::FLD_BOILERPLATE => 'Der Betrag wird auf Ihr Konto überwiesen.
+Für Rückfragen stehen wir Ihnen selbstverständlich zur Verfügung.
+
+Mit freundlichen Grüßen
+Ihr tine Team',
+        ]));
+        Sales_Controller_Boilerplate::getInstance()->create(new Sales_Model_Boilerplate([
+            Sales_Model_Boilerplate::FLD_IS_DEFAULT => true,
+            Sales_Model_Boilerplate::FLD_LANGUAGE => 'en',
+            Sales_Model_Boilerplate::FLD_MODEL => Sales_Model_Document_Credit::class,
+            Sales_Model_Boilerplate::FLD_NAME => 'Pretext',
+            Sales_Model_Boilerplate::FLD_BOILERPLATE => 'Dear Sir or Madam,
+
+we are issuing the following credit note for the services you have provided:',
+        ]));
+        Sales_Controller_Boilerplate::getInstance()->create(new Sales_Model_Boilerplate([
+            Sales_Model_Boilerplate::FLD_IS_DEFAULT => true,
+            Sales_Model_Boilerplate::FLD_LANGUAGE => 'en',
+            Sales_Model_Boilerplate::FLD_MODEL => Sales_Model_Document_Credit::class,
+            Sales_Model_Boilerplate::FLD_NAME => 'Posttext',
+            Sales_Model_Boilerplate::FLD_BOILERPLATE => 'The amount will be transferred to your account.
+For questions and further information, we are available at any time.
+
+With kind regards
+Your tine Team',
+        ]));
+        $this->addApplicationUpdate(Sales_Config::APP_NAME, '18.20', self::RELEASE018_UPDATE020);
+    }
+
+    public function update021(): void
+    {
+        Setup_SchemaTool::updateSchema([
+            Sales_Model_Document_Offer::class,
+        ]);
+        $this->addApplicationUpdate(Sales_Config::APP_NAME, '18.21', self::RELEASE018_UPDATE021);
     }
 }

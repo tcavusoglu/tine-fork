@@ -135,9 +135,15 @@ class EventManager_Controller_Event extends Tinebase_Controller_Record_Abstract
         static::$updateStatisticsCache = [];
     }
 
+    protected function _inspectAfterSetRelatedDataCreate($updatedRecord, $_record)
+    {
+        $this->_createImageWatermarks($updatedRecord);
+    }
+
     public function _inspectAfterSetRelatedDataUpdate($updatedRecord, $record, $currentRecord)
     {
         parent::_inspectAfterSetRelatedDataUpdate($updatedRecord, $record, $currentRecord);
+        $this->_createImageWatermarks($updatedRecord);
 
         // check if $currentrecord had options that have been deleted in $record
         // - those need to be removed from registrations
@@ -212,10 +218,22 @@ class EventManager_Controller_Event extends Tinebase_Controller_Record_Abstract
         $assertAclUsage = $this->assertPublicUsage();
         try {
             $response = new \Laminas\Diactoros\Response();
-            $events = $this->search();
-            $event = $events->getFirstRecord();
-            $converter = Tinebase_Convert_Factory::factory($event);
-            $eventArray = $converter->fromTine20RecordSet($events);
+
+            $filter = Tinebase_Model_Filter_FilterGroup::getFilterForModel(
+                EventManager_Model_Event::class,
+                [
+                    [
+                        'field' => EventManager_Model_Event::FLD_STATUS,
+                        'operator' => 'equals',
+                        'value' => '1' // active events
+                    ],
+                ],
+            );
+            $eventListOfRecords = EventManager_Controller_Event::getInstance()
+                ->search($filter);
+            $events = $eventListOfRecords->getFirstRecord();
+            $converter = Tinebase_Convert_Factory::factory($events);
+            $eventArray = $converter->fromTine20RecordSet($eventListOfRecords);
             $response->getBody()->write(json_encode($eventArray));
         } catch (Tinebase_Exception_NotFound $tenf) {
             $response = new \Laminas\Diactoros\Response('php://memory', 404);
@@ -333,14 +351,19 @@ class EventManager_Controller_Event extends Tinebase_Controller_Record_Abstract
                             ->get(EventManager_Config::REGISTRATION_STATUS)->records
                             ->getById($registration->{EventManager_Model_Registration::FLD_STATUS});
                         $registration->{EventManager_Model_Registration::FLD_STATUS} = $status->value;
-                        $registrations_data[] = $registration->toArray();
-                    }
-
-                    if (count($registrations_data) === 0) {
-                        $registrations_data = $contact->toArray();
+                        if (
+                            $registration->{EventManager_Model_Registration::FLD_REGISTRANT}
+                                ->email === $email_registrant
+                        ) {
+                            $registrations_data[] = $registration->toArray();
+                        }
                     }
 
                     if (!empty($contact)) {
+                        if (count($registrations_data) === 0) {
+                            $registrations_data = $contact->toArray();
+                        }
+
                         $contact = Addressbook_Controller_Contact::getInstance()
                             ->get($contact->getId()); // necessary to get relations
                         $dependant_participant = $this->getRelatedContacts($contact);
@@ -394,5 +417,85 @@ class EventManager_Controller_Event extends Tinebase_Controller_Record_Abstract
                 ->get($related_contact->related_id)->toArray();
         }
         return $related_contacts;
+    }
+
+    protected function _createImageWatermarks(EventManager_Model_Event $event): void
+    {
+        // TODO do we always want to overwrite? we would need to check if source changed...
+        $overwrite = true;
+        foreach ($event->images as $image) {
+            $imageAttachment = $event->attachments->getById($image->{EventManager_Model_ImageMetadata::FLD_NODE_ID});
+            if (!$imageAttachment) {
+                // attachment already deleted - do nothing
+                continue;
+            }
+            $node = Tinebase_FileSystem::getInstance()->get($image->{EventManager_Model_ImageMetadata::FLD_NODE_ID});
+            Tinebase_ActionQueue::getInstance()->queueAction(
+                'Tinebase_FileSystem_RecordAttachments.createWatermark',
+                $node,
+                $image->source,
+                $overwrite
+            );
+        }
+    }
+
+    public function publicApiGetImages()
+    {
+        $assertAclUsage = $this->assertPublicUsage();
+        try {
+            $response = new \Laminas\Diactoros\Response();
+            $images = EventManager_Controller_ImageMetadata::getInstance()->search();
+            foreach ($images as $image) {
+                $image->image_vfs = EventManager_Controller_ImageMetadata::getImageUrl(
+                    EventManager_Config::APP_NAME,
+                    $image->node_id,
+                    -1,
+                    -1
+                );
+            }
+            $imagesArray = [];
+            foreach ($images as $image) {
+                $converter = Tinebase_Convert_Factory::factory($image);
+                $imagesArray[] = $converter->fromTine20Model($image);
+            }
+            $response->getBody()->write(json_encode($imagesArray));
+        } catch (Tinebase_Exception_NotFound $tenf) {
+            $response = new \Laminas\Diactoros\Response('php://memory', 404);
+            $response->getBody()->write(json_encode($tenf->getMessage()));
+        } catch (Tinebase_Exception_Record_NotAllowed $terna) {
+            $response = new \Laminas\Diactoros\Response('php://memory', 401);
+            $response->getBody()->write(json_encode($terna->getMessage()));
+        } catch (Tinebase_Exception_AccessDenied $e) {
+            $response = new \Laminas\Diactoros\Response('php://memory', 403);
+            $response->getBody()->write(json_encode($e->getMessage()));
+        } finally {
+            $assertAclUsage();
+        }
+        return $response;
+    }
+
+    public function publicApiGetImage($imageId, $width = -1, $height = -1, $ratiomode = 0)
+    {
+        $assertAclUsage = $this->assertPublicUsage();
+        try {
+            $image = Tinebase_Controller::getInstance()->getImage('Tinebase', $imageId, Tinebase_Model_Image::LOCATION_VFS_WATERMARK);
+            if ($width != -1 && $height != -1) {
+                Tinebase_ImageHelper::resize($image, $width, $height, $ratiomode);
+            }
+            $response = new \Laminas\Diactoros\Response(headers: ['Content-Type' => $image->mime]);
+            $response->getBody()->write($image->blob);
+        } catch (Tinebase_Exception_NotFound $tenf) {
+            $response = new \Laminas\Diactoros\Response('php://memory', 404);
+            $response->getBody()->write(json_encode($tenf->getMessage()));
+        } catch (Tinebase_Exception_Record_NotAllowed $terna) {
+            $response = new \Laminas\Diactoros\Response('php://memory', 401);
+            $response->getBody()->write(json_encode($terna->getMessage()));
+        } catch (Tinebase_Exception_AccessDenied $e) {
+            $response = new \Laminas\Diactoros\Response('php://memory', 403);
+            $response->getBody()->write(json_encode($e->getMessage()));
+        } finally {
+            $assertAclUsage();
+        }
+        return $response;
     }
 }

@@ -100,54 +100,47 @@
     margin: -2px 2px -2px 0;
 }
 
-.attendance-clock-menu-button.x-btn {
-    filter: none;
-}
-
-.attendance-clock-menu-button div.x-btn-arrow {
-    display: none !important;
-}
-
-.attendance-clock-menu-button button {
-    color: white !important;
-}
-
-.attendance-clock-menu-button .x-btn-image.attendance-clock{
-    width: 30px;
-    height: 30px;
-}
-
-.attendance-clock-menu-button td{
-    background-color: inherit;
-}
-
-.attendance-clock-menu-button.x-btn-over .x-btn-mc{
-    background-color: inherit;
-}
-
-.attendance-clock-menu-button.x-btn-over .x-btn-tl{
-    display: none;
-}
-
 .attendance-clock {
     mask-image:url(../../images/icon-set/icon_attendanceclock.svg) !important;
     mask-size: 28px 28px;
     -webkit-mask-image:url(../../images/icon-set/icon_attendanceclock.svg) !important;
     -webkit-mask-size: 28px 28px;
     background-color: white;
+  //filter: none !important;
 }
 
-.attendance-clock-menu-button-clock_in .attendance-clock{
-    background-color: #9af56e;
+.attendance-clock-menu-button {
+  .x-btn-image {
+    filter: invert(0) !important;
+  }
+  div.x-btn-arrow {
+    background-color: white;
+  }
 }
 
-.attendance-clock-menu-button-clock_paused .attendance-clock{
-    background-color: #edd107;
+.attendance-clock-menu-button-clock_in {
+  .attendance-clock,
+  div.x-btn-arrow {
+    //background-color: #9af56e;
+    background-color: var(--bs-success) !important;
+  }
 }
 
-.attendance-clock-menu-button-clock_out .attendance-clock{
-    background-color: #f7a18f;
-}
+  .attendance-clock-menu-button-clock_paused {
+    .attendance-clock,
+    div.x-btn-arrow {
+      //background-color: #edd107;
+      background-color: var(--bs-warning) !important;
+    }
+  }
+
+  .attendance-clock-menu-button-clock_out {
+    .attendance-clock,
+    div.x-btn-arrow {
+      //background-color: #f7a18f;
+      background-color: var(--bs-danger) !important;
+    }
+  }
 
 .clock-in {
     background-image:url(../../images/icon-set/df/icon_df_login.svg) !important;

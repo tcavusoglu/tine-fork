@@ -717,6 +717,8 @@ class Felamimail_Controller_Account extends Tinebase_Controller_Record_Grants
                     $existContact['container_id'] = $account['contact_id']['container_id'] ?? $existContact['container_id'];
                     $existContact['n_family'] = $name;
                     $existContact['org_name'] = $account['organization'];
+                    $existContact['n_fileas'] = $name;
+
                     $contact = Addressbook_Controller_Contact::getInstance()->update($existContact, true, true);
                 }
             } catch (Tinebase_Exception_NotFound $tenf) {
@@ -1051,6 +1053,7 @@ class Felamimail_Controller_Account extends Tinebase_Controller_Record_Grants
             'sieve_custom',
             'sieve_vacation',
             'sieve_rules',
+            'sieve_spam_move',
             'sent_folder',
             'trash_folder',
             'drafts_folder',
@@ -1317,6 +1320,10 @@ class Felamimail_Controller_Account extends Tinebase_Controller_Record_Grants
                 $currentRecord->sieve_notification_move_folder
             ) {
                 Felamimail_Controller_Sieve::getInstance()->updateAutoMoveNotificationScript($updatedRecord);
+            }
+
+            if ($updatedRecord->sieve_spam_move !== $currentRecord->sieve_spam_move) {
+                Felamimail_Controller_Sieve::getInstance()->updateAutoMoveSpamScript($updatedRecord);
             }
 
             if (is_array($record->sieve_vacation) && is_array($record->sieve_rules)) {

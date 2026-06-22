@@ -1674,7 +1674,7 @@ class Tinebase_ModelConfiguration extends Tinebase_ModelConfiguration_Const
                 }
                 $defaultValue = Tinebase_Config::getAppConfig($fieldDef[self::CONFIG][self::DEFAULT_FROM_CONFIG][self::APP_NAME])
                     ->{$fieldDef[self::CONFIG][self::DEFAULT_FROM_CONFIG][self::CONFIG]};
-                $fieldDef[Zend_Filter_Input::DEFAULT_VALUE] = $this->_validators[$fieldKey][Zend_Filter_Input::DEFAULT_VALUE] = $defaultValue;
+                $this->_validators[$fieldKey][Zend_Filter_Input::DEFAULT_VALUE] = $defaultValue;
                 $fieldDef[self::INPUT_FILTERS][Tinebase_Record_Filter_CallableEmpty::class] = $defaultValue;
                 foreach ($this->_filters[$fieldKey] ?? [] as $filter) {
                     if ($filter instanceof Tinebase_Record_Filter_CallableEmpty) {
@@ -1886,9 +1886,13 @@ class Tinebase_ModelConfiguration extends Tinebase_ModelConfiguration_Const
         }
 
         $relatedModels = array();
+        $forceAdvancedSearch = false;
         foreach ($this->_filterModel as $name => $filter) {
             if ($filter['filter'] === 'Tinebase_Model_Filter_ExplicitRelatedRecord') {
                 $relatedModels[] = $filter['options']['related_model'];
+                if (!empty($filter['forceAdvancedSearch'])) {
+                    $forceAdvancedSearch = true;
+                }
             }
             if (isset($filter[self::QUERY_FILTER]) && $filter[self::QUERY_FILTER]) {
                 $queryFilters[] = $name;
@@ -1915,6 +1919,9 @@ class Tinebase_ModelConfiguration extends Tinebase_ModelConfiguration_Const
 
             if (count($relatedModels) > 0) {
                 $queryFilterData['options']['relatedModels'] = array_unique($relatedModels);
+            }
+            if ($forceAdvancedSearch) {
+                $queryFilterData['options']['forceAdvancedSearch'] = true;
             }
 
             $this->_filterModel['query'] = $queryFilterData;

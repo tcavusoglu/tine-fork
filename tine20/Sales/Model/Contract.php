@@ -115,6 +115,18 @@ class Sales_Model_Contract extends Tinebase_Record_Abstract
         ],
         
         'filterModel' => array(
+            'customer' => array(
+                'filter' => 'Tinebase_Model_Filter_ExplicitRelatedRecord',
+                'label' => 'Customer', // _('Customer')
+                'options' => array(
+                    'controller' => 'Sales_Controller_Customer',
+                    'filtergroup' => 'Sales_Model_CustomerFilter',
+                    'own_filtergroup' => 'Sales_Model_ContractFilter',
+                    'own_controller' => 'Sales_Controller_Contract',
+                    'related_model' => 'Sales_Model_Customer',
+                ),
+                'forceAdvancedSearch' => true,
+            ),
             'contact_internal' => array(
                 'filter' => 'Tinebase_Model_Filter_ExplicitRelatedRecord',
                 'label' => 'Contact Person (internal)', // _('Contact Person (internal)')
@@ -373,7 +385,7 @@ class Sales_Model_Contract extends Tinebase_Record_Abstract
 
     public static function touchOnRelated(Tinebase_Model_Relation $relation): bool
     {
-        if (Sales_Model_Invoice::class === $relation->own_model) {
+        if (Sales_Model_Document_Invoice::class === $relation->own_model) {
             return false;
         }
         return true;

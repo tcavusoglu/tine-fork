@@ -33,6 +33,7 @@ class Sales_Model_Document_Invoice extends Sales_Model_Document_Abstract
     public const FLD_LAST_DATEV_SEND_DATE = 'last_datev_send_date';
 
     public const FLD_PAYMENT_REMINDERS = 'payment_reminders';
+    public const FLD_AUTO_INVOICE_BILLING_DATE = 'auto_invoice_billing_date';
 
     /**
      * invoice status
@@ -53,7 +54,7 @@ class Sales_Model_Document_Invoice extends Sales_Model_Document_Abstract
         $_definition[self::RECORD_NAME] = 'Invoice'; // gettext('GENDER_Invoice')
         $_definition[self::RECORDS_NAME] = 'Invoices'; // ngettext('Invoice', 'Invoices', n)
 
-        $_definition[self::VERSION] = 5;
+        $_definition[self::VERSION] = 6;
         $_definition[self::MODEL_NAME] = self::MODEL_NAME_PART;
         $_definition[self::TABLE][self::NAME] = self::TABLE_NAME;
 
@@ -73,6 +74,9 @@ class Sales_Model_Document_Invoice extends Sales_Model_Document_Abstract
                 self::NAME => Sales_Config::DOCUMENT_INVOICE_STATUS,
                 self::LENGTH => 255,
                 self::NULLABLE => true,
+                self::CONFIG                        => [
+                    self::NO_AUTO_TRANSITION            => true,
+                ],
             ]
         ]);
 
@@ -87,6 +91,7 @@ class Sales_Model_Document_Invoice extends Sales_Model_Document_Abstract
                 self::QUERY_FILTER              => true,
                 self::SHY                       => true,
                 self::CONFIG                    => [
+                    self::NO_AUTO_TRANSITION        => true,
                     Tinebase_Numberable::STEPSIZE          => 1,
                     Tinebase_Numberable_String::PREFIX     => $translate->_('PI-'),
                     Tinebase_Numberable_String::ZEROFILL   => 7,
@@ -108,6 +113,7 @@ class Sales_Model_Document_Invoice extends Sales_Model_Document_Abstract
             self::LABEL             => 'Payment Reminders', // _('Payment Reminders')
             self::TYPE              => self::TYPE_RECORDS,
             self::CONFIG            => [
+                self::NO_AUTO_TRANSITION        => true,
                 self::APP_NAME          => Sales_Config::APP_NAME,
                 self::MODEL_NAME        => Sales_Model_Document_PaymentReminder::MODEL_NAME_PART,
                 self::DEPENDENT_RECORDS => true,
@@ -127,9 +133,17 @@ class Sales_Model_Document_Invoice extends Sales_Model_Document_Abstract
         $_definition[self::FIELDS][self::FLD_LAST_DATEV_SEND_DATE] = [
             self::LABEL                 => 'Last Datev send date', // _('Last Datev send date')
             self::TYPE                  => self::TYPE_DATETIME,
-            self::VALIDATORS            => array(Zend_Filter_Input::ALLOW_EMPTY => true),
             self::NULLABLE              => true,
             self::SHY                   => true,
+        ];
+
+        $_definition[self::FIELDS][self::FLD_AUTO_INVOICE_BILLING_DATE] = [
+            self::TYPE                  => self::TYPE_DATE,
+            self::NULLABLE              => true,
+            self::SHY                   => true,
+            self::CONFIG                => [
+                self::NO_AUTO_TRANSITION    => true,
+            ],
         ];
     }
 
@@ -212,6 +226,11 @@ class Sales_Model_Document_Invoice extends Sales_Model_Document_Abstract
         }
         if (!$this->{self::FLD_SALES_TAX_BY_RATE} instanceof Tinebase_Record_RecordSet) {
             throw new Tinebase_Exception_UnexpectedValue(self::FLD_SALES_TAX_BY_RATE . ' not resolved');
+        }
+        if (null === $debitor->{Sales_Model_Debitor::FLD_EAS_ID}) {
+            $orgDebitor = Sales_Controller_Debitor::getInstance()->get($debitor->getIdFromProperty(Sales_Model_Debitor::FLD_ORIGINAL_ID));
+            $debitor->{Sales_Model_Debitor::FLD_EAS_ID} = $orgDebitor->{Sales_Model_Debitor::FLD_EAS_ID};
+            $debitor->{Sales_Model_Debitor::FLD_ELECTRONIC_ADDRESS} = $orgDebitor->{Sales_Model_Debitor::FLD_ELECTRONIC_ADDRESS};
         }
         $pm = $pm->getFirstRecord();
         /** @var Sales_Model_PaymentMeans $pm */

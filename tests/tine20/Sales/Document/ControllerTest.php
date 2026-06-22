@@ -170,6 +170,9 @@ class Sales_Document_ControllerTest extends Sales_Document_Abstract
 
         $order = Sales_Controller_Document_Order::getInstance()->create(new Sales_Model_Document_Order([
             Sales_Model_Document_Order::FLD_CUSTOMER_ID => $customer,
+            Sales_Model_Document_Order::FLD_CONTRACT_ID => Sales_Controller_Contract::getInstance()->create(new Sales_Model_Contract([
+                'title' => 'unittest',
+            ], true)),
             Sales_Model_Document_Order::FLD_ORDER_STATUS => Sales_Model_Document_Order::STATUS_ACCEPTED,
             Sales_Model_Document_Order::FLD_RECIPIENT_ID => $customer->{Sales_Model_Customer::FLD_DEBITORS}->getFirstRecord()->{Sales_Model_Debitor::FLD_BILLING}->getFirstRecord(),
             Sales_Model_Document_Order::FLD_INVOICE_RECIPIENT_ID => $customer->{Sales_Model_Customer::FLD_DEBITORS}->getFirstRecord()->{Sales_Model_Debitor::FLD_BILLING}->getFirstRecord(),
@@ -185,6 +188,8 @@ class Sales_Document_ControllerTest extends Sales_Document_Abstract
         ]));
         $this->assertSame(Sales_Config::DOCUMENT_FOLLOWUP_STATUS_NONE, $order->{Sales_Model_Document_Order::FLD_FOLLOWUP_INVOICE_BOOKED_STATUS});
         $this->assertSame(Sales_Config::DOCUMENT_FOLLOWUP_STATUS_NONE, $order->{Sales_Model_Document_Order::FLD_FOLLOWUP_INVOICE_CREATED_STATUS});
+        //$this->assertInstanceOf(Sales_Model_Contract::class, $order->{Sales_Model_Document_Order::FLD_CONTRACT_ID});
+        $this->assertNotEmpty($order->{Sales_Model_Document_Order::FLD_CONTRACT_ID});
 
         $invoice = Sales_Controller_Document_Abstract::executeTransition(new Sales_Model_Document_Transition([
             Sales_Model_Document_Transition::FLD_TARGET_DOCUMENT_TYPE => Sales_Model_Document_Invoice::class,
@@ -197,6 +202,7 @@ class Sales_Document_ControllerTest extends Sales_Document_Abstract
                 ]),
             ]
         ]));
+        $this->assertNotEmpty($invoice->{Sales_Model_Document_Abstract::FLD_CONTRACT_ID});
 
         $order = Sales_Controller_Document_Order::getInstance()->get($order->getId());
         $this->assertSame(Sales_Config::DOCUMENT_FOLLOWUP_STATUS_NONE, $order->{Sales_Model_Document_Order::FLD_FOLLOWUP_INVOICE_BOOKED_STATUS});
@@ -223,6 +229,7 @@ class Sales_Document_ControllerTest extends Sales_Document_Abstract
 
         $invoice->{Sales_Model_Document_Invoice::FLD_INVOICE_STATUS} = Sales_Model_Document_Invoice::STATUS_BOOKED;
         $invoice = Sales_Controller_Document_Invoice::getInstance()->update($invoice);
+        $this->assertNotEmpty($invoice->{Sales_Model_Document_Abstract::FLD_CONTRACT_ID});
 
         $order = Sales_Controller_Document_Order::getInstance()->get($order->getId());
         $this->assertSame(Sales_Config::DOCUMENT_FOLLOWUP_STATUS_COMPLETED, $order->{Sales_Model_Document_Order::FLD_FOLLOWUP_INVOICE_BOOKED_STATUS});
@@ -241,10 +248,11 @@ class Sales_Document_ControllerTest extends Sales_Document_Abstract
                 ]),
             ]
         ]));
+        $this->assertNotEmpty($storno->{Sales_Model_Document_Abstract::FLD_CONTRACT_ID});
 
         Tinebase_Record_Expander_DataRequest::clearCache();
         $invoice = Sales_Controller_Document_Invoice::getInstance()->get($invoice->getId());
-        $this->assertSame(Sales_Config::DOCUMENT_REVERSAL_STATUS_REVERSED, $invoice->{Sales_Model_Document_Abstract::FLD_REVERSAL_STATUS});
+        $this->assertSame(Sales_Config::DOCUMENT_REVERSED_STATUS_REVERSED, $invoice->{Sales_Model_Document_Abstract::FLD_REVERSED_STATUS});
 
         $order = Sales_Controller_Document_Order::getInstance()->get($order->getId());
         $this->assertSame(Sales_Config::DOCUMENT_FOLLOWUP_STATUS_NONE, $order->{Sales_Model_Document_Order::FLD_FOLLOWUP_INVOICE_BOOKED_STATUS});
@@ -1498,7 +1506,7 @@ class Sales_Document_ControllerTest extends Sales_Document_Abstract
         $result = Sales_Controller_Customer::getInstance()->search($filter = Tinebase_Model_Filter_FilterGroup::getFilterForModel(
             Sales_Model_Customer::class, $filterArray = [
             ['field' => 'document_order', 'operator' => 'definedBy', 'value' => [
-                ['field' => Sales_Model_Document_Order::FLD_ORDER_STATUS, 'operator' => 'equals', 'value' => Sales_Model_Document_Order::STATUS_DONE],
+                ['field' => Sales_Model_Document_Order::FLD_ORDER_STATUS, 'operator' => 'equals', 'value' => Sales_Model_Document_Order::STATUS_COMPLETED],
             ]],
         ]));
         $this->assertSame(0, $result->count());
@@ -1786,6 +1794,41 @@ class Sales_Document_ControllerTest extends Sales_Document_Abstract
         $this->assertStringStartsWith($inTranslated, $updatedInvoice->{Sales_Model_Document_Invoice::FLD_DOCUMENT_NUMBER});
     }
 
+    public function testCreditNumbers(): void
+    {
+        $customer = $this->_createCustomer();
+
+        $credit = Sales_Controller_Document_Credit::getInstance()->create(new Sales_Model_Document_Credit([
+            Sales_Model_Document_Abstract::FLD_CUSTOMER_ID => $customer,
+            Sales_Model_Document_Abstract::FLD_RECIPIENT_ID => $customer->postal,
+        ]));
+
+        $translate = Tinebase_Translation::getDefaultTranslation(Sales_Config::APP_NAME);
+
+        $pcTranslated = $translate->_('PC-');
+        $crTranslated = $translate->_('CR-');
+
+        $this->assertStringStartsWith($pcTranslated, $credit->{Sales_Model_Document_Credit::FLD_DOCUMENT_PROFORMA_NUMBER});
+        $this->assertSame($credit->{Sales_Model_Document_Credit::FLD_DOCUMENT_PROFORMA_NUMBER}, $credit->{Sales_Model_Document_Credit::FLD_DOCUMENT_NUMBER});
+        $this->assertSame(Sales_Model_Document_Credit::STATUS_DRAFT, $credit->{Sales_Model_Document_Credit::FLD_CREDIT_STATUS});
+
+        $credit->{Sales_Model_Document_Credit::FLD_DOCUMENT_DATE} = Tinebase_DateTime::today()->subDay(1);
+        $updatedCredit = Sales_Controller_Document_Credit::getInstance()->update($credit);
+
+        $this->assertSame($credit->{Sales_Model_Document_Credit::FLD_DOCUMENT_PROFORMA_NUMBER},
+            $updatedCredit->{Sales_Model_Document_Credit::FLD_DOCUMENT_PROFORMA_NUMBER});
+        $this->assertSame($credit->{Sales_Model_Document_Credit::FLD_DOCUMENT_PROFORMA_NUMBER}, $credit->{Sales_Model_Document_Credit::FLD_DOCUMENT_NUMBER});
+
+        $updatedCredit->{Sales_Model_Document_Credit::FLD_CREDIT_STATUS} = Sales_Model_Document_Credit::STATUS_BOOKED;
+        $updatedCredit = Sales_Controller_Document_Credit::getInstance()->update($updatedCredit);
+
+        $this->assertSame(Sales_Model_Document_Credit::STATUS_BOOKED, $updatedCredit->{Sales_Model_Document_Credit::FLD_CREDIT_STATUS});
+        $this->assertSame($credit->{Sales_Model_Document_Credit::FLD_DOCUMENT_PROFORMA_NUMBER},
+            $updatedCredit->{Sales_Model_Document_Credit::FLD_DOCUMENT_PROFORMA_NUMBER});
+        $this->assertNotEmpty($updatedCredit->{Sales_Model_Document_Credit::FLD_DOCUMENT_NUMBER});
+        $this->assertStringStartsWith($crTranslated, $updatedCredit->{Sales_Model_Document_Credit::FLD_DOCUMENT_NUMBER});
+    }
+
     public function testDeliveryNumbers()
     {
         $customer = $this->_createCustomer();
@@ -1822,5 +1865,53 @@ class Sales_Document_ControllerTest extends Sales_Document_Abstract
             $updatedDelivery->{Sales_Model_Document_Delivery::FLD_DOCUMENT_PROFORMA_NUMBER});
         $this->assertNotEmpty($updatedDelivery->{Sales_Model_Document_Delivery::FLD_DOCUMENT_NUMBER});
         $this->assertStringStartsWith($dnTranslated, $updatedDelivery->{Sales_Model_Document_Delivery::FLD_DOCUMENT_NUMBER});
+    }
+
+    public function testDocumentNumberAlteration()
+    {
+        $customer = $this->_createCustomer();
+        $product = $this->_createProduct();
+
+        $numberableCfg = Tinebase_Controller_NumberableConfig::getInstance()->search(
+            Tinebase_Model_Filter_FilterGroup::getFilterForModel(Tinebase_Model_NumberableConfig::class, [
+                [TMFA::FIELD => Tinebase_Model_NumberableConfig::FLD_MODEL, TMFA::OPERATOR => TMFA::OP_EQUALS, TMFA::VALUE => Sales_Model_Document_Invoice::class],
+                [TMFA::FIELD => Tinebase_Model_NumberableConfig::FLD_PROPERTY, TMFA::OPERATOR => TMFA::OP_EQUALS, TMFA::VALUE => Sales_Model_Document_Invoice::FLD_DOCUMENT_NUMBER],
+            ]))->getFirstRecord();
+        $numberableCfg->{Tinebase_Model_NumberableConfig::FLD_EDITABLE} = true;
+        Tinebase_Controller_NumberableConfig::getInstance()->update($numberableCfg);
+
+        $number = Tinebase_Translation::getDefaultTranslation(Sales_Config::APP_NAME)->_('IN-') . '00042';
+
+        $invoice = Sales_Controller_Document_Invoice::getInstance()->create(new Sales_Model_Document_Invoice([
+            Sales_Model_Document_Invoice::FLD_CUSTOMER_ID => $customer,
+            Sales_Model_Document_Invoice::FLD_INVOICE_STATUS => Sales_Model_Document_Invoice::STATUS_PROFORMA,
+            Sales_Model_Document_Invoice::FLD_DOCUMENT_NUMBER => $number,
+            Sales_Model_Document_Invoice::FLD_RECIPIENT_ID => $customer->postal,
+            Sales_Model_Document_Invoice::FLD_POSITIONS => new Tinebase_Record_RecordSet(Sales_Model_DocumentPosition_Invoice::class, [
+                new Sales_Model_DocumentPosition_Invoice([
+                    Sales_Model_DocumentPosition_Invoice::FLD_TITLE => 'pos 1',
+                    Sales_Model_DocumentPosition_Invoice::FLD_PRODUCT_ID => $product->getId(),
+                    Sales_Model_DocumentPosition_Invoice::FLD_QUANTITY => 1,
+                    Sales_Model_DocumentPosition_Invoice::FLD_UNIT_PRICE => 1,
+                    Sales_Model_DocumentPosition_Invoice::FLD_UNIT_PRICE_TYPE => Sales_Config::PRICE_TYPE_NET,
+                    Sales_Model_DocumentPosition_Invoice::FLD_SALES_TAX_RATE => 19,
+                ], true),
+            ])
+        ]));
+
+        $this->assertNotEmpty($invoice->{Sales_Model_Document_Invoice::FLD_DOCUMENT_PROFORMA_NUMBER});
+        $this->assertNotSame($number, $invoice->{Sales_Model_Document_Invoice::FLD_DOCUMENT_PROFORMA_NUMBER});
+        $this->assertSame($number, $invoice->{Sales_Model_Document_Invoice::FLD_DOCUMENT_NUMBER});
+
+        $invoice->{Sales_Model_Document_Invoice::FLD_DESCRIPTION} = 'unittest';
+        $invoice = Sales_Controller_Document_Invoice::getInstance()->update($invoice);
+        $this->assertNotSame($number, $invoice->{Sales_Model_Document_Invoice::FLD_DOCUMENT_PROFORMA_NUMBER});
+        $this->assertSame($number, $invoice->{Sales_Model_Document_Invoice::FLD_DOCUMENT_NUMBER});
+
+        $number = Tinebase_Translation::getDefaultTranslation(Sales_Config::APP_NAME)->_('IN-') . '00043';
+        $invoice->{Sales_Model_Document_Invoice::FLD_DOCUMENT_NUMBER} = $number;
+        $invoice = Sales_Controller_Document_Invoice::getInstance()->update($invoice);
+        $this->assertNotSame($number, $invoice->{Sales_Model_Document_Invoice::FLD_DOCUMENT_PROFORMA_NUMBER});
+        $this->assertSame($number, $invoice->{Sales_Model_Document_Invoice::FLD_DOCUMENT_NUMBER});
     }
 }

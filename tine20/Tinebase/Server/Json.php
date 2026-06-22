@@ -278,8 +278,10 @@ class Tinebase_Server_Json extends Tinebase_Server_Abstract implements Tinebase_
                     (self::userIsRegistered() ? Tinebase_Core::getUser()->getId() : Tinebase_Core::USER_ANONYMOUS) .
                     ($appPwd ? $appPwd->getId() : ''));
 
-                if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__
-                    . " Get server from cache");
+                if (Tinebase_Core::isLogLevel(Zend_Log::DEBUG)) {
+                    Tinebase_Core::getLogger()->debug(__METHOD__ . '::' . __LINE__
+                        . " Get server from cache");
+                }
 
                 $server = $cache->load($cacheId);
                 if ($server instanceof Zend_Json_Server) {
@@ -287,8 +289,10 @@ class Tinebase_Server_Json extends Tinebase_Server_Abstract implements Tinebase_
                 }
                 
             } catch (Zend_Cache_Exception $zce) {
-                if (Tinebase_Core::isLogLevel(Zend_Log::NOTICE)) Tinebase_Core::getLogger()->notice(__METHOD__ . '::' . __LINE__
-                    . " Failed to create cache. Exception: \n". $zce);
+                if (Tinebase_Core::isLogLevel(Zend_Log::NOTICE)) {
+                    Tinebase_Core::getLogger()->notice(__METHOD__ . '::' . __LINE__
+                        . " Failed to create cache. Exception: \n". $zce);
+                }
             }
         }
 
@@ -449,9 +453,7 @@ class Tinebase_Server_Json extends Tinebase_Server_Abstract implements Tinebase_
         $server->setTarget('index.php')
                ->setEnvelope(Zend_Json_Server_Smd::ENV_JSONRPC_2);
             
-        $smd = $server->getServiceMap();
-
-        return $smd;
+        return $server->getServiceMap();
     }
 
     /**
@@ -595,6 +597,16 @@ class Tinebase_Server_Json extends Tinebase_Server_Abstract implements Tinebase_
                 ),
                 'help'   => 'get one ' . $simpleModelName . ' identified by $id',
                 'plural' => false,
+            ),
+            'count' => array(
+                'params' => array(
+                    new Zend_Server_Method_Parameter(array(
+                        'type' => 'array',
+                        'name' => 'filter',
+                    )),
+                ),
+                'help'   => 'Count search results for ' . $simpleModelName . 's matching given arguments',
+                'plural' => true,
             ),
             'search' => array(
                 'params' => array(

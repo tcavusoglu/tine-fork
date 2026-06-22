@@ -109,6 +109,12 @@ msgstr "Standard Beschreibung für durch die Stempeluhr erzeugte Stundenzettel."
 msgid "attendance recorder generated"
 msgstr "Angelegt durch die Stempeluhr"
 
+msgid "Employees default AR PT device id"
+msgstr ""
+
+msgid "Employees default AR WT device id"
+msgstr ""
+
 msgid "Enabled Features"
 msgstr "Aktiviertes Features"
 
@@ -204,6 +210,9 @@ msgstr "%s abwesend"
 msgid "%s is away"
 msgstr "%s ist abwesend"
 
+msgid "wtr during affected time is already booked, no changes possible anymore"
+msgstr "Während der betroffenen Zeit ist der Arbeitszeitbericht bereits gebucht, Änderungen sind nicht mehr möglich"
+
 msgid "monthly wt reports can't be created"
 msgstr "Monatliche Arbeitszeitberichte können nicht manuell erzeugt werden"
 
@@ -212,6 +221,9 @@ msgstr "Sie müssen den Vormonat zuerst abrechnen"
 
 msgid "You need to revert the clearing of the previous month first."
 msgstr "Sie müssen die Abrechnung des Vormonats zuvor aufheben"
+
+msgid "Attendance Recorder Devices"
+msgstr ""
 
 msgid "Wage types"
 msgstr "Lohnarten"
@@ -364,6 +376,17 @@ msgstr "{0} Konten wurden im Jahr {1} erfolgreich erstellt!"
 msgid "Create new accounts"
 msgstr "Personalkonten anlegen"
 
+msgid "Absence Planning"
+msgstr "Abwesenheitsplanung"
+
+msgid "Revenue Analysis"
+msgstr "Umsatzanalyse"
+
+msgid "Human Resources"
+msgid_plural "Human Resources"
+msgstr[0] "Human Resources"
+msgstr[1] "Human Resources"
+
 msgid "Clock in"
 msgstr "Einstempeln"
 
@@ -386,6 +409,18 @@ msgstr "Info"
 
 msgid "Create Timesheet"
 msgstr "Stundenzettel erstellen"
+
+msgid "Start. If button is disabled, please configure a recorder device in Human Resources"
+msgstr "Start. Wenn der Knopf deaktiviert ist, konfigurieren Sie bitte zuerst die Zeitkonten im Modul Mitarbeiter in der Human Resources Applikation."
+
+msgid "Pause"
+msgstr "Pause"
+
+msgid "Stop"
+msgstr "Stopp"
+
+msgid "Edit Timesheet"
+msgstr "Stundenzettel bearbeiten"
 
 msgid "Saving data..."
 msgstr "Daten werden gespeichert..."
@@ -518,6 +553,9 @@ msgstr "Wende Kontaktdaten auf dieses Formular an"
 msgid "Salutation"
 msgstr "Anrede"
 
+msgid "Transponder"
+msgstr ""
+
 msgid "Personal Information"
 msgstr "Persönliche Informationen"
 
@@ -618,17 +656,6 @@ msgstr "Bestätigung"
 msgid "Legend"
 msgstr "Legende"
 
-msgid "Absence Planning"
-msgstr "Abwesenheitsplanung"
-
-msgid "Revenue Analysis"
-msgstr "Umsatzanalyse"
-
-msgid "Human Resources"
-msgid_plural "Human Resources"
-msgstr[0] "Human Resources"
-msgstr[1] "Human Resources"
-
 msgid "Template"
 msgstr "Vorlage"
 
@@ -645,7 +672,7 @@ msgid "Totals of the selected lines"
 msgstr "Summen der selektierten Zeilen"
 
 msgid "Reload"
-msgstr "Arbeitszeiterfassung"
+msgstr "Neu Laden"
 
 msgid "Reload all data"
 msgstr "Alle Daten neu laden"
@@ -721,6 +748,81 @@ msgstr "Schnellsuche"
 #, fuzzy
 msgid "Vacation corrections"
 msgstr "Urlaus Korrektur"
+
+msgid "GENDER_Attendance Recorder Device"
+msgstr ""
+
+msgid "Attendance Recorder Device"
+msgid_plural "Attendance Recorder Devices"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "Name"
+msgstr "Name"
+
+msgid "Show in User Interface"
+msgstr ""
+
+msgid "Allow Multiple Starts"
+msgstr ""
+
+msgid "Allow Pause"
+msgstr ""
+
+msgid "Stops"
+msgstr ""
+
+msgid "Starts"
+msgstr ""
+
+msgid "Pauses"
+msgstr ""
+
+msgid "Unpauses"
+msgstr ""
+
+msgid "Device Config"
+msgstr ""
+
+msgid "GENDER_Device Reference"
+msgstr ""
+
+msgid "Device Reference"
+msgid_plural "Device References"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "Parent"
+msgstr ""
+
+msgid "Device"
+msgstr ""
+
+msgid "GENDER_Timesheet Config"
+msgstr ""
+
+msgid "Timesheet Config"
+msgid_plural "Timesheet Configs"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "Timeaccount"
+msgstr "Zeitkonto"
+
+msgid "Allow Other Timeaccounts"
+msgstr ""
+
+msgid "Fill Gaps of Devices"
+msgstr ""
+
+msgid "Rounding by Clock"
+msgstr ""
+
+msgid "Rounding Pause Threshold"
+msgstr ""
+
+msgid "Rounding to Minute"
+msgstr ""
 
 msgid "Break Time"
 msgid_plural "Break Times"
@@ -1014,6 +1116,12 @@ msgstr "Verträge"
 msgid "Cost Centers"
 msgstr "Kostenstellen"
 
+msgid "Project Time Recorder Device"
+msgstr "Projektzeiterfassung mit"
+
+msgid "Working Time Recorder Device"
+msgstr "Arbeitszeiterfassung mit"
+
 msgid "Free Day"
 msgid_plural "Free Days"
 msgstr[0] "Freier Tag"
@@ -1047,9 +1155,6 @@ msgstr "male"
 
 msgid "Abbreviation"
 msgstr "Abkürzung"
-
-msgid "Name"
-msgstr "Name"
 
 msgid "System"
 msgstr "System"
@@ -1348,245 +1453,3 @@ msgstr "[I] Kind krank"
 msgid "[H] Short Business trip"
 msgstr "[Z] Kurze Dienstreise"
 
-msgid "Manage all Employee"
-msgstr "Alle Mitarbeiter managen"
-
-msgid "Manage all employee regardless configured division grants."
-msgstr "Allen Mitarbeiter unabhängig der Abteilungsrechte managen."
-
-msgid "Manage all working times regardless configured division grants."
-msgstr "Allen Arbeitszeiten unabhängig der Abteilungsrechte managen."
-
-msgid "Default Feast Calendar"
-msgstr "Standard-Feiertagskalender"
-
-msgid "Here you can define the day, when the vacation days taken from last year expires, the format is MM-DD."
-msgstr "Hier können Sie den Tag angeben, ab dem die Urlaubstage vom letzten Jahr verfallen sind. Bitte im Format MM-TT angeben."
-
-msgid "Stream Intervals available"
-msgstr "Verfügbare Stream-Intervalle"
-
-msgid "Stream Types available"
-msgstr "Verfügbare Stream-Typen"
-
-msgid "Contracts may not overlap"
-msgstr "Verträge dürfen sich nicht überschneiden"
-
-msgid "No valid blpipe for the working time scheme of this contract for this date"
-msgstr "Keine valide blpipe für das Arbeitszeitschema dieses Vertrags beim gegebenen Datum"
-
-msgid "previous months need to be cleared first"
-msgstr "Sie müssen den Vormonat zuerst abrechnen"
-
-msgid "following months need to be uncleared first"
-msgstr "Sie müssen die Abrechnung des Vormonats zuvor aufheben"
-
-msgid "Free time types"
-msgstr "Abwesenheitsarten"
-
-msgid "Excel current columns"
-msgstr "Excel angezeigte Spalten"
-
-msgid "Possible vaction days"
-msgstr "Mögliche Urlaubstage"
-
-msgid "Requested vaction days"
-msgstr "Angefragte Urlaubstage"
-
-msgid "Taken vaction days"
-msgstr "Verbrauchte Urlaubstage"
-
-msgid "Remaining vaction days"
-msgstr "Übrige Urlaubstage"
-
-msgid "Data saving is performed ..."
-msgstr "Daten werden gespeichert..."
-
-msgid "Data saving successful!"
-msgstr "Daten speichern erfolgreich!"
-
-msgid "Data loading is performed ..."
-msgstr "Daten werden geladen..."
-
-msgid "Working Hours per week"
-msgstr "Arbeitsstunden pro Woche"
-
-msgid "Vacation in same period"
-msgstr "Urlaub im selben Zeitraum"
-
-msgid "There are some vacation days matching the period of the contract you added. After saving this employee, changing the contract is not possible anymore."
-msgstr "Es gibt Urlaubstage die zu dem Zeitraum des hinzugefügten Vertrags passen. Nachdem der Mitarbeiter gespeichert wurde, kann der Vertrag nicht mehr geändert werden."
-
-msgid "Timesheets generated by the Attendance Recorders are created on the so called workingtime timeaccount of the division of the employee whereas projecttime timesheets are booked on the corrensponding project timeaccounts. Employee workingtime of a day is calculated by summing up all timesheets ot the day from this employee. If workingtime and projecttime is tracked in parallel this rule preferes workingtime on a daily bases."
-msgstr "Die von den Zeiterfassungsgeräten erzeugten Stundenzettel werden auf dem so genannten Arbeitszeitkonto der Abteilung des Mitarbeiters erstellt, während die Projektzeitstundenzettel auf den entsprechenden Projektzeitkonten verbucht werden. Die Arbeitszeit eines Mitarbeiters an einem Tag wird berechnet, indem alle Stundenzettel des Tages von diesem Mitarbeiter summiert werden. Bei paralleler Erfassung von Arbeits- und Projektzeit bevorzugt diese Regel die Arbeitszeit auf Tagesbasis."
-
-msgid "If workingtime is found for a given day only workingtime timesheets of this day will be included into workingtime calculation."
-msgstr "Wenn die Arbeitszeit für einen bestimmten Tag gefunden wird, werden nur die Arbeitszeiten dieses Tages in die Arbeitszeitberechnung einbezogen."
-
-#, python-brace-format
-msgid "There could not be found any {0}. Please try to change your filter-criteria or view-options."
-msgstr "Es konnte keine {0} gefunden werden. Bitte ändern Sie die Filterkriterien oder Ansichtseinstellungen."
-
-msgid "Could not book as vacation"
-msgstr "Konnte nicht als Urlaub gebucht werden"
-
-msgid "Apply contact data on form"
-msgstr "Wende Kontaktdaten auf dieses Formular an"
-
-msgid "Free Time"
-msgid_plural "Free Times"
-msgstr[0] "Abwesenheit"
-msgstr[1] "Abwesenheiten"
-
-msgid "You have to select at least one day to save this freetime entry."
-msgstr "Sie müssen wenigstens einen Tag auswählen um den Eintrag zu speichern."
-
-msgid "Present remaining vacation based on accepted scheduled vacations days including non expired vacations of previous periods"
-msgstr "Derzeitiger Resturlaub incl. Resturlaubstage aus Vorperioden basierend auf den akzeptiert geplanten Urlaubstagen"
-
-msgid "Loading free time planning data..."
-msgstr "Abwesenheitsdaten werden geladen..."
-
-msgid "Add Free Time"
-msgstr "Abwesenheit hinzufügen"
-
-msgid "Edit Free Time"
-msgstr "Abwesenheit bearbeiten"
-
-msgid "Delete Free Time"
-msgstr "Abwesenheit löschen"
-
-msgid "Free Time Planning"
-msgstr "Abwesenheitsplanung"
-
-msgid "Workingtime Tracking"
-msgstr "Arbeitszeiterfassung"
-
-msgid "Vacation Corrections"
-msgstr "Urlaubs Korrektur"
-
-msgid "Vacation Days Base"
-msgstr "Urlaubsanspruch: Basistage"
-
-msgid "Vacations weekly working days"
-msgstr "Urlaubsanspruch: Wöchentliche Arbeitstage"
-
-msgid "Feast Calendar"
-msgstr "Feiertagskalender"
-
-msgid "Break Time Net"
-msgstr "Pausenzeit (Netto)"
-
-msgid "Sum Accepted Working Time Correction"
-msgstr "Summe Akzeptierte Arbeitszeitkorrekturen"
-
-msgid "Working Time Balance Previous Day"
-msgstr "Arbeitszeit-Saldo Vortag"
-
-msgid "Remark"
-msgstr "Anmerkung"
-
-msgid "The grant to read own basic employee data, accounts, free times and working time reports."
-msgstr "Die Berechtigung eigene Mitarbeiterbasisdaten, Personalkonten, Abwesenheiten und Arbeitszeitberichte zu sehen."
-
-msgid "The grant to read basic employees data for all employees in this division."
-msgstr "Die Berechtigung Mitarbeiterbasisdaten für alle Mitarbeiter dieser Abteilung zu sehen."
-
-msgid "The grant to read full employees data, accounts, contracts and free times for all employees in this division."
-msgstr "Die Berechtigung vollständige Mitarbeiterdaten, Personalkonten, Verträge und Abwesenheiten für alle Mitarbeiter dieser Abteilung zu sehen."
-
-msgid "The grant to update full employees data, accounts, contracts and free times for all employees in this division."
-msgstr "Die Berechtigung vollständige Mitarbeiterdaten, Personalkonten, Verträge und Abwesenheiten für alle Mitarbeiter dieser Abteilung zu bearbeiten."
-
-msgid "The grant to read working time reports for all employees in this division."
-msgstr "Die Berechtigung Arbeitszeitberichte für alle Mitarbeiter dieser Abteilung zu sehen."
-
-msgid "The grant to update working time reports for all employees in this division."
-msgstr "Die Berechtigung Arbeitszeitberichte für alle Mitarbeiter dieser Abteilung zu bearbeiten."
-
-msgid "The grant to create own free times and working time reports change requests."
-msgstr "Die Berechtigung Änderungsanträge für eigene Arbeitszeitberichte und Abwesenheiten zu erstellen."
-
-msgid "The grant to read free times and working time reports change requests for all employees in this division."
-msgstr "Die Berechtigung Änderungsanträge auf Arbeitszeitberichte und Abwesenheiten für alle Mitarbeiter dieser Abteilung zu sehen."
-
-msgid "The grant to create free times and working time reports change requests for all employees in this division (implies read of basic employee, contract and account data)."
-msgstr "Die Berechtigung Änderungsanträge auf Arbeitszeitberichte und Abwesenheiten für alle Mitarbeiter dieser Abteilung zu erstellen (impliziert sehen von Mitarbeiterbasisdaten, Vertägen und Personalkonten)."
-
-msgid "The grant to update free times and working time reports change requests for all employees in this division (implies read of basic employee, contract and account data)."
-msgstr "Die Berechtigung Änderungsanträge auf Arbeitszeitberichte und Abwesenheiten für alle Mitarbeiter dieser Abteilung zu bearbeiten (impliziert sehen von Mitarbeiterbasisdaten, Vertägen und Personalkonten)."
-
-msgid "The grant to administrate this division (implies all other grants and the grant to set grants as well)."
-msgstr "Die Berechtigung diese Abteilung zu Administrieren (beinhaltet alle anderen Berechtigungen)."
-
-msgid "Free Time Calendar"
-msgstr "Freizeit Kalender"
-
-msgid "Postalcode"
-msgstr "Postleitzahl"
-
-msgid "E-Mail"
-msgstr "E-Mail"
-
-msgid "Project Time Recorder Device"
-msgstr "Projektzeiterfassung mit"
-
-msgid "Working Time Recorder Device"
-msgstr "Arbeitszeiterfassung mit"
-
-msgid "GENDER_Free Time"
-msgstr "female"
-
-msgid "Enable Freetime Timetracking"
-msgstr "Abwesenheits-Zeiterfassung aktivieren"
-
-msgid "Timeaccount"
-msgstr "Zeitkonto"
-
-msgid "Responsibles"
-msgstr "Verantwortliche"
-
-msgid "Timeaccounts"
-msgstr "Zeitkonten"
-
-msgid "Fill to daily target time"
-msgstr "Zum Tagesziel auffüllen"
-
-msgid "[7] Sick pay - Sickness from 7nth week on"
-msgstr "[7] Lohnfortzahlung ab 7. Krankheitswoche"
-
-msgid "Daily WTR Corretions Requested"
-msgstr "Korrekturantrag Täglicher-Arbeitszeitbericht"
-
-msgid "Monthly WTR Corretions Requested"
-msgstr "Korrekturantrag Monatlicher-Arbeitszeitbericht"
-
-msgid "All Free Times"
-msgstr "Alle Abwesenheiten"
-
-msgid "All free time records"
-msgstr "Alle Abwesenheits-Datensätze"
-
-msgid "All Free Times this year"
-msgstr "Alle Abwesenheiten dieses Jahr"
-
-msgid "All Free Times next year"
-msgstr "Alle Abwesenheiten nächstes Jahr"
-
-msgid "All Free Times requested"
-msgstr "Alle Beantragen Abwesenheiten"
-
-msgid "Feast day"
-msgstr "Feiertag"
-
-msgid "Feast day bonus"
-msgstr "Feiertagszulage"
-
-msgid "Sick pay - Sickness of Child"
-msgstr "Lohnfortzahlung - Kind Krank"
-
-msgid "Sick pay - Sickness from 7nth week on"
-msgstr "Lohnfortzahlung - Krank ab 7.  Woche"
-
-msgid "wtr during affected time is already booked, no changes possible anymore"
-msgstr "Während der betroffenen Zeit ist der Arbeitszeitbericht bereits gebucht, Änderungen sind nicht mehr möglich"

@@ -43,7 +43,7 @@ class Sales_Model_Document_Offer extends Sales_Model_Document_Abstract
         $_definition[self::RECORD_NAME] = 'Offer'; // gettext('GENDER_Offer')
         $_definition[self::RECORDS_NAME] = 'Offers'; // ngettext('Offer', 'Offers', n)
         
-        $_definition[self::VERSION] = 6;
+        $_definition[self::VERSION] = 7;
         $_definition[self::MODEL_NAME] = self::MODEL_NAME_PART;
         $_definition[self::TABLE][self::NAME] = self::TABLE_NAME;
 
@@ -71,6 +71,9 @@ class Sales_Model_Document_Offer extends Sales_Model_Document_Abstract
         // offer customers are optional
         unset($_definition[self::FIELDS][self::FLD_CUSTOMER_ID][self::VALIDATORS]);
 
+        unset($_definition[self::FIELDS][self::FLD_REVERSED_STATUS]);
+        unset($_definition[self::FIELDS][self::FLD_REVERSAL]);
+
         $_definition[self::FIELDS][self::FLD_POSITIONS][self::CONFIG][self::MODEL_NAME] =
             Sales_Model_DocumentPosition_Offer::MODEL_NAME_PART;
 
@@ -83,6 +86,9 @@ class Sales_Model_Document_Offer extends Sales_Model_Document_Abstract
                 self::NAME => Sales_Config::DOCUMENT_OFFER_STATUS,
                 self::LENGTH => 255,
                 self::NULLABLE => true,
+                self::CONFIG                        => [
+                    self::NO_AUTO_TRANSITION            => true,
+                ],
             ],
         ]);
 
@@ -91,6 +97,7 @@ class Sales_Model_Document_Offer extends Sales_Model_Document_Abstract
                 self::TYPE => self::TYPE_RECORD,
                 self::DISABLED => true,
                 self::CONFIG => [
+                    self::NO_AUTO_TRANSITION => true,
                     self::APP_NAME => Sales_Config::APP_NAME,
                     self::MODEL_NAME => Sales_Model_Document_Order::MODEL_NAME_PART,
                 ],
@@ -104,6 +111,9 @@ class Sales_Model_Document_Offer extends Sales_Model_Document_Abstract
                 self::UI_CONFIG                     => [
                     self::READ_ONLY                     => true,
                 ],
+                self::CONFIG                        => [
+                    self::NO_AUTO_TRANSITION            => true,
+                ],
             ],
             self::FLD_FOLLOWUP_ORDER_BOOKED_STATUS     => [
                 self::LABEL                         => 'Order Booked', // _('Order Booked')
@@ -112,6 +122,9 @@ class Sales_Model_Document_Offer extends Sales_Model_Document_Abstract
                 self::SHY                           => true,
                 self::UI_CONFIG                     => [
                     self::READ_ONLY                     => true,
+                ],
+                self::CONFIG                        => [
+                    self::NO_AUTO_TRANSITION            => true,
                 ],
             ],
         ]);

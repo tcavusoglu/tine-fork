@@ -47,6 +47,7 @@ class Sales_Frontend_Json extends Tinebase_Frontend_Json_Abstract
         Sales_Model_DivisionBankAccount::MODEL_NAME_PART,
         Sales_Model_DivisionEvalDimensionItem::MODEL_NAME_PART,
         Sales_Model_DivisionGrants::MODEL_NAME_PART,
+        Sales_Model_DocumentPosition_Credit::MODEL_NAME_PART,
         Sales_Model_DocumentPosition_Delivery::MODEL_NAME_PART,
         Sales_Model_DocumentPosition_Invoice::MODEL_NAME_PART,
         Sales_Model_DocumentPosition_Offer::MODEL_NAME_PART,
@@ -55,6 +56,7 @@ class Sales_Frontend_Json extends Tinebase_Frontend_Json_Abstract
         Sales_Model_Document_AttachedDocument::MODEL_NAME_PART,
         Sales_Model_Document_Boilerplate::MODEL_NAME_PART,
         Sales_Model_Document_Category::MODEL_NAME_PART,
+        Sales_Model_Document_Credit::MODEL_NAME_PART,
         Sales_Model_Document_Customer::MODEL_NAME_PART,
         Sales_Model_Document_Debitor::MODEL_NAME_PART,
         Sales_Model_Document_Delivery::MODEL_NAME_PART,
@@ -1278,19 +1280,5 @@ class Sales_Frontend_Json extends Tinebase_Frontend_Json_Abstract
     public function deleteOffers($ids)
     {
         return $this->_delete($ids, Sales_Controller_Offer::getInstance());
-    }
-
-    /**
-     * @param $id Invoice Id
-     * @return bool|Sales_Model_Invoice|Tinebase_Record_Interface
-     * @throws Tinebase_Exception_SystemGeneric
-     */
-    public function createTimesheetForInvoice($id)
-    {
-        $invoice = Sales_Controller_Invoice::getInstance()->createTimesheetFor($id);
-        if (! $invoice) {
-            throw new Tinebase_Exception_SystemGeneric('Timesheet could not be created');
-        }
-        return $this->getInvoice($invoice->getId());
     }
 }

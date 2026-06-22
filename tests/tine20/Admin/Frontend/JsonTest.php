@@ -1,10 +1,10 @@
 <?php
 /**
- * Tine 2.0 - http://www.tine20.org
+ * Tine 2.0 - https://www.tine20.org
  * 
  * @package     Admin
  * @license     http://www.gnu.org/licenses/agpl.html
- * @copyright   Copyright (c) 2008-2022 Metaways Infosystems GmbH (http://www.metaways.de)
+ * @copyright   Copyright (c) 2008-2026 Metaways Infosystems GmbH (https://www.metaways.de)
  * @author      Philipp Schüle <p.schuele@metaways.de>
  */
 
@@ -53,6 +53,23 @@ class Admin_Frontend_JsonTest extends Admin_Frontend_TestCase
         $this->assertGreaterThan(0,sizeof($result['members']));
         $this->assertEquals($data['description'], $result['description']);
         $this->assertEquals(Tinebase_Core::getUser()->accountId, $result['last_modified_by'], 'last_modified_by not matching');
+    }
+
+    /**
+     * try to update group name with only case change (e.g. "Testgruppe" -> "TestGruppe")
+     */
+    public function testUpdateGroupNameCaseOnly()
+    {
+        $this->_skipIfLDAPBackend('FIXME: LDAP may not support case-only name changes');
+
+        $data = $this->_createGroup();
+        $originalName = $data['name'];
+        $data['name'] = strtoupper(substr($originalName, 0, 1)) . substr($originalName, 1);
+        $data['members'] = [];
+
+        $result = $this->_json->saveGroup($data);
+
+        $this->assertEquals($data['name'], $result['name'], 'group name should be updated with new casing');
     }
 
     /**
@@ -1065,7 +1082,7 @@ class Admin_Frontend_JsonTest extends Admin_Frontend_TestCase
         $info = $this->_json->getServerInfo();
         self::assertArrayHasKey('html', $info);
         self::assertStringContainsString("phpinfo()", $info['html']);
-        self::assertStringContainsString("PHP Version =>", $info['html']);
+        self::assertStringContainsString("PHP Version =", $info['html']);
     }
 
     protected function createExampleAppRecord()
@@ -1442,5 +1459,25 @@ class Admin_Frontend_JsonTest extends Admin_Frontend_TestCase
         $filter = [['field' => "query", 'operator' => "contains", 'value' => 'YomiName']];
         $cfs = $this->_json->searchCustomfields($filter, []);
         self::assertEquals(1, $cfs['totalcount'], print_r($cfs, true));
+    }
+
+    /**
+     * @return void
+     * @throws Zend_Cache_Exception
+     *
+     * @group noupdate
+     */
+    public function testSearchSchedulerTasks()
+    {
+        Tinebase_Core::getCache()->clean();
+        $smd = Tinebase_Frontend_Http::getServiceMap();
+        self::assertArrayHasKey('services', $smd, 'SMD should have services');
+        self::assertArrayHasKey('Admin.searchSchedulerTasks', $smd['services'], 'Admin.searchSchedulerTasks should be in SMD');
+
+        $filter = [['field' => "query", 'operator' => "contains", 'value' => '']];
+        $result = $this->_json->searchSchedulerTasks($filter, []);
+        self::assertArrayHasKey('totalcount', $result, 'result should have totalcount');
+        self::assertArrayHasKey('results', $result, 'result should have results');
+        self::assertGreaterThan(0, $result['totalcount']);
     }
 }
