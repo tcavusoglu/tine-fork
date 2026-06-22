@@ -1,7 +1,7 @@
 const { expect: expectPuppeteer } = require('expect-puppeteer');
 const lib = require('../../lib/browser');
 
-require('dotenv').config();
+// TODO: Create a dummy time account in the test setup, use it for testing instead of relying on existing data, and delete it again.
 
 beforeAll(async () => {
     await lib.getBrowser('Zeiterfassung', 'Stundenzettel');
@@ -12,33 +12,54 @@ describe('Create and delete time sheet', () => {
     let popupWindow = null;
 
     test('Open dialog', async () => {
-        popupWindow = await lib.getEditDialog('Stundenzettel hinzufügen');
+        // TODO: is the global.page parameter really needed?
+        popupWindow = await lib.getEditDialog('Stundenzettel hinzufügen', global.page);
         await expectPuppeteer(popupWindow).toMatchElement('span.x-tab-strip-text', {text: 'Stundenzettel'});
     });
 
     test('Select time account', async() => {
-        await popupWindow.waitForSelector('[name="timeaccount_id"]');
-        await expectPuppeteer(popupWindow).toFill('[name="timeaccount_id"]', 'test');
+        // TODO: Move this into a new testInsertComboInputValue() helper function.
+
+        await popupWindow.waitForSelector('input[name="timeaccount_id"]');
+        await expectPuppeteer(popupWindow).toFill('input[name="timeaccount_id"]', 'test');
         await popupWindow.waitForSelector('.x-combo-list-item');
         await expectPuppeteer(popupWindow).toClick('.x-combo-list-item', {text: '1 - Test Timeaccount 1'});
+
+        // Check for the actual values in the input fields.
+        await popupWindow.waitForFunction(
+            (sel, expected) => {
+                const el = document.querySelector(sel);
+                return !!el && el.value.trim() === expected;
+            },
+            {timeout: lib.getEnvInt('TEST_TIMEOUT_FORM_VALUE_CHANGED')},
+            'input[name="timeaccount_id"]',
+            '1 - Test Timeaccount 1'
+        );
     });
 
     test('Enter start and end time', async() => {
+        // This fails sometimes, please adjust TEST_TIMEOUT_NETWORK_IDLE if it does.
+        //await popupWindow.waitForNetworkIdle({idleTime: lib.getEnvInt('TEST_TIMEOUT_NETWORK_IDLE')});
+
+        // Try a lot of different formats.
+        await lib.formInsertInputValue(popupWindow, 'input[name="duration"]', '03:30');
+        await lib.formInsertInputValue(popupWindow, 'input[name="duration"]', '3:30', '03:30');
+        await lib.formInsertInputValue(popupWindow, 'input[name="duration"]', '3.5', '03:30');
+        await lib.formInsertInputValue(popupWindow, 'input[name="duration"]', '3,5', '03:30');
+
+        await lib.formInsertInputValue(popupWindow, 'input[name="start_time"]', '08:30');
+        await lib.formInsertInputValue(popupWindow, 'input[name="start_time"]', '8:30', '08:30');
+        await lib.formInsertInputValue(popupWindow, 'input[name="start_time"]', '830', '08:30');
+
+        // Check if the current username is correct.
         const currentUser = await lib.getCurrentUser(popupWindow);
-
-        await popupWindow.waitForSelector('input[name="duration"]');
-        await expectPuppeteer(popupWindow).toFill('input[name="duration"]', '03:30');
-        await new Promise(r => setTimeout(r, 500));
-
-        await popupWindow.waitForSelector('input[name="start_time"]');
-        await expectPuppeteer(popupWindow).toFill('input[name="start_time"]', '08:00');
-        await new Promise(r => setTimeout(r, 500));
-
         expect(await popupWindow.evaluate(() => document.querySelector('input[name=account_id]').value)).toEqual(currentUser.accountDisplayName);
     });
 
     test('Enter description', async () => {
-        await popupWindow.waitForSelector('[name="description"]');
+        // TODO: Move this into a new testInsertTextValue() helper function.
+
+        await popupWindow.waitForSelector('[name="description"]', { visible: true });
         await expectPuppeteer(popupWindow).toClick('[name="description"]');
         await expectPuppeteer(popupWindow).toFill('[name=description]', testDescription);
     });
@@ -48,29 +69,55 @@ describe('Create and delete time sheet', () => {
     });
 
     test('Check values in the grid', async() => {
-        await page.waitForSelector('.t-app-timetracker .x-btn-image.x-tbar-loading');
-        await page.click('.t-app-timetracker .x-btn-image.x-tbar-loading');
-        await new Promise(r => setTimeout(r, 2000));
-        await expectPuppeteer(page).toMatchElement('div.x-grid3-col-timeaccount_id', {text: '1 - Test Timeaccount 1', visible: true});
-        await expectPuppeteer(page).toMatchElement('div.x-grid3-col-description', {text: testDescription, visible: true});
-        //await expectPuppeteer(page).toMatchElement('div.x-grid3-col-duration', {text: '3 Stunden, 30 Minuten'});
+        // Reload list and wait until the new entry appears in the grid.
+        await global.page.waitForSelector('.t-app-timetracker .x-btn-image.x-tbar-loading');
+        await expectPuppeteer(global.page).toClick('.t-app-timetracker .x-btn-image.x-tbar-loading');
+        await global.page.waitForFunction(
+            (text) => {
+                const nodes = Array.from(document.querySelectorAll('div.x-grid3-col-description'));
+                return nodes.some(n => n.textContent && n.textContent.includes(text));
+            },
+            {timeout: lib.getEnvInt('TEST_TIMEOUT_GRID_UPDATED')},
+            testDescription
+        );
+        await expectPuppeteer(global.page).toMatchElement('div.x-grid3-col-timeaccount_id', {text: '1 - Test Timeaccount 1', visible: true});
+        await expectPuppeteer(global.page).toMatchElement('div.x-grid3-col-description', {text: testDescription, visible: true});
+        await expectPuppeteer(global.page).toMatchElement('div.x-grid3-col-duration span.duration-renderer-medium', {text: '3 Stunden, 30 Minuten'});
+        await expectPuppeteer(global.page).toMatchElement('div.x-grid3-col-duration span.duration-renderer-small', {text: '3:30'});
+        await expectPuppeteer(global.page).toMatchElement('div.x-grid3-col-accounting_time span.duration-renderer-medium', {text: '3 Stunden, 30 Minuten'});
     });
 
     test('Delete and confirm', async() => {
-        await expectPuppeteer(page).toClick('div.x-grid3-col-description', {text: testDescription, visible: true});
-        await new Promise(r => setTimeout(r, 500));
-        await page.waitForSelector('.x-grid3-row-selected');
-        await page.keyboard.press('Delete');
-        await page.waitForSelector('.btn.btn-md.vue-button.yes-button', {visible: true});
-        await expectPuppeteer(page).toClick('.btn.btn-md.vue-button.yes-button', {text: 'Ja', visible: true});
-        await new Promise(r => setTimeout(r, 1000));
-        await page.waitForSelector('.t-app-timetracker .x-btn-image.x-tbar-loading');
-        await page.click('.t-app-timetracker .x-btn-image.x-tbar-loading');
-        await new Promise(r => setTimeout(r, 2000));
-        await expectPuppeteer(page).not.toMatchElement('div.x-grid3-col-description', {text: testDescription});
+        // Click on entry and press Delete key.
+        await expectPuppeteer(global.page).toClick('div.x-grid3-col-description', {text: testDescription, visible: true});
+        await global.page.waitForSelector('.x-grid3-row-selected', { visible: true, timeout: lib.getEnvInt('TEST_TIMEOUT_ACTIONABLE') });
+        await global.page.keyboard.press('Delete');
+
+        // Wait for modal confirmation dialog to appear, click on "Ja" and wait until the dialog disappears.
+        await global.page.waitForSelector('.btn.btn-md.vue-button.yes-button', {visible: true});
+        await expectPuppeteer(global.page).toClick('.btn.btn-md.vue-button.yes-button', {text: 'Ja', visible: true});
+        try {
+            await global.page.waitForSelector('.btn.btn-md.vue-button.yes-button', {hidden: true, timeout: lib.getEnvInt('TEST_TIMEOUT_POPUP_CLOSE')});
+        } catch (e) {
+            // If the selector is still visible after the timeout, we can assume that the confirmation dialog did not close properly.
+            throw new Error('Confirmation dialog did not close after confirming deletion');
+        }
+
+        // Refresh grid and check for absence of the entry.
+        await global.page.waitForSelector('.t-app-timetracker .x-btn-image.x-tbar-loading');
+        await global.page.click('.t-app-timetracker .x-btn-image.x-tbar-loading');
+        await global.page.waitForFunction(
+            (text) => {
+                const nodes = Array.from(document.querySelectorAll('div.x-grid3-col-description'));
+                return !nodes.some(n => n.textContent && n.textContent.includes(text));
+            },
+            { timeout: lib.getEnvInt('TEST_TIMEOUT_GRID_UPDATED') },
+            testDescription
+        );
+        await expectPuppeteer(global.page).not.toMatchElement('div.x-grid3-col-description', {text: testDescription});
     });
 });
 
 afterAll(async () => {
-    browser.close();
+    global.browser.close();
 });
